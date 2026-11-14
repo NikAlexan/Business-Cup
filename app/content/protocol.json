@@ -2,17 +2,17 @@
   {
     "kind": "control_text",
     "order": 1,
-    "text": "Today I will speak at a comfortable pace, making each word clear. A steady voice helps listeners follow the message from beginning to end.",
-    "prompt_version": "control-v1",
-    "instruction": "Read naturally and clearly.",
-    "target_duration_seconds": 35,
+    "text": "When the sunlight strikes raindrops in the air, they act as a prism and form a rainbow. The rainbow is a division of white light into many beautiful colors. These take the shape of a long round arch, with its path high above, and its two ends apparently beyond the horizon. There is, according to legend, a boiling pot of gold at one end. People look, but no one ever finds it. When a man looks for something beyond his reach, his friends say he is looking for the pot of gold at the end of the rainbow.",
+    "prompt_version": "control-v2",
+    "instruction": "Read naturally, the way you would read to a listener.",
+    "target_duration_seconds": 40,
     "max_duration_seconds": 60
   },
   {
     "kind": "novel_text",
     "order": 2,
-    "text": "Before the town awoke, a small delivery van crossed the bridge. The driver paused near the station, checked the address, and carried a parcel to the front door.",
-    "prompt_version": "novel-v1-03",
+    "text": "Before the town awoke, a small delivery van crossed the old stone bridge. The driver, a quiet man named Tom, had made this trip every morning for nine years. He paused near the station, checked the address on a damp envelope, and turned onto a narrow street lined with bakeries. The air smelled of fresh bread and rain. At the last house, a light was already on in the kitchen. He carried the parcel to the front door, knocked twice, and waited. An old woman opened the door, smiled, and thanked him as if he had brought her the whole world.",
+    "prompt_version": "novel-v2-03",
     "instruction": "Read this unfamiliar passage at your normal pace.",
     "target_duration_seconds": 40,
     "max_duration_seconds": 60
@@ -20,10 +20,10 @@
   {
     "kind": "intonation",
     "order": 3,
-    "text": "You finished the recording. You finished the recording? First, we listen; then, we practice; finally, we try again.",
-    "prompt_version": "intonation-v1",
-    "instruction": "Read the statement, question, and list with the indicated intonation.",
-    "target_duration_seconds": 25,
+    "text": "Did you hear the news? The bakery on the corner is finally open! They sell bread, pastries, and fresh coffee. I didn't say it was cheap — I said it was good. So, are you coming with me tomorrow, or not?",
+    "prompt_version": "intonation-v2",
+    "instruction": "Read it as if you were telling a friend.",
+    "target_duration_seconds": 20,
     "max_duration_seconds": 60
   }
 ]

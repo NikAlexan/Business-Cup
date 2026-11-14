@@ -1,0 +1,35 @@
+{
+  "version": "targets-v1",
+  "goals": {
+    "clear_speech": {
+      "focus": ["speaking_rate_wpm", "pause_ratio"],
+      "speaking_rate_wpm": {"min": 130, "max": 160},
+      "pause_ratio": {"min": 0.14, "max": 0.22},
+      "intonation": "reference"
+    },
+    "expressive_voice": {
+      "focus": ["intonation_range_semitones", "pause_ratio"],
+      "speaking_rate_wpm": {"min": 140, "max": 170},
+      "pause_ratio": {"min": 0.12, "max": 0.20},
+      "intonation": "wider"
+    },
+    "confident_delivery": {
+      "focus": ["speaking_rate_wpm", "pause_ratio"],
+      "speaking_rate_wpm": {"min": 150, "max": 190},
+      "pause_ratio": {"min": 0.09, "max": 0.14},
+      "intonation": "not_narrower"
+    }
+  },
+  "labels": {
+    "speaking_rate_wpm": {"below": "Calm, unhurried", "within": "On target", "above": "Brisk"},
+    "pause_ratio": {"below": "Few pauses", "within": "Well-placed pauses", "above": "Long gaps"},
+    "intonation_range_semitones": {
+      "below": "Narrower than before",
+      "within": "Holding your range",
+      "above": "Wider than before",
+      "steady": "Steady",
+      "varied": "Varied",
+      "wide": "Wide, lively"
+    }
+  }
+}

@@ -4,11 +4,20 @@ import signal
 import threading
 import time
 
+import numpy as np
 from sqlalchemy import and_, or_, select, update
 
-from app.audio import QUALITY_RULES, AudioRejected, decode, pitch, quality_check, timing_metrics
+from app.audio import (
+    QUALITY_RULES,
+    AudioRejected,
+    combine_timing,
+    decode,
+    pitch,
+    quality_check,
+    timing_metrics,
+)
 from app.config import Settings
-from app.content import EXERCISES, generate_plan
+from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
 from app.provider import OpenAIAudioProvider, ProviderFailure
 from app.service import Service
@@ -16,8 +25,18 @@ from app.service import Service
 log = logging.getLogger("voice.worker")
 
 
+MEASUREMENT_VERSION = "voice-metrics-v2"
+
+
 class WorkCancelled(Exception):
     pass
+
+
+def comparable_measurements(previous):
+    """Baseline measurements for interpretation, only if measured the same way."""
+    if previous and previous.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION:
+        return previous["measurements"]
+    return None
 
 
 def compare(before, after, measurements):
@@ -25,7 +44,7 @@ def compare(before, after, measurements):
     compatible = (
         conditions_match
         and before["protocol_version"] == after["protocol_version"]
-        and before.get("analysis_metadata", {}).get("measurement_version") == "voice-metrics-v1"
+        and before.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION
     )
     metrics = {}
     for name, value in measurements.items():
@@ -209,7 +228,9 @@ class Worker:
                     provider = self.provider_factory(self.settings)
                     try:
                         transcript = provider.transcribe(signal, item["task"]["text"])
-                        measurements = timing_metrics(signal, segments, transcript["word_count"])
+                        measurements = timing_metrics(
+                            signal, segments, transcript["word_count"], transcript["words"]
+                        )
                         with self.database.session.begin() as db:
                             s, _ = self.locked(db, claim)
                             s.put(
@@ -245,17 +266,18 @@ class Worker:
             )
             recordings.append(rec)
         self.stage(claim, "measurements")
-        _, segments = quality_check(signals[0], self.settings, "assessment")
-        pitch_metrics, _ = pitch(signals[0])
-        _, intonation = pitch(signals[2])
+        reading = np.concatenate(
+            signals[:2]
+        )  # tasks 1 + 2 are the reading passages; task 3 is for the AI only
+        pitch_metrics, intonation = pitch(reading)
         # Configuration errors are explicit, never a synthetic report.
         provider = self.provider_factory(self.settings)
         try:
             self.stage(claim, "transcription")
-            transcript = provider.transcribe(signals[0], a["tasks"][0]["text"])
+            transcripts = [provider.transcribe(signals[i], a["tasks"][i]["text"]) for i in (0, 1)]
             measurements = {
                 **pitch_metrics,
-                **timing_metrics(signals[0], segments, transcript["word_count"]),
+                **combine_timing(*((t["word_count"], t["words"]) for t in transcripts)),
                 "intonation_range_semitones": intonation,
             }
             previous = (
@@ -264,8 +286,10 @@ class Worker:
                 else None
             )
             comparison = compare(previous, a, measurements) if previous else None
+            interpretation = interpret(a["goal"], measurements, comparable_measurements(previous))
             self.stage(claim, "ai_analysis")
-            report = provider.report(signals, a, measurements, comparison)
+            report = provider.report(signals, a, measurements, comparison, interpretation)
+            transcript = {"verified": all(t["verified"] for t in transcripts)}
             if not transcript["verified"]:
                 report["limitations"].append(
                     "Pace could not be measured reliably because transcription did not align with the task."
@@ -289,16 +313,18 @@ class Worker:
                 recordings=recordings,
                 measurements=measurements,
                 measurement_scope={
-                    "pace_and_pauses_task_ids": [a["tasks"][0]["id"]],
-                    "pitch_task_ids": [a["tasks"][0]["id"]],
-                    "intonation_task_ids": [a["tasks"][2]["id"]],
+                    "pace_and_pauses_task_ids": [t["id"] for t in a["tasks"][:2]],
+                    "pitch_task_ids": [t["id"] for t in a["tasks"][:2]],
+                    "intonation_task_ids": [t["id"] for t in a["tasks"][:2]],
                 },
                 report=report,
+                interpretation=interpretation,
                 comparison=comparison,
                 plan_id=p["id"],
                 analysis_metadata={
                     "protocol_version": a["protocol_version"],
-                    "measurement_version": "voice-metrics-v1",
+                    "measurement_version": MEASUREMENT_VERSION,
+                    "targets_version": TARGETS_VERSION,
                     "quality_rules_version": "quality-v1",
                     "thresholds": QUALITY_RULES,
                     "transcription_status": "completed" if transcript["verified"] else "unverified",

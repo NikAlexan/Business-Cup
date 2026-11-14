@@ -10,3 +10,4 @@ audio_data/
 models/
 .coverage
 htmlcov/
+.superpowers/

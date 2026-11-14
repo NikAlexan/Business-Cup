@@ -121,6 +121,17 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
     a = complete_assessment(client, worker, speech_file)
     assert a["report"]["priorities"] and a["measurements"]["f0_median_hz"]["available"]
     assert a["comparison"] is None
+    assert set(a["interpretation"]) == {
+        "speaking_rate_wpm",
+        "pause_ratio",
+        "intonation_range_semitones",
+        "f0_median_hz",
+    }
+    assert a["analysis_metadata"]["targets_version"] == "targets-v1"
+    assert a["analysis_metadata"]["measurement_version"] == "voice-metrics-v2"
+    scope = [t["id"] for t in a["tasks"][:2]]
+    assert a["measurement_scope"]["pace_and_pauses_task_ids"] == scope
+    assert a["measurements"]["pause_count"]["value"] >= 8  # sentence ends in both reading passages
     plan = client.get("/api/v1/plan").json()
     assert len(plan["lessons"]) == 14
     assert all(
@@ -160,6 +171,8 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
         row.data = value
     repeated = complete_assessment(client, worker, speech_file, "reassessment")
     assert repeated["comparison"]["baseline_assessment_id"] == a["id"]
+    assert repeated["comparison"]["metrics"]["pause_ratio"]["available"]
+    assert repeated["interpretation"]["intonation_range_semitones"]["note"].startswith("your baseline")
     assert repeated["plan_id"] != plan["id"]
     assert client.get("/api/v1/plans/" + plan["id"]).json()["status"] == "archived"
     assert client.get("/api/v1/progress").json()["summary"]["completed_lessons_all_time"] == 1
@@ -501,6 +514,30 @@ def test_speech_follow_streams_transcript(client, speech_file):
             ws.send_bytes(b"abc")
             ws.receive_json()
     text = " ".join(w for w, _ in words)
-    assert "COMFORTABLE PACE" in text
+    assert "POT OF GOLD" in text
     starts = [t for _, t in words]
     assert starts == sorted(starts) and 0 < starts[-1] < len(samples) / rate
+
+
+def test_reading_tasks_are_long_enough():
+    from app.content import NOVEL_TEXTS, protocol
+
+    tasks = protocol()
+    assert 85 <= len(tasks[0]["text"].split()) <= 110
+    assert all(85 <= len(t.split()) <= 110 for t in NOVEL_TEXTS)
+    assert len({t["prompt_version"] for t in tasks}) == 3
+    assert (
+        tasks[2]["prompt_version"] == "intonation-v2" and "?" in tasks[2]["text"] and "!" in tasks[2]["text"]
+    )
+
+
+def test_interpretation_uses_assessment_goal(client, worker, speech_file):
+    guest(client)
+
+    def switch_goal():
+        assert client.patch("/api/v1/preferences", json={"goal": "confident_delivery"}).status_code == 200
+
+    a = complete_assessment(client, worker, speech_file, before_submit=switch_goal)
+    assert (
+        a["interpretation"]["speaking_rate_wpm"]["target"]["min"] == 130
+    )  # clear_speech, the goal at creation

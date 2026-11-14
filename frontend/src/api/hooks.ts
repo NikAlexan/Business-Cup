@@ -8,6 +8,8 @@ export const usePlan = () => useQuery({ queryKey: ['plan'], queryFn: () => reque
 export const useProgress = () => useQuery({ queryKey: ['progress'], queryFn: () => request<Progress>('/progress') })
 export const useAssessment = (id: string | undefined) =>
   useQuery({ queryKey: ['assessment', id], queryFn: () => request<Assessment>('/assessments/' + id), enabled: !!id })
+export const useExercises = () =>
+  useQuery({ queryKey: ['exercises'], queryFn: () => request<{ items: Exercise[] }>('/exercises'), staleTime: Infinity })
 export const useExercise = (id: string | undefined) =>
   useQuery({ queryKey: ['exercise', id], queryFn: () => request<Exercise>('/exercises/' + id), enabled: !!id, staleTime: Infinity })
 

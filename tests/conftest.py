@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -18,11 +19,7 @@ from app.worker import Worker
 @pytest.fixture(scope="session")
 def speech_file(tmp_path_factory):
     path = tmp_path_factory.mktemp("audio") / "speech.wav"
-    text = (
-        "Today I will speak at a comfortable pace, making each word clear. "
-        "A steady voice helps listeners follow the message from beginning to end. "
-        "Take a comfortable breath before beginning the next sentence."
-    )
+    text = json.loads((Path("app/content/protocol.json")).read_text())[0]["text"]
     subprocess.run(
         [
             "ffmpeg",
@@ -130,9 +127,13 @@ class FakeProvider:
         pass
 
     def transcribe(self, signal, text):
-        return {"text": text, "word_count": len(text.split()), "verified": True}
+        words, t = [], 0.5
+        for w in text.split():
+            words.append({"start": t, "end": t + 0.3})
+            t += 0.3 + (0.5 if w[-1] in ".?!" else 0.05)
+        return {"text": text, "word_count": len(words), "verified": True, "words": words}
 
-    def report(self, signals, assessment, measurements, comparison):
+    def report(self, signals, assessment, measurements, comparison, interpretation=None):
         return {
             "summary": "Practice clear phrase endings and intentional intonation.",
             "observations": [
@@ -152,7 +153,7 @@ def worker(settings, app):
     return Worker(settings, app.state.database, provider_factory=FakeProvider)
 
 
-def complete_assessment(client, worker, speech_file, kind="initial", demo=False):
+def complete_assessment(client, worker, speech_file, kind="initial", demo=False, before_submit=None):
     created = assessment(client, kind, demo)
     assert created.status_code == 201, created.text
     a = created.json()
@@ -164,6 +165,8 @@ def complete_assessment(client, worker, speech_file, kind="initial", demo=False)
         assert worker.run_once()
         job = client.get("/api/v1/jobs/" + r.json()["job_id"]).json()
         assert job["status"] == "completed", job
+    if before_submit:
+        before_submit()
     submitted = post(client, "/assessments/" + a["id"] + "/submit", {})
     assert submitted.status_code == 202, submitted.text
     assert worker.run_once()

@@ -18,7 +18,8 @@ REPORT = {
 
 def provider(handler):
     return OpenAIAudioProvider(
-        Settings(_env_file=None, openai_api_key="test-not-real"), httpx.MockTransport(handler)
+        Settings(_env_file=None, openai_api_key="test-not-real", app_secret="x" * 32),
+        httpx.MockTransport(handler),
     )
 
 
@@ -28,9 +29,19 @@ def test_audio_payload_and_transcription_alignment():
     def handler(request):
         calls.append(request)
         if request.url.path.endswith("transcriptions"):
-            return httpx.Response(200, json={"text": "Read each word clearly."})
+            assert b'name="timestamp_granularities[]"\r\n\r\nword' in request.content
+            assert b"verbose_json" in request.content
+            words = [
+                {"word": w, "start": i, "end": i + 0.5}
+                for i, w in enumerate("Read each word clearly".split())
+            ]
+            return httpx.Response(200, json={"text": "Read each word clearly.", "words": words})
         body = json.loads(request.content)
         assert body["model"] == "gpt-audio-1.5"
+        prompt = body["messages"][0]["content"][0]["text"]
+        assert '"interpretation": {"pause_ratio": {"target"' in prompt
+        assert "fairly clear" in prompt and "cite a measured number" in prompt
+        assert "as a percentage" in prompt
         assert body["modalities"] == ["text"]
         assert "response_format" not in body
         assert body["messages"][0]["content"][1]["input_audio"]["format"] == "wav"
@@ -39,8 +50,11 @@ def test_audio_payload_and_transcription_alignment():
     p = provider(handler)
     try:
         signal = np.zeros(16000, dtype=np.float32)
-        assert p.transcribe(signal, "Read each word clearly.")["word_count"] == 4
-        r = p.report([signal], {"goal": "clear_speech", "tasks": []}, {}, None)
+        t = p.transcribe(signal, "Read each word clearly.")
+        assert t["word_count"] == 4
+        assert t["words"][-1] == {"start": 3, "end": 3.5}
+        interpretation = {"pause_ratio": {"target": {"min": 0.14, "max": 0.22}, "band": "above"}}
+        r = p.report([signal], {"goal": "clear_speech", "tasks": []}, {}, None, interpretation)
         assert r["priorities"][0]["exercise_ids"] == ["E03"]
         assert len(calls) == 2
     finally:
@@ -53,7 +67,7 @@ def test_unverified_transcription_is_unavailable():
     )
     try:
         r = p.transcribe(np.zeros(16000), "A calm voice carries a clear message.")
-        assert r["word_count"] is None and not r["verified"]
+        assert r["word_count"] is None and not r["verified"] and r["words"] == []
     finally:
         p.close()
 

@@ -290,7 +290,7 @@ class Service:
             "created_at": iso(),
             "goal": self.guest.data["preferences"]["goal"],
             "timezone": self.guest.data["preferences"]["timezone"],
-            "protocol_version": "assessment-v1",
+            "protocol_version": "assessment-v2",
             "previous_assessment_id": previous["id"] if previous else None,
             "recording_conditions": payload["recording_conditions"],
             "tasks": protocol(previous, len(self.assessments())),

@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { useAssessment, useMe } from '../api/hooks'
+import { useAssessment, useExercises, useMe } from '../api/hooks'
 import { AppShell } from '../components/AppShell'
 import { METRICS, MetricTile } from '../components/MetricTile'
 import { ErrorBanner, Skeleton } from '../components/ui'
@@ -19,6 +19,8 @@ export default function Profile() {
   const { assessmentId } = useParams()
   const a = useAssessment(assessmentId)
   const me = useMe()
+  const ex = useExercises()
+  const title = (id: string) => ex.data?.items.find((x) => x.id === id)?.title
   const tz = me.data?.preferences.timezone ?? 'UTC'
   if (a.isPending) return <AppShell><Skeleton height={360} /></AppShell>
   if (a.error || !a.data) return <AppShell><ErrorBanner error={a.error} onRetry={() => a.refetch()} /></AppShell>
@@ -43,7 +45,7 @@ export default function Profile() {
         </div>
         <div className="rs-grid4">
           {METRICS.map((s) => (
-            <MetricTile key={s.key} spec={s} all={m} comparison={re ? d.comparison : null} />
+            <MetricTile key={s.key} spec={s} all={m} comparison={re ? d.comparison : null} interpretation={d.interpretation?.[s.key]} />
           ))}
         </div>
         {re && d.comparison && (
@@ -59,8 +61,7 @@ export default function Profile() {
               <p key={i} style={{ margin: 0 }}>{o.text}</p>
             ))}
             <p style={{ margin: 0, fontSize: 15, color: 'var(--muted)' }}>
-              These are observations from three short recordings, not a diagnosis.
-              {d.report?.limitations.length ? ' ' + d.report.limitations.join(' ') : ''}
+              These are observations from your recordings, not a diagnosis.
             </p>
           </div>
           <div className="rs-stack" style={{ gap: 10 }}>
@@ -72,7 +73,7 @@ export default function Profile() {
                 <span className="rs-opt__icon" style={{ background: 'var(--sun)' }}>{i + 1}</span>
                 <span>
                   <span className="rs-opt__title">{label(p.tag)}</span>
-                  <span className="rs-opt__meta">{p.reason} · {p.exercise_ids.join(' · ')}</span>
+                  <span className="rs-opt__meta">{[p.reason, ...p.exercise_ids.map(title).filter(Boolean)].join(' · ')}</span>
                 </span>
               </div>
             ))}

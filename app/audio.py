@@ -190,23 +190,37 @@ def pitch(signal):
     }, metric(span, "semitones", reason)
 
 
-def timing_metrics(signal, segments, word_count=None):
-    duration = len(signal) / SAMPLE_RATE
-    speech_seconds = sum(b - a for a, b in segments) / SAMPLE_RATE
-    pauses = [(segments[i][0] - segments[i - 1][1]) / SAMPLE_RATE for i in range(1, len(segments))]
-    pauses = [p for p in pauses if p >= 0.3]
-    pause_time = sum(pauses)
-    reason = "transcription_unavailable"
+def timing_metrics(signal, segments, word_count=None, words=None):
+    # Pauses are gaps between transcribed words: Silero VAD holds speech probability through
+    # sentence pauses, and edge silence must not dilute pace. segments stay for quality checks.
+    return combine_timing((word_count, words))
+
+
+def combine_timing(*parts):
+    """Timing pooled over (word_count, words) parts; unavailable if any part lacks words, never partial."""
+    total_words = span = pause_time = pause_count = 0
+    for word_count, words in parts:
+        if not word_count or not words or len(words) < 2:
+            return {k: metric(None, u, "transcription_unavailable") for k, u in TIMING_UNITS.items()}
+        pauses = [b["start"] - a["end"] for a, b in zip(words, words[1:])]
+        pauses = [g for g in pauses if g >= 0.3]
+        total_words += word_count
+        span += words[-1]["end"] - words[0]["start"]
+        pause_time += sum(pauses)
+        pause_count += len(pauses)
     return {
-        "pause_count": metric(len(pauses), "count"),
+        "pause_count": metric(pause_count, "count"),
         "pause_total_seconds": metric(round(pause_time, 3), "s"),
-        "pause_ratio": metric(round(pause_time / duration, 4), "ratio"),
-        "speaking_rate_wpm": metric(
-            round(word_count * 60 / duration, 2) if word_count else None, "words/min", reason
-        ),
-        "articulation_rate_wpm": metric(
-            round(word_count * 60 / speech_seconds, 2) if word_count and speech_seconds else None,
-            "words/min",
-            reason,
-        ),
+        "pause_ratio": metric(round(pause_time / span, 4), "ratio"),
+        "speaking_rate_wpm": metric(round(total_words * 60 / span, 2), "words/min"),
+        "articulation_rate_wpm": metric(round(total_words * 60 / (span - pause_time), 2), "words/min"),
     }
+
+
+TIMING_UNITS = {
+    "pause_count": "count",
+    "pause_total_seconds": "s",
+    "pause_ratio": "ratio",
+    "speaking_rate_wpm": "words/min",
+    "articulation_rate_wpm": "words/min",
+}
