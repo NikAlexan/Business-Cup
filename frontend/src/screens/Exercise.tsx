@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, post, useMutationWithKey } from '../api/api'
-import { useExercise, useJob, useMe, usePlan, useToday } from '../api/hooks'
+import { useJob, useMe, usePlan, useToday } from '../api/hooks'
 import type { Attempt, Lesson, PlanItem } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
@@ -39,7 +39,7 @@ function TimerCheck({ text, min, onFinish, busy }: { text: string; min: number; 
         <span style={{ font: '600 28px var(--font-display)' }}>
           {clock(elapsed)} <span style={{ color: 'var(--muted)', fontSize: 18 }}>/ {clock(min)}</span>
         </span>
-        <span className="rs-label">{elapsed >= min ? 'Time reached — finish when ready' : `Practice for at least ${clock(min)}`}</span>
+        <span className="rs-label">Suggested practice time · finish when you have completed the steps</span>
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button className="rs-btn rs-btn--secondary" type="button" onClick={() => setRunning((r) => !r)}>
@@ -74,9 +74,14 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
   const r = useRecorder({ maxSeconds: max, accepted })
   const [job, setJob] = useState<{ id: string; rec: string } | null>(null)
   const j = useJob(job?.id)
+  const [checkError, setCheckError] = useState<string | null>(null)
   const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) => uploadRecording({ purpose: 'exercise', plan_item_id: item.id }, v.blob, v.mime, key))
   useEffect(() => {
     const s = j.data?.status
+    if (s === 'failed') {
+      setCheckError(j.data?.error?.message ?? 'The recording check failed. Please send your take again.')
+      setJob(null)
+    }
     if (job && (s === 'completed' || s === 'needs_rerecord')) {
       onRecorded(job.rec)
       setJob(null)
@@ -89,7 +94,10 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
   useEffect(() => setPlayT(null), [r.state])
   const wpm = item.task.verification.target_wpm
   const pacer = wpm && recording ? (r.seconds * (wpm.min + wpm.max)) / 2 / 60 : undefined
-  const send = () => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJob({ id: d.job_id, rec: d.recording.id }) })
+  const send = () => {
+    setCheckError(null)
+    if (r.blob && r.mime) upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJob({ id: d.job_id, rec: d.recording.id }) })
+  }
   return (
     <>
       <div className="rs-card rs-stack" style={{ padding: 28, gap: 12 }}>
@@ -101,7 +109,7 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
         )}
       </div>
       {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
-      {j.data?.status === 'failed' && <ErrorBanner text={j.data.error?.message ?? 'The recording check failed.'} />}
+      {checkError && <ErrorBanner text={checkError} onRetry={send} />}
       <RecorderDock r={r} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" onPlayTime={setPlayT} />
     </>
   )
@@ -124,7 +132,6 @@ export default function Exercise() {
   const me = useMe()
   useRedirectOn401(today.error)
   const found = locate(planItemId, [today.data?.lesson, ...(plan.data?.lessons ?? [])])
-  const ex = useExercise(found?.item.exercise_id)
   const [result, setResult] = useState<Attempt | null>(null)
   const attempt = useMutationWithKey((b: Body, key) => post<Attempt>('/exercise-attempts', b, key))
 
@@ -166,12 +173,12 @@ export default function Exercise() {
           <div className="rs-stack" style={{ gap: 12 }}>
             <h1 className="rs-h rs-h1">{item.title}</h1>
             <div className="rs-meta">
-              <span className="rs-opt__icon" style={{ width: 34, height: 34, fontSize: 12, background: 'var(--primary)', color: 'var(--primary-ink)' }}>{item.exercise_id}</span>
+
               <span>{Math.max(1, Math.round(item.estimated_duration_seconds / 60))} min</span>
               <span>{item.difficulty ?? ''}</span>
               <span>+{item.notes_available} notes</span>
             </div>
-            <p style={{ margin: 0, color: 'var(--muted)' }}>{ex.data?.instruction ?? item.task.instruction}</p>
+            <p style={{ margin: 0, color: 'var(--muted)' }}>{item.task.instruction}</p>
             {item.reason && <p style={{ margin: 0, fontSize: 15 }}>{item.reason}</p>}
             {v.target_wpm && (
               <div>
@@ -189,7 +196,9 @@ export default function Exercise() {
             )}
             {passed ? (
               <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }} role="status">
-                <h2 className="rs-h" style={{ fontSize: 22 }}>{result ? 'Nice work!' : 'Already done'}</h2>
+                <h2 className="rs-h" style={{ fontSize: 22 }}>{result ? 'Practice complete' : 'Already done'}</h2>
+                {result && <p style={{ margin: 0 }}>{result.feedback.summary}</p>}
+                {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}

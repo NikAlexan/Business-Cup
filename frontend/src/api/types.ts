@@ -160,7 +160,7 @@ export type Attempt = {
   status: 'passed' | 'needs_retry'
   reward: Reward
   practice_seconds: number
-  feedback: { summary: string; issues: Issue[] }
+  feedback: { summary: string; issues: Issue[]; coaching?: Issue[] }
 }
 export type Completion = {
   lesson_id: string

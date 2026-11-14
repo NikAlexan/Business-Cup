@@ -533,10 +533,8 @@ class Service:
         }[kind]
         if fields != {required}:
             fail(422, "validation_error", "Fields do not match the assigned verification type.")
-        issues, metrics = [], None
-        if kind == "timer" and payload["elapsed_seconds"] < v["min_elapsed_seconds"]:
-            issues = [{"code": "timer_too_short", "message": "Continue practicing for the minimum duration."}]
-        elif kind == "self_confirmation" and payload["self_confirmed"] is not True:
+        issues, metrics, coaching = [], None, []
+        if kind == "self_confirmation" and payload["self_confirmed"] is not True:
             issues = [{"code": "not_confirmed", "message": "Confirm completion after practicing."}]
         elif kind == "recording":
             rec = self.get(payload["recording_id"], "recording")
@@ -552,14 +550,14 @@ class Service:
             if target and not issues:
                 rate = (metrics or {}).get("speaking_rate_wpm", {})
                 if not rate.get("available"):
-                    issues = [
+                    coaching = [
                         {
                             "code": "measurement_unavailable",
                             "message": "Read the assigned passage again so the pace can be measured.",
                         }
                     ]
                 elif not target["min"] <= rate["value"] <= target["max"]:
-                    issues = [
+                    coaching = [
                         {
                             "code": "pace_outside_target",
                             "message": "Try reading within the target pace range.",
@@ -577,7 +575,14 @@ class Service:
             "elapsed_seconds": payload.get("elapsed_seconds"),
             "recording_id": payload.get("recording_id"),
             "feedback": {
-                "summary": "Practice completed." if passed else "Please try this exercise again.",
+                "summary": (
+                    "Recording received. Audio quality checked; pronunciation and expression have not been scored."
+                    if passed and kind == "recording"
+                    else "Practice completed."
+                    if passed
+                    else "Please try this exercise again."
+                ),
+                "coaching": coaching,
                 "metrics": metrics,
                 "issues": issues,
             },

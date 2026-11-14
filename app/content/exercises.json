@@ -1,12 +1,12 @@
 {
-  "catalog_version": "catalog-v1",
+  "catalog_version": "catalog-v2",
   "items": [
     {
       "id": "E01",
-      "version": 1,
+      "version": 2,
       "title": "Articulation warm-up",
       "goal": "Move your lips, tongue, and jaw gently. Keep all movements comfortable.",
-      "instruction": "Move your lips, tongue, and jaw gently. Keep all movements comfortable.",
+      "instruction": "Complete each movement gently for five repetitions. Rest between rounds as needed; finish when the sequence is complete, without waiting for a timer.",
       "example": {
         "type": "text",
         "text": "Smile gently, round your lips, then relax your jaw.",
@@ -17,20 +17,20 @@
         "articulation"
       ],
       "verification": {
-        "type": "timer",
-        "min_elapsed_seconds": 45,
+        "type": "self_confirmation",
+        "min_elapsed_seconds": null,
         "required_metrics": []
       },
       "difficulty_variants": [
         {
           "id": "beginner",
           "label": "Beginner",
-          "text": "Smile gently, round your lips, then relax your jaw."
+          "text": "1. Smile gently, then round your lips: five times.\n2. Relax your jaw and open it a little, without stretching: five times.\n3. Say pa, ta, ka slowly and clearly: five rounds.\n4. Say one everyday sentence with a relaxed face. Stop if anything feels uncomfortable."
         },
         {
           "id": "intermediate",
           "label": "Intermediate",
-          "text": "Smile gently, round your lips, then relax your jaw. Repeat once with a deliberate change of emphasis."
+          "text": "1. Smile gently, then round your lips: five times.\n2. Relax your jaw and open it a little, without stretching: five times.\n3. Say pa, ta, ka slowly and clearly: five rounds.\n4. Say one everyday sentence with a relaxed face. Stop if anything feels uncomfortable."
         }
       ],
       "content_locale": "en-US"

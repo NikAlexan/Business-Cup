@@ -28,12 +28,20 @@ export async function getMic(timeoutMs = 10_000): Promise<MediaStream> {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
     throw new DOMException('insecure', 'SecurityError')
   let timer: number | undefined
+  let expired = false
   const timeout = new Promise<never>((_, reject) => {
-    timer = window.setTimeout(() => reject(new DOMException('timeout', 'TimeoutError')), timeoutMs)
+    timer = window.setTimeout(() => {
+      expired = true
+      reject(new DOMException('timeout', 'TimeoutError'))
+    }, timeoutMs)
   })
   try {
     return await Promise.race([
-      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }),
+      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }).then((stream) => {
+        // A permission prompt may resolve after timeout. Release that late microphone immediately.
+        if (expired) stream.getTracks().forEach((track) => track.stop())
+        return stream
+      }),
       timeout,
     ])
   } finally {

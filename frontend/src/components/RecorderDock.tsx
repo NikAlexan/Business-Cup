@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { LevelMeter, STATUS_TEXT } from './LevelMeter'
 import { MicBlocked } from './MicBlocked'
 import type { useRecorder } from '../lib/recorder'
@@ -31,6 +31,7 @@ export function RecorderDock({
   onPlayTime?: (seconds: number) => void // playback position for word highlighting
 }) {
   const raf = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
   const status = r.level.status
   if (r.error) return <MicBlocked kind={r.error} onRetry={r.start} />
   if (r.state === 'recorded' && r.url)
