@@ -453,3 +453,27 @@ def test_rewards_follow_completed_practice(client, worker, speech_file):
     assert client.delete("/api/v1/guest-data").status_code == 204
     guest(client)
     assert client.get("/api/v1/me").json()["progress"]["notes_total"] == 0
+
+
+def test_conflicts_carry_user_message(client, worker, speech_file):
+    guest(client)
+    complete_assessment(client, worker, speech_file)
+    lesson = client.get("/api/v1/today").json()["lesson"]
+    for item in lesson["items"]:
+        if item["task"]["verification"]["type"] == "timer":
+            payload = {"plan_item_id": item["id"], "elapsed_seconds": 60}
+        else:
+            r = upload(client, speech_file, {"purpose": "exercise", "plan_item_id": item["id"]})
+            worker.run_once()
+            payload = {"plan_item_id": item["id"], "recording_id": r.json()["recording"]["id"]}
+        assert post(client, "/exercise-attempts", payload).status_code == 201
+    client.put("/api/v1/progress/" + lesson["id"], json={"status": "completed"})
+    repeat = post(
+        client, "/exercise-attempts", {"plan_item_id": lesson["items"][0]["id"], "elapsed_seconds": 60}
+    )
+    nxt = client.get("/api/v1/plan").json()["lessons"][1]["items"][0]
+    locked = post(client, "/exercise-attempts", {"plan_item_id": nxt["id"], "elapsed_seconds": 60})
+    for r, code in ((repeat, "plan_item_already_completed"), (locked, "lesson_locked")):
+        assert r.status_code == 409
+        err = r.json()["error"]
+        assert err["code"] == code and err["message"] and isinstance(err["details"], dict)
