@@ -1,27 +1,27 @@
 export const Logo = () => (
   <span aria-hidden="true" className="rs-logo">
-    <i style={{ height: 8, background: '#ffc23d' }} />
-    <i style={{ height: 15, background: '#14b3a0' }} />
-    <i style={{ height: 10, background: '#ffc23d' }} />
+    <i style={{ height: 8, background: 'var(--sun)' }} />
+    <i style={{ height: 15, background: 'var(--primary)' }} />
+    <i style={{ height: 10, background: 'var(--sun)' }} />
   </span>
 )
 export const StreakIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-    <rect x="2" y="9" width="3" height="6" rx="1.5" fill="#e09b00" />
-    <rect x="7" y="5" width="3" height="14" rx="1.5" fill="#e09b00" />
-    <rect x="12" y="2" width="3" height="20" rx="1.5" fill="#e09b00" />
-    <rect x="17" y="7" width="3" height="10" rx="1.5" fill="#e09b00" />
+    <rect x="2" y="9" width="3" height="6" rx="1.5" fill="var(--sun-edge)" />
+    <rect x="7" y="5" width="3" height="14" rx="1.5" fill="var(--sun-edge)" />
+    <rect x="12" y="2" width="3" height="20" rx="1.5" fill="var(--sun-edge)" />
+    <rect x="17" y="7" width="3" height="10" rx="1.5" fill="var(--sun-edge)" />
   </svg>
 )
 export const NoteIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M9 18V5l11-2v13" fill="none" stroke="#14b3a0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="6.5" cy="18" r="3" fill="#14b3a0" />
-    <circle cx="17.5" cy="16" r="3" fill="#14b3a0" />
+    <path d="M9 18V5l11-2v13" fill="none" stroke="var(--primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="6.5" cy="18" r="3" fill="var(--primary)" />
+    <circle cx="17.5" cy="16" r="3" fill="var(--primary)" />
   </svg>
 )
 export const ClockIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f8fff" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--sky)" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
     <circle cx="12" cy="12" r="9" />
     <path d="M12 7v5l3 2" />
   </svg>

@@ -124,6 +124,7 @@ export type Assessment = {
   job_id: string | null
   plan_id: string | null
   demo_override_used: boolean
+  analysis_metadata?: { demo?: { prepared_data?: boolean } }
   completed_at: string | null
   report: {
     summary: string

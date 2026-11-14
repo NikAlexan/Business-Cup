@@ -254,6 +254,14 @@ def create_app(settings=None):
     def me(s: S):
         return s.me()
 
+    @app.post("/api/v1/demo/seed")
+    def demo_seed(s: S):
+        if not settings.demo_mode:
+            fail(403, "demo_mode_disabled", "Demo mode is not enabled.")
+        from app.demo import seed
+
+        return seed(s)
+
     @app.patch("/api/v1/preferences")
     def preferences(payload: Preferences, s: S):
         s.auth()

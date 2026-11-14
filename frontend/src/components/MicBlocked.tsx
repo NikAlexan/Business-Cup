@@ -25,7 +25,7 @@ export function MicBlocked({ kind, onRetry }: { kind: MicErrorKind; onRetry: () 
       </div>
       <div className="rs-cols" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
         <div className="rs-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '32px 20px', background: 'var(--danger-tint)' }}>
-          <span className="rs-badge" style={{ background: '#fff', color: 'var(--danger)' }}>
+          <span className="rs-badge" style={{ background: 'var(--ground)', color: 'var(--danger)' }}>
             {c.badge}
           </span>
         </div>

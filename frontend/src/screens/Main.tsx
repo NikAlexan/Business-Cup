@@ -106,7 +106,7 @@ export default function Main() {
               </p>
             </div>
           </div>
-          <div className="d-only" style={{ background: 'var(--stage)', borderRadius: 32, padding: 40, color: '#fff', minHeight: 560, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 20 }}>
+          <div className="d-only" style={{ background: 'var(--stage)', borderRadius: 32, padding: 40, color: 'var(--stage-ink)', minHeight: 560, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 20 }}>
             <h2 className="rs-h" style={{ fontSize: 26, maxWidth: '16ch' }}>
               A 14-session plan built from your own recording
             </h2>

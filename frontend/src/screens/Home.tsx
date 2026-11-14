@@ -39,7 +39,7 @@ function Week() {
         {days.map((d) => (
           <div key={d.date} className="rs-stack" style={{ gap: 4, alignItems: 'center' }}>
             <span className="rs-label">{new Date(d.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'narrow', timeZone: 'UTC' })}</span>
-            <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: d.completed_lessons ? 'var(--sun)' : '#ebebeb' }}>
+            <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: d.completed_lessons ? 'var(--sun)' : 'var(--line)' }}>
               {d.completed_lessons ? <Check /> : null}
             </span>
           </div>

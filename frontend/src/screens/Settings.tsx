@@ -12,7 +12,7 @@ const GOALS = [
   ['expressive_voice', 'More expressive voice'],
   ['confident_delivery', 'Confident delivery'],
 ]
-const select = { height: 48, borderRadius: 14, border: '2px solid var(--line)', padding: '0 14px', font: '400 16px var(--font-text)', background: '#fff', color: 'var(--ink)' }
+const select = { height: 48, borderRadius: 14, border: '2px solid var(--line)', padding: '0 14px', font: '400 16px var(--font-text)', background: 'var(--ground)', color: 'var(--ink)' }
 const ZONES: string[] = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? []
 
 export default function Settings() {
@@ -32,6 +32,10 @@ export default function Settings() {
       qc.clear()
       navigate('/', { replace: true })
     },
+  })
+  const seed = useMutation({
+    mutationFn: () => request('/demo/seed', { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries(),
   })
   const pref = me.data?.preferences
   const zones = pref && !ZONES.includes(pref.timezone) ? [pref.timezone, ...ZONES] : ZONES
@@ -74,6 +78,17 @@ export default function Settings() {
             )}
           </div>
         )}
+        {me.data?.demo_mode && (
+          <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
+            <h2 className="rs-h" style={{ fontSize: 20 }}>Demo data</h2>
+            <p style={{ margin: 0 }}>Replace this profile's data with two assessments and six completed lessons.</p>
+            <button className="rs-btn rs-btn--secondary" type="button" disabled={seed.isPending} onClick={() => seed.mutate()} style={{ alignSelf: 'flex-start' }}>
+              Fill with demo data
+            </button>
+            {seed.error && <ErrorBanner error={seed.error} />}
+            {seed.isSuccess && <span className="rs-label" role="status" style={{ color: 'var(--success)' }}>Filled</span>}
+          </div>
+        )}
         <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
           <h2 className="rs-h" style={{ fontSize: 20 }}>Your data</h2>
           <p style={{ margin: 0 }}>There's no account. Your profile, plan and recordings are tied to this browser. Clearing cookies or switching devices starts you fresh.</p>
@@ -82,12 +97,12 @@ export default function Settings() {
               Delete my data…
             </button>
           ) : (
-            <div className="rs-stack" style={{ gap: 12, border: '2px solid #ffc4bf', borderRadius: 18, padding: 16, background: '#fff' }}>
+            <div className="rs-stack" style={{ gap: 12, border: '2px solid var(--danger-tint)', borderRadius: 18, padding: 16, background: 'var(--ground)' }}>
               <span style={{ fontWeight: 500 }}>Delete your recordings, profile and plan?</span>
               <span style={{ fontSize: 15, color: 'var(--muted)' }}>This can't be undone. Your streak and notes go too.</span>
               {wipe.error && <ErrorBanner error={wipe.error} />}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button className="rs-btn" type="button" disabled={wipe.isPending} onClick={() => wipe.mutate()} style={{ background: 'var(--danger)', color: '#fff', boxShadow: '0 3px 0 #a3201d' }}>
+                <button className="rs-btn" type="button" disabled={wipe.isPending} onClick={() => wipe.mutate()} style={{ background: 'var(--danger)', color: 'var(--ground)', boxShadow: '0 3px 0 var(--danger-edge)' }}>
                   Delete my data
                 </button>
                 <button className="rs-btn rs-btn--secondary" type="button" onClick={() => setConfirm(false)}>

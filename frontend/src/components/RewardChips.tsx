@@ -1,9 +1,9 @@
 import { formatMinutes } from '../lib/format'
 import { ClockIcon, NoteIcon, StreakIcon } from './Icons'
 
-export function RewardChips({ streak, notes, seconds, style }: { streak?: number; notes: number; seconds?: number; style?: React.CSSProperties }) {
+export function RewardChips({ streak, notes, seconds, style, className }: { streak?: number; notes: number; seconds?: number; style?: React.CSSProperties; className?: string }) {
   return (
-    <div className="rs-chips" style={style}>
+    <div className={className ? 'rs-chips ' + className : 'rs-chips'} style={style}>
       {streak !== undefined && (
         <span className="rs-chip" title="Days in a row">
           <StreakIcon /> {streak}

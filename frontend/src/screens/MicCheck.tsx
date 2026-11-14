@@ -14,7 +14,7 @@ const ENVS = [
   ['some_noise', 'Some noise'],
   ['noisy', 'Noisy'],
 ] as const
-const select = { height: 48, borderRadius: 14, border: '2px solid var(--line)', padding: '0 14px', font: '400 16px var(--font-text)', background: '#fff', color: 'var(--ink)' }
+const select = { height: 48, borderRadius: 14, border: '2px solid var(--line)', padding: '0 14px', font: '400 16px var(--font-text)', background: 'var(--ground)', color: 'var(--ink)' }
 
 export default function MicCheck() {
   const navigate = useNavigate()
@@ -112,7 +112,7 @@ export default function MicCheck() {
                   <legend style={{ font: '500 15px var(--font-text)', marginBottom: 8, padding: 0 }}>Room</legend>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {ENVS.map(([id, label]) => (
-                      <label key={id} className="rs-chip" style={{ border: `2px solid ${env === id ? 'var(--primary-edge)' : 'var(--line)'}`, background: env === id ? 'var(--tonal)' : '#fff', font: '500 15px var(--font-text)', cursor: 'pointer' }}>
+                      <label key={id} className="rs-chip" style={{ border: `2px solid ${env === id ? 'var(--primary-edge)' : 'var(--line)'}`, background: env === id ? 'var(--tonal)' : 'var(--ground)', font: '500 15px var(--font-text)', cursor: 'pointer' }}>
                         <input type="radio" name="env" checked={env === id} onChange={() => setEnv(id)} style={{ accentColor: 'var(--primary-edge)', margin: '0 4px 0 0' }} />
                         {label}
                       </label>
