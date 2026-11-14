@@ -8,6 +8,8 @@ import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
 import { NoteIcon } from '../components/Icons'
 import { RecorderDock } from '../components/RecorderDock'
+import { ScriptText } from '../components/ScriptText'
+import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { limitFor, uploadRecording, useRecorder } from '../lib/recorder'
 
@@ -75,9 +77,21 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
       r.reset()
     }
   }, [j.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+  const recording = r.state === 'recording'
+  const follow = useSpeechFollow(item.task.text, recording)
+  const wpm = item.task.verification.target_wpm
+  const pacer = wpm && recording ? (r.seconds * (wpm.min + wpm.max)) / 2 / 60 : undefined
   const send = () => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJob({ id: d.job_id, rec: d.recording.id }) })
   return (
     <>
+      <div className="rs-card rs-stack" style={{ padding: 28, gap: 12 }}>
+        <ScriptText text={item.task.text} read={recording ? follow.read : 0} pacer={pacer} />
+        {recording && (follow.supported || pacer !== undefined) && (
+          <span className="rs-label">
+            {[follow.supported && 'Read words turn green', pacer !== undefined && 'the blue mark moves at the target pace'].filter(Boolean).join(' · ')}
+          </span>
+        )}
+      </div>
       {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
       {j.data?.status === 'failed' && <ErrorBanner text={j.data.error?.message ?? 'The recording check failed.'} />}
       <RecorderDock r={r} max={max} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" />
@@ -160,9 +174,11 @@ export default function Exercise() {
             )}
           </div>
           <div className="rs-stack" style={{ gap: 16 }}>
-            <div className="rs-card" style={{ padding: 28 }}>
-              <p className="rs-script rs-script--big">{item.task.text}</p>
-            </div>
+            {(v.type !== 'recording' || passed) && (
+              <div className="rs-card" style={{ padding: 28 }}>
+                <ScriptText text={item.task.text} />
+              </div>
+            )}
             {passed ? (
               <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }} role="status">
                 <h2 className="rs-h" style={{ fontSize: 22 }}>{result ? 'Nice work!' : 'Already done'}</h2>

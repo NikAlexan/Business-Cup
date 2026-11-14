@@ -19,3 +19,6 @@ button.rs-btn { font-family: var(--font-display); }
 @keyframes rs-rot { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rs-spin { animation-duration: 3s; } }
 .rs-update { position: fixed; left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 20; max-width: 520px; margin: 0 auto; box-shadow: 0 4px 0 var(--line); }
+.rs-word--read { color: var(--success); text-decoration: underline 3px var(--primary); text-underline-offset: 6px; transition: color 150ms ease-out; }
+.rs-word--pace { box-shadow: inset 0 -6px 0 var(--sky-tint); border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .rs-word--read { transition: none; } }
