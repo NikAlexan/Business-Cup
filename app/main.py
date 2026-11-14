@@ -502,6 +502,10 @@ def create_app(settings=None):
             s.put("attempt", attempt)
         return attempt
 
+    @app.post("/api/v1/exercise-attempts/{attempt_id}/review")
+    def speech_review(attempt_id: UUID, payload: Empty, request: Request, s: S):
+        return mutate(s, request, {}, lambda: s.request_speech_review(attempt_id))
+
     @app.get("/api/v1/exercise-attempts/{attempt_id}")
     def attempt_by_id(attempt_id: UUID, s: S):
         return s.get(attempt_id, "attempt")

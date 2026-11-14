@@ -5,7 +5,7 @@ import threading
 import time
 
 import numpy as np
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, case, or_, select, update
 
 from app.audio import (
     QUALITY_RULES,
@@ -16,7 +16,7 @@ from app.audio import (
     quality_check,
     timing_metrics,
 )
-from app.coaching import timing_feedback
+from app.coaching import quote_evidence, timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
@@ -109,7 +109,11 @@ class Worker:
                         and_(Job.status == "processing", Job.lease_until <= now),
                     )
                 )
-                .order_by(Job.id)
+                .order_by(
+                    case((Job.data["type"].as_string() == "recording_check", 0), else_=1),
+                    Job.data["created_at"].as_string(),
+                    Job.id,
+                )
                 .with_for_update(skip_locked=True)
                 .limit(1)
             )
@@ -149,6 +153,10 @@ class Worker:
             d = copy.deepcopy(j.data)
             d.update(stage=stage, updated_at=iso())
             j.data, j.lease_until = d, time.time() + self.settings.job_lease_seconds
+            if d["type"] == "exercise_review":
+                a = s.get(d["attempt_id"], "attempt")
+                a["speech_review"]["status"] = "processing"
+                s.put("attempt", a)
             if d["assessment_id"] and d["type"] == "assessment_analysis":
                 a = s.get(d["assessment_id"], "assessment")
                 a["status"] = "processing"
@@ -294,6 +302,77 @@ class Worker:
             measurements = None
         self.publish_recording(claim, rec, quality, measurements, speech_feedback)
 
+    def exercise_review(self, claim):
+        attempt = self.snapshot(claim, claim["job"]["attempt_id"], "attempt")
+        rec = self.snapshot(claim, attempt["recording_id"], "recording")
+        with self.database.session.begin() as db:
+            s, _ = self.locked(db, claim)
+            _, _, item = s.find_item(attempt["plan_item_id"])
+        path = self.settings.audio_data / claim["guest_id"] / rec["id"]
+        signal = decode(path, self.settings, item["task"]["verification"]["max_recording_seconds"])
+        self.stage(claim, "transcription")
+        provider = self.provider_factory(self.settings)
+        try:
+            transcript = provider.transcribe(
+                signal, " ".join([item["task"]["text"]] * item["task"].get("repetitions", 1))
+            )
+            metrics = timing_metrics(signal, [], transcript["word_count"], transcript["words"])
+            report = None
+            if not metrics["speaking_rate_wpm"]["available"]:
+                status, reason = "unavailable", "transcription_unverified"
+            else:
+                self.stage(claim, "speech_coaching")
+                report = provider.exercise_review(
+                    signal,
+                    {
+                        "goal": attempt["speech_review"]["goal"],
+                        "title": item["title"],
+                        "task": item["task"],
+                        "saved_focus": (attempt.get("practice_focus") or {}).get("note", ""),
+                        "verified_transcript": transcript["text"],
+                        "measurements": metrics,
+                    },
+                )
+                observation = report.get("observation")
+                if observation:
+                    evidence = quote_evidence(
+                        observation["evidence_quote"],
+                        transcript,
+                        len(signal) / 16000,
+                        observation.get("occurrence", 1),
+                    )
+                    if not evidence:
+                        raise ProviderFailure("analysis_invalid_evidence")
+                    observation["evidence"] = evidence
+                status, reason = "completed", None
+            usage = copy.deepcopy(provider.usage)
+        finally:
+            provider.close()
+        with self.database.session.begin() as db:
+            s, job = self.locked(db, claim)
+            # Re-read to preserve reflections saved while the analysis was in flight.
+            a = s.get(attempt["id"], "attempt")
+            a["speech_review"].update(
+                status=status,
+                report=report,
+                reason=reason,
+                completed_at=iso(),
+                source="audio_model",
+                model=self.settings.audio_model,
+                error=None,
+            )
+            s.put("attempt", a)
+            s.put("ai_usage", {"id": new_id(), "attempt_id": a["id"], "created_at": iso(), "calls": usage})
+            d = copy.deepcopy(job.data)
+            d.update(
+                status="completed",
+                stage="done",
+                updated_at=iso(),
+                poll_after_ms=None,
+                result={"attempt_id": a["id"], "review_status": status},
+            )
+            job.status, job.data, job.lease_until = "completed", d, None
+
     def assessment(self, claim):
         a = self.snapshot(claim, claim["job"]["assessment_id"], "assessment")
         signals, recordings = [], []
@@ -432,6 +511,10 @@ class Worker:
                 a = s.get(d["assessment_id"], "assessment")
                 a["status"] = d["status"]
                 s.put("assessment", a)
+            elif d["type"] == "exercise_review":
+                a = s.get(d["attempt_id"], "attempt")
+                a["speech_review"].update(status=d["status"], error=d["error"])
+                s.put("attempt", a)
             elif d["recording_id"]:
                 rec = s.get(d["recording_id"], "recording")
                 rec["status"] = d["status"]
@@ -458,7 +541,11 @@ class Worker:
         thread.start()
         try:
             self.stage(claim, "decoding")
-            (self.recording if claim["job"]["type"] == "recording_check" else self.assessment)(claim)
+            {
+                "recording_check": self.recording,
+                "assessment_analysis": self.assessment,
+                "exercise_review": self.exercise_review,
+            }[claim["job"]["type"]](claim)
         except WorkCancelled:
             log.info("Discarded canceled/stale result job_id=%s", claim["job"]["id"])
         except Exception as exc:

@@ -391,6 +391,44 @@ test('a recovered retryable job resumes the saved check without uploading audio 
   expect(uploads).toBe(0)
 })
 
+test('background speech coaching refreshes after its job finishes and seeks grounded evidence', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
+  let finished = false
+  const review = { status: 'queued', job_id: 'speech-job', report: null }
+  const pending = { ...savedAttempt, speech_review: review }
+  const report = { summary: 'Listen to the phrase ending.', observation: { text: 'Check the final word.', evidence: { quote: 'clear message', start_seconds: 3, end_seconds: 5 } },
+    next_step: 'Let the final word land.', listening_question: 'Can you hear the final sound?', limitations: ['One take only.'] }
+  setup(baseItem, (path) => {
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [pending], next_cursor: null })
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(finished ? { ...pending, speech_review: { ...review, status: 'completed', report } } : pending)
+    if (path === '/api/v1/jobs/speech-job') { finished = true; return Response.json({ status: 'completed' }) }
+  })
+  open('/exercise/item')
+  await screen.findByText('Listen to the phrase ending.')
+  expect(screen.getByText('Let the final word land.')).toBeTruthy()
+  expect(screen.getByText('AI listening notes can be mistaken. Check the observation against your own playback.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Listen to “clear message”' }))
+  expect((screen.getByLabelText('Your completed take') as HTMLAudioElement).currentTime).toBe(3)
+  expect(play).toHaveBeenCalledOnce()
+})
+
+test('a speech-coaching failure keeps saved audio, reflection and completion available', async () => {
+  const failed = { ...savedAttempt, speech_review: { status: 'failed', job_id: 'failed-speech', report: null } }
+  let retried = false
+  setup(baseItem, (path) => {
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [failed], next_cursor: null })
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(failed)
+    if (path === '/api/v1/jobs/failed-speech') return Response.json({ status: retried ? 'queued' : 'failed', retryable: !retried, poll_after_ms: 100000 })
+    if (path === '/api/v1/jobs/failed-speech/retry') { retried = true; return Response.json({ job_id: 'failed-speech' }, { status: 202 }) }
+  })
+  open('/exercise/item')
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry speech coaching' }))
+  await waitFor(() => expect(retried).toBe(true))
+  expect(screen.getByLabelText('Your completed take')).toBeTruthy()
+  expect(screen.getByRole('textbox', { name: 'What did you hear, and what will you try next?' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Practice again — no extra notes' })).toBeTruthy()
+})
+
 test('a completed day still exposes its exercises for review and marks prepared history', async () => {
   const lesson = { id: 'lesson', day_index: 1, status: 'completed', items: [baseItem], estimated_duration_seconds: 90 }
   setup(baseItem, (path) => {

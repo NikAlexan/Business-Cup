@@ -33,7 +33,7 @@ Plan generation considers variant usage across prior plans, chooses the least-us
 
 Audio issues such as silence or clipping require another take. Pace outside the drill's band is coaching, not a failed attempt. Missing credentials, rate limits or other expected provider failures during optional exercise transcription preserve accepted audio and return unavailable measurements with a reason. The full baseline/check-in assessment still requires its analysis to succeed.
 
-The exercise screen restores saved attempt feedback through `latest_attempt_id`, shows available measured pace, and preserves the checked take for resending an attempt after a transport error. Completed takes can be played beside their saved feedback, including after reload. A full qualitative AI review remains further work; quality checks do not claim to score diction or expression.
+The exercise screen restores saved attempt feedback through `latest_attempt_id`, shows available measured pace, and preserves the checked take for resending an attempt after a transport error. Completed takes can be played beside their saved feedback, including after reload. Optional background audio-model coaching is described below; audio quality itself does not score diction or expression.
 
 ## Validation
 
@@ -57,6 +57,15 @@ An accepted upload persists its check job pointer. The item endpoint returns the
 
 `PUT /exercise-attempts/{id}/reflection` stores a trimmed subjective note (500 characters maximum). A repeat can reference `based_on_attempt_id`; upload snapshots the source note into `practice_focus`, which survives reload and later edits of the original note. The repeat result offers the previous private recording beside its own playback. Compatible timing feedback is shown side by side without claiming that a numerical change means improvement.
 
-Catalog-v6 adds optional pause timing to E08; E06 already requests pace. Their feedback schema `speech-timing-feedback-v1` labels transcript-derived pace, pause share, a recognized word boundary and a playable audio interval, plus one small next step. It never scores pronunciation, emotion or expression. Other exercise types keep quality checks and listening/reflection prompts. Transcription unavailability remains advisory. This iteration does not implement a qualitative daily audio-model review.
+Catalog-v6 adds optional pause timing to E08; E06 already requests pace. Their feedback schema `speech-timing-feedback-v1` labels transcript-derived pace, pause share, a recognized word boundary and a playable audio interval, plus one small next step. It never scores pronunciation, emotion or expression. Other exercise types keep quality checks and listening/reflection prompts. Transcription unavailability remains advisory. The original timing loop is independent of the later background qualitative review described below.
 
 Timing validates each word interval against the decoded duration and matches the word count to intervals, as well as checking finite, ordered, nonoverlapping timestamps. Invalid timing is unavailable, not a low score. Assessment measurement version is now `voice-metrics-v3`; previous versions and prepared demo baselines are not comparable to current real measurements. Check-in playback only returns pairs with actual recording IDs on both sides.
+
+
+## Background speech coaching
+
+A saved passed recording can queue `exercise_review` separately from its quality check and completion. `speech_review` on the attempt persists job ID, schema version, status, goal snapshot and eventual report. A missing provider configuration or exhausted per-guest/service daily budget records an unavailable reason; it never rejects the completed practice. Existing takes can request coaching through `POST /exercise-attempts/{id}/review`; failed jobs use bounded `/jobs/{id}/retry`. Owner/deletion/lease controls apply to this job as to other processing. Publication re-reads the attempt to preserve concurrent reflection edits. Queued recording quality checks take priority over waiting analysis jobs.
+
+The provider receives the real audio, saved task, verified transcript, measured timing and the repeat's saved focus. It returns a concise summary, at most one audible observation, a contiguous transcript quote/occurrence, one comfortable next action, one listening question and uncertainty notes. The server resolves the quote into actual validated ASR intervals; it does not accept model-generated timestamps or objective skill scores. If transcript timing cannot support an anchor, coaching is unavailable. An absent quote is an invalid response. A quoted interval locates the phrase, but does not prove the model's perceptual judgment. The UI labels it as fallible AI listening notes and offers playback.
+
+Tests validate real-audio request construction through mocked HTTP, strict schema rejection, worker publication, ownership, unchanged completion/reward/audio, daily budgets, provider failure/retry, grounding and concurrent reflection. They do not establish accuracy on human speech. Paid-provider and human usefulness evaluation remain outstanding.

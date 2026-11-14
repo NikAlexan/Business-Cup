@@ -1,4 +1,39 @@
-"""Listening prompts grounded in validated word timing, never pronunciation or emotion scores."""
+"""Listening prompts and playback anchors grounded in validated transcript timing."""
+
+import re
+
+
+def quote_evidence(quote, transcript, duration, occurrence=1):
+    """Locate model-selected words in ASR output; never accept a model-invented timestamp."""
+
+    def tokenize(text):
+        return re.findall(r"[a-zA-Z0-9]+(?:'[a-zA-Z]+)?", text.lower())
+
+    if len(transcript.get("recognized_words", [])) != len(transcript.get("words", [])):
+        return None
+    wanted = tokenize(quote)
+    if not 2 <= len(wanted) <= 12:
+        return None
+    tokens, frames = [], []
+    for index, word in enumerate(transcript.get("recognized_words", [])):
+        if not isinstance(word, str):
+            return None
+        for token in tokenize(word):
+            tokens.append(token)
+            frames.append(index)
+    for start in range(len(tokens) - len(wanted) + 1):
+        if tokens[start : start + len(wanted)] == wanted:
+            occurrence -= 1
+            if occurrence:
+                continue
+            first, last = frames[start], frames[start + len(wanted) - 1]
+            timing = transcript["words"]
+            return {
+                "quote": " ".join(transcript["recognized_words"][first : last + 1]),
+                "start_seconds": max(0, timing[first]["start"] - 0.2),
+                "end_seconds": min(duration, timing[last]["end"] + 0.2),
+            }
+    return None
 
 
 def timing_feedback(transcript, metrics, verification, duration):

@@ -2,7 +2,22 @@ import numpy as np
 import pytest
 
 from app.audio import timing_metrics
-from app.coaching import timing_feedback
+from app.coaching import quote_evidence, timing_feedback
+
+
+def test_quoted_evidence_uses_the_requested_occurrence_and_rejects_absent_phrases():
+    transcript = {
+        "recognized_words": ["Say", "this.", "Say", "this."],
+        "words": [{"start": i, "end": i + 0.5} for i in range(4)],
+    }
+    assert quote_evidence("say this", transcript, 4, 2) == {
+        "quote": "Say this.",
+        "start_seconds": 1.8,
+        "end_seconds": 3.7,
+    }
+    assert quote_evidence("say this", transcript, 4, 3) is None
+    assert quote_evidence("absent phrase", transcript, 4) is None
+    assert quote_evidence("this", transcript, 4) is None
 
 
 def test_feedback_uses_actual_timings_and_a_playable_recognized_word_boundary():

@@ -15,6 +15,7 @@ export type Reassessment = {
 export type Streak = { current_days: number; longest_days: number; last_practice_on: string | null }
 export type Me = {
   guest_id: string
+  capabilities?: { exercise_coaching?: boolean; assessment?: boolean; daily_training?: boolean }
   data_provenance?: { prepared_demo_history: boolean }
   preferences: { goal: string; timezone: string; locale: string }
   demo_mode: boolean
@@ -163,6 +164,12 @@ export type Job = {
 }
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
+  speech_review?: {
+    status: 'queued' | 'processing' | 'completed' | 'unavailable' | 'failed'
+    job_id: string | null
+    reason?: string | null
+    report: { summary: string; observation: { text: string; evidence: { quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; limitations: string[] } | null
+  }
   reflection?: { note: string; updated_at: string }
   practice_focus?: { attempt_id: string; note: string } | null
   practice_only?: boolean

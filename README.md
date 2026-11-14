@@ -145,3 +145,6 @@ Browser checks require the root `.venv`, Python dependencies, FFmpeg and the pin
 
 
 The daily practice loop restores accepted uploads after reload, keeps completed sessions reachable, and saves a listening reflection as the next take's focus. Pace/pause drills show validated transcript timing, playable word-boundary evidence and one next step; repeat results include previous audio and compatible timing side by side. These are timing observations and subjective reflections, not automated pronunciation or expressiveness scores. Prepared demo history stays labeled and cannot act as a comparable numerical baseline for real audio.
+
+
+When provider credentials are configured, each saved accepted exercise recording can start separate background speech coaching. The attempt's `speech_review` survives reload, offers one audio-grounded listening note and one next action, and cannot revoke completion. Configure `EXERCISE_REVIEWS_ENABLED`, `MAX_EXERCISE_REVIEWS_PER_DAY` and `MAX_TOTAL_EXERCISE_REVIEWS_PER_DAY` to control automatic work; these are job-count budgets, not currency caps. Provider calls use actual audio through the existing [Chat Completions audio integration](https://developers.openai.com/api/docs/guides/audio-chat-completions). Automated tests mock paid calls and do not establish real-world coaching accuracy.

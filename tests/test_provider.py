@@ -15,6 +15,53 @@ REPORT = {
     "recommended_exercise_ids": ["E03"],
 }
 
+DAILY_REPORT = {
+    "summary": "Listen to the phrase ending.",
+    "observation": {
+        "text": "Check whether the final word is distinct.",
+        "evidence_quote": "clear voice",
+        "occurrence": 1,
+    },
+    "next_step": "Let the final word land comfortably.",
+    "listening_question": "Can you hear the final sound?",
+    "limitations": ["This is an observation about one take."],
+}
+
+
+def test_daily_review_sends_actual_audio_and_validates_the_small_coaching_contract():
+    def handler(request):
+        body = json.loads(request.content)
+        assert body["store"] is False and body["modalities"] == ["text"]
+        assert body["messages"][0]["role"] == "system"
+        content = body["messages"][1]["content"]
+        assert content[1]["input_audio"]["format"] == "wav"
+        assert len(content[1]["input_audio"]["data"]) > 1000
+        assert '"saved_focus": "Keep endings audible"' in content[0]["text"]
+        assert "untrusted" in body["messages"][0]["content"]
+        assert "Do not invent measurements" in body["messages"][0]["content"]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(DAILY_REPORT)}}]})
+
+    p = provider(handler)
+    try:
+        assert p.exercise_review(np.zeros(16000), {"saved_focus": "Keep endings audible"}) == DAILY_REPORT
+    finally:
+        p.close()
+
+
+@pytest.mark.parametrize(
+    "report",
+    ["not JSON", {**DAILY_REPORT, "score": 9.5}, {**DAILY_REPORT, "observation": {"text": "unsupported"}}],
+)
+def test_daily_review_rejects_malformed_or_uncontracted_claims(report):
+    p = provider(
+        lambda _: httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(report)}}]})
+    )
+    try:
+        with pytest.raises(ProviderFailure, match="analysis_invalid_response"):
+            p.exercise_review(np.zeros(16000), {})
+    finally:
+        p.close()
+
 
 def provider(handler):
     return OpenAIAudioProvider(

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from app.access import NoBillingAccessPolicy
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
-from app.errors import fail
+from app.errors import ApiError, fail
 
 COOKIE = "guest_session"
 ACTIVE = {"draft", "queued", "processing", "needs_rerecord"}
@@ -233,8 +233,13 @@ class Service:
             "current_plan_id": p["id"] if p else None,
             "reassessment": self.reassessment(),
             "capabilities": {
-                c: self.policy.check_access(self.guest.subject_id, c)
-                for c in ("assessment", "daily_training")
+                "exercise_coaching": bool(
+                    self.settings.exercise_reviews_enabled and self.settings.openai_api_key.get_secret_value()
+                ),
+                **{
+                    c: self.policy.check_access(self.guest.subject_id, c)
+                    for c in ("assessment", "daily_training")
+                },
             },
             "progress": {
                 "completed_lessons": p["completed_lessons"] if p else 0,
@@ -312,7 +317,7 @@ class Service:
         }
         return 201, self.put("assessment", a)
 
-    def queue(self, kind, assessment_id=None, recording_id=None):
+    def queue(self, kind, assessment_id=None, recording_id=None, attempt_id=None):
         data = {
             "id": new_id(),
             "type": kind,
@@ -330,6 +335,8 @@ class Service:
             "retryable": False,
             "retry_batches": 0,
         }
+        if attempt_id:
+            data["attempt_id"] = attempt_id
         self.db.add(Job(id=data["id"], guest_id=self.guest.id, status="queued", data=data))
         self.db.flush()
         return data
@@ -444,11 +451,56 @@ class Service:
             rec["status"] = "queued"
             self.put("recording", rec)
         j.status, j.data, j.lease_until, j.lease_token = "queued", d, None, None
+        if d["type"] == "exercise_review":
+            a = self.get(d["attempt_id"], "attempt")
+            a["speech_review"].update(status="queued", error=None)
+            self.put("attempt", a)
         if d["assessment_id"] and d["type"] == "assessment_analysis":
             a = self.get(d["assessment_id"], "assessment")
             a["status"] = "queued"
             self.put("assessment", a)
         return 202, {"job_id": j.id, "status": "queued", "poll_after_ms": 2000}
+
+    def start_speech_review(self, attempt):
+        """Coaching availability never changes audio acceptance or completion credit."""
+        unavailable = {"status": "unavailable", "job_id": None, "report": None}
+        if not self.settings.exercise_reviews_enabled or not self.settings.openai_api_key.get_secret_value():
+            return {**unavailable, "reason": "not_configured"}
+        if (
+            sum(
+                j.data["type"] == "exercise_review"
+                and self.local_date(j.data["created_at"]) == self.local_date()
+                for j in self.db.scalars(select(Job).where(Job.guest_id == self.guest.id))
+            )
+            >= self.settings.max_exercise_reviews_per_day
+        ):
+            return {**unavailable, "reason": "daily_limit"}
+        try:
+            self.consume_budget("exercise_reviews", self.settings.max_total_exercise_reviews_per_day)
+        except ApiError as exc:
+            if exc.status != 429:
+                raise
+            return {**unavailable, "reason": "service_daily_limit"}
+        job = self.queue("exercise_review", attempt_id=attempt["id"])
+        return {
+            "version": "exercise-review-v1",
+            "status": "queued",
+            "job_id": job["id"],
+            "report": None,
+            "goal": self.guest.data["preferences"]["goal"],
+            "requested_at": iso(),
+        }
+
+    def request_speech_review(self, attempt_id):
+        self.auth("daily_training")
+        attempt = self.get(attempt_id, "attempt")
+        if attempt["status"] != "passed" or not attempt.get("recording_id"):
+            fail(422, "review_not_available", "Speech coaching needs a saved, accepted recording.")
+        previous = attempt.get("speech_review")
+        if not previous or previous["status"] == "unavailable":
+            attempt["speech_review"] = self.start_speech_review(attempt)
+            self.put("attempt", attempt)
+        return 200, attempt
 
     def find_item(self, item_id, writable=False, practice_only=False):
         for p in self.all("plan"):
@@ -745,6 +797,8 @@ class Service:
             }[kind]()
         if kind == "self_confirmation":
             a["self_confirmed"] = payload["self_confirmed"]
+        if passed and kind == "recording":
+            a["speech_review"] = self.start_speech_review(a)
         if not practice_only:
             item["latest_attempt_id"] = a["id"]
             if passed:

@@ -95,3 +95,17 @@ class VoiceReport(Input):
 
 class ReflectionInput(Input):
     note: str = Field(max_length=500)
+
+
+class SpeechObservation(Input):
+    text: str = Field(min_length=1, max_length=500)
+    evidence_quote: str = Field(min_length=1, max_length=180)
+    occurrence: int = Field(default=1, ge=1, le=20)
+
+
+class ExerciseReview(Input):
+    summary: str = Field(min_length=1, max_length=350)
+    observation: SpeechObservation | None
+    next_step: str = Field(min_length=1, max_length=350)
+    listening_question: str = Field(min_length=1, max_length=200)
+    limitations: list[str] = Field(min_length=1, max_length=3)

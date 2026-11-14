@@ -11,6 +11,7 @@ import { NoteIcon } from '../components/Icons'
 import { RecorderDock } from '../components/RecorderDock'
 import { TakeReflection } from '../components/TakeReflection'
 import { TakeComparison } from '../components/TakeComparison'
+import { SpeechReview } from '../components/SpeechReview'
 import { ScriptText } from '../components/ScriptText'
 import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
@@ -281,9 +282,10 @@ export default function Exercise() {
                   <span className="rs-label">Based on transcript timings. Playback helps you check the word boundary.</span>
                 </section>}
                 {result?.feedback.next_step && <p><strong>Try next:</strong> {result.feedback.next_step}</p>}
+                {result?.status === 'passed' && result.recording_id && <SpeechReview key={"speech-review-" + result.id} take={result} onHear={(seconds) => { const audio = audioRef.current; if (audio) { audio.currentTime = seconds; void audio.play().catch(() => {}) } }} />}
                 {result?.practice_focus?.note && <p><strong>Your focus for this take:</strong> {result.practice_focus.note}</p>}
                 {result?.practice_focus && <TakeComparison take={result} />}
-                {result && <TakeReflection key={result.id} attempt={result} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }); void qc.invalidateQueries({ queryKey: ['attempt', result.id] }) }} />}
+                {result && <TakeReflection key={"reflection-" + result.id} attempt={result} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }); void qc.invalidateQueries({ queryKey: ['attempt', result.id] }) }} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
