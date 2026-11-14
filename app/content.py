@@ -42,7 +42,12 @@ def variant_timing(variant, verification):
     if verification == "self_confirmation":
         return {
             "expected_recording_seconds": None,
-            "estimated_practice_seconds": variant["action_duration_seconds"],
+            "estimated_practice_seconds": max(
+                variant["action_duration_seconds"],
+                math.ceil(words * 60 / 140) + (repetitions - 1) * 3 + 10,
+            )
+            if repetitions > 1
+            else variant["action_duration_seconds"],
             "max_recording_seconds": None,
             "includes_listening": False,
         }
@@ -61,33 +66,47 @@ def variant_timing(variant, verification):
 
 def generate_plan(assessment, report, version, previous_plans=()):
     priorities = [p["tag"] for p in report["priorities"]]
-    target_ids = []
+    groups = []
     for priority in report["priorities"]:
-        for eid in priority["exercise_ids"]:
-            if eid in EXERCISES and eid not in target_ids and eid not in ("E01", "E12"):
-                target_ids.append(eid)
-    for ex in EXERCISES.values():
-        if (
-            set(ex["tags"]) & set(priorities)
-            and ex["id"] not in target_ids
-            and ex["id"] not in ("E01", "E12")
-        ):
-            target_ids.append(ex["id"])
-    if not target_ids:
-        target_ids = ["E03", "E08", "E09", "E10"]
-    usage = Counter(
-        item["task"].get("variant_id")
-        for plan in previous_plans
-        for lesson in plan["lessons"]
-        for item in lesson["items"]
-    )
+        matching = [
+            eid
+            for eid, ex in EXERCISES.items()
+            if priority["tag"] in ex["tags"] and eid not in ("E01", "E12")
+        ]
+        recommended = [eid for eid in priority["exercise_ids"] if eid in matching]
+        if matching:
+            groups.append(
+                {
+                    "tag": priority["tag"],
+                    "ids": recommended or matching,
+                    "matching": matching,
+                    "reason": priority.get("reason"),
+                }
+            )
+    if not groups:
+        groups = [
+            {"tag": "clarity", "ids": ["E03", "E04"], "matching": ["E03", "E04"], "reason": None},
+            {"tag": "intonation", "ids": ["E09", "E10"], "matching": ["E09", "E10"], "reason": None},
+        ]
+    history_items = [item for p in previous_plans for lesson in p["lessons"] for item in lesson["items"]]
+    usage = Counter(item["task"].get("variant_id") for item in history_items)
+    continued = {
+        item["exercise_id"]
+        for item in history_items
+        if item["status"] == "completed" and item.get("difficulty") == "intermediate"
+    }
+    focus_uses, complementary_uses, current_variants = Counter(), Counter(), Counter()
+    reasons = {}
 
     def make_item(eid, day, position):
         ex = EXERCISES[eid]
-        difficulty = "beginner" if day <= 7 else "intermediate"
+        difficulty = "intermediate" if eid in continued or day > 7 else "beginner"
         pool = [v for v in ex["difficulty_variants"] if v["difficulty"] == difficulty]
-        variant = min(pool, key=lambda v: usage[v["id"]])
+        offset = (version - 1) % len(pool)
+        pool = pool[offset:] + pool[:offset]
+        variant = min(pool, key=lambda v: (current_variants[v["id"]], usage[v["id"]]))
         usage[variant["id"]] += 1
+        current_variants[variant["id"]] += 1
         verification = ex["verification"]["type"]
         timing = variant_timing(variant, verification)
         return {
@@ -102,9 +121,8 @@ def generate_plan(assessment, report, version, previous_plans=()):
             if eid == "E01"
             else "Bring the skills together in a new story."
             if eid == "E12"
-            else "Practice your assessment priorities."
-            if eid in target_ids
-            else "Build a balanced session with a complementary skill.",
+            else reasons.get(eid, "Balance your focus work with a complementary speaking skill."),
+            "difficulty_basis": "previous_practice" if eid in continued else "plan_progression",
             "status": "pending",
             "latest_attempt_id": None,
             "completed_at": None,
@@ -135,19 +153,33 @@ def generate_plan(assessment, report, version, previous_plans=()):
 
     lessons = []
     for day in range(1, 15):
-        chosen = [target_ids[(day - 1) % len(target_ids)]]
-        if len(target_ids) > 1:
-            chosen.append(target_ids[day % len(target_ids)])
-        sequence = list(dict.fromkeys(["E01", *chosen]))
+        chosen = []
+        reasons = {}
+        for group in groups[:2]:
+            candidates = [eid for eid in group["ids"] if eid not in chosen]
+            if not candidates:
+                candidates = [eid for eid in group["matching"] if eid not in chosen]
+            if candidates:
+                eid = min(candidates, key=lambda eid: focus_uses[eid])
+                chosen.append(eid)
+                focus_uses[eid] += 1
+                reasons[eid] = group["reason"] or f"Practice your {group['tag']} focus."
+        if len(chosen) == 1:
+            related = [eid for eid in groups[0]["matching"] if eid not in chosen]
+            if related:
+                eid = min(related, key=lambda eid: complementary_uses[eid])
+                chosen.append(eid)
+                complementary_uses[eid] += 1
+                reasons[eid] = f"Explore another way to practice {groups[0]['tag']}."
+        sequence = ["E01", *chosen]
         items = [make_item(eid, day, n) for n, eid in enumerate(sequence, 1)]
-        # Add complementary practice using actual chosen-variant estimates, keeping narration last.
         narration = make_item("E12", day, 0)
-        for eid in ("E11", "E02", "E03", "E08", "E09", "E04", "E07"):
-            if sum(i["estimated_duration_seconds"] for i in [*items, narration]) >= 300:
-                break
-            if eid not in sequence:
-                sequence.append(eid)
-                items.append(make_item(eid, day, len(items) + 1))
+        remaining = [eid for eid in EXERCISES if eid not in (*sequence, "E12")]
+        while sum(i["estimated_duration_seconds"] for i in [*items, narration]) < 300 and remaining:
+            eid = min(remaining, key=lambda eid: complementary_uses[eid])
+            remaining.remove(eid)
+            complementary_uses[eid] += 1
+            items.append(make_item(eid, day, len(items) + 1))
         narration["position"] = len(items) + 1
         items.append(narration)
         lessons.append(

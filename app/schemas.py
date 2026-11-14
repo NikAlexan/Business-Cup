@@ -58,6 +58,7 @@ class Empty(Input):
 
 class AttemptInput(Input):
     plan_item_id: UUID
+    practice_only: bool = False
     elapsed_seconds: float | None = Field(default=None, ge=0, le=3600, allow_inf_nan=False)
     self_confirmed: bool | None = None
     recording_id: UUID | None = None

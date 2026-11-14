@@ -23,17 +23,27 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
   const r = useRecorder({ maxSeconds: max, accepted })
   const [jobId, setJobId] = useState<string | null>(null)
   const job = useJob(jobId)
+  const [checkError, setCheckError] = useState<string | null>(null)
   const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) =>
     uploadRecording({ purpose: 'assessment', assessment_id: assessmentId, task_id: task.id }, v.blob, v.mime, key),
   )
   useEffect(() => {
     const s = job.data?.status
-    if (s === 'completed' || s === 'needs_rerecord' || s === 'failed') {
+    if (s === 'failed') {
+      setCheckError(job.data?.error?.message ?? 'The recording check failed. Your take is still here; try sending it again.')
+      setJobId(null)
+      onChecked()
+    }
+    if (s === 'completed' || s === 'needs_rerecord') {
       setJobId(null)
       r.reset()
       onChecked()
     }
   }, [job.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+  const send = () => {
+    setCheckError(null)
+    if (r.blob && r.mime) upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJobId(d.job_id) })
+  }
   const busy = upload.isPending || !!jobId
   const follow = useSpeechFollow(task.text, r.state === 'recording')
   const [playT, setPlayT] = useState<number | null>(null)
@@ -46,12 +56,13 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
           Read it at your own pace — there's no time limit to chase.{follow.supported ? ' Words you read turn green.' : ''}
         </span>
       </div>
-      {upload.error && <ErrorBanner error={upload.error} onRetry={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime })} />}
+      {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
+      {checkError && <ErrorBanner text={checkError} onRetry={send} />}
       <RecorderDock
         r={r}
         sending={busy}
         onPlayTime={setPlayT}
-        onSend={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJobId(d.job_id) })}
+        onSend={send}
       />
     </>
   )
@@ -85,6 +96,7 @@ export default function Record() {
 
   if (!id) return <FlowFrame><ErrorBanner text="This link is missing the assessment." /><Link to="/">Start over</Link></FlowFrame>
   if (a.isPending || me.isPending) return <FlowFrame><Skeleton height={320} /></FlowFrame>
+  if (me.error) return <FlowFrame><ErrorBanner error={me.error} onRetry={() => me.refetch()} /></FlowFrame>
   if (a.error || !a.data) return <FlowFrame><ErrorBanner error={a.error} onRetry={() => a.refetch()} /></FlowFrame>
 
   const progress = Math.round((index / Math.max(1, tasks.length)) * 100)

@@ -444,13 +444,20 @@ class Service:
             self.put("assessment", a)
         return 202, {"job_id": j.id, "status": "queued", "poll_after_ms": 2000}
 
-    def find_item(self, item_id, writable=False):
+    def find_item(self, item_id, writable=False, practice_only=False):
         for p in self.all("plan"):
             self.unlock(p)
             for lesson in p["lessons"]:
                 for item in lesson["items"]:
                     if item["id"] == str(item_id):
-                        if writable:
+                        if practice_only:
+                            if item["status"] != "completed":
+                                fail(
+                                    409,
+                                    "exercise_not_completed",
+                                    "Complete this exercise before extra practice.",
+                                )
+                        elif writable:
                             if p["status"] != "active":
                                 fail(409, "plan_inactive", "This plan is no longer active.")
                             if item["status"] == "completed":
@@ -470,6 +477,8 @@ class Service:
         purpose = fields["purpose"]
         a = task = item = None
         if purpose == "assessment":
+            if fields.get("practice_only"):
+                fail(422, "validation_error", "Extra practice applies only to completed exercises.")
             if not fields["assessment_id"] or not fields["task_id"] or fields["plan_item_id"]:
                 fail(422, "validation_error", "Assessment upload requires only assessment_id and task_id.")
             a = self.get(fields["assessment_id"], "assessment")
@@ -483,7 +492,9 @@ class Service:
         else:
             if not fields["plan_item_id"] or fields["assessment_id"] or fields["task_id"]:
                 fail(422, "validation_error", "Exercise upload requires only plan_item_id.")
-            _, _, item = self.find_item(fields["plan_item_id"], writable=True)
+            _, _, item = self.find_item(
+                fields["plan_item_id"], writable=True, practice_only=fields.get("practice_only", False)
+            )
             if item["task"]["verification"]["type"] != "recording":
                 fail(422, "validation_error", "This exercise does not accept recordings.")
         used = sum(self.local_date(r["created_at"]) == self.local_date() for r in self.all("recording"))
@@ -524,7 +535,23 @@ class Service:
 
     def attempt(self, payload):
         self.auth("daily_training")
-        p, lesson, item = self.find_item(payload["plan_item_id"], writable=True)
+        practice_only = payload.get("practice_only", False)
+        p, lesson, item = self.find_item(payload["plan_item_id"], writable=True, practice_only=practice_only)
+        if (
+            practice_only
+            and sum(
+                self.local_date(a["created_at"]) == self.local_date()
+                for a in self.all("attempt")
+                if a.get("practice_only")
+            )
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily extra-practice limit reached.",
+                {"retry_after_seconds": 3600},
+            )
         v = item["task"]["verification"]
         kind = v["type"]
         fields = {
@@ -544,6 +571,16 @@ class Service:
             rec = self.get(payload["recording_id"], "recording")
             if rec["purpose"] != "exercise" or rec["plan_item_id"] != item["id"]:
                 fail(404, "not_found", "Recording not found for this plan item.")
+            if bool(rec.get("practice_only")) != practice_only:
+                fail(422, "practice_mode_mismatch", "Use a recording made for this practice mode.")
+            if any(
+                a.get("recording_id") == rec["id"] and a["status"] == "passed" for a in self.all("attempt")
+            ):
+                fail(
+                    409,
+                    "recording_already_used",
+                    "This take is already saved. Record a new take for extra practice.",
+                )
             if rec["status"] in ("queued", "processing"):
                 fail(409, "recording_not_ready", "Wait for the recording check to finish.")
             if rec["status"] == "failed":
@@ -571,6 +608,7 @@ class Service:
         a = {
             "id": new_id(),
             "plan_item_id": item["id"],
+            "practice_only": practice_only,
             "reward": {"notes": 0, "parts": []},
             "practice_seconds": 0,
             "practice_seconds_source": {
@@ -597,13 +635,14 @@ class Service:
             },
             "created_at": iso(),
             "completed_at": iso() if passed else None,
-            "plan_item_status": "completed" if passed else "pending",
+            "plan_item_status": "completed" if practice_only or passed else "pending",
         }
-        if passed:
+        if passed and not practice_only:
             parts = [{"notes": 2 if item["exercise_id"] == "E01" else 3, "reason": "exercise_completed"}]
             if kind == "recording":
                 parts.append({"notes": 1, "reason": "quality_bonus"})
             a["reward"] = {"notes": sum(x["notes"] for x in parts), "parts": parts}
+        if passed:
             a["practice_seconds"] = {
                 "timer": lambda: payload["elapsed_seconds"],
                 "recording": lambda: round(rec["duration_seconds"]),
@@ -611,11 +650,12 @@ class Service:
             }[kind]()
         if kind == "self_confirmation":
             a["self_confirmed"] = payload["self_confirmed"]
-        item["latest_attempt_id"] = a["id"]
-        if passed:
-            item.update(status="completed", completed_at=a["completed_at"])
-        lesson["status"] = "in_progress"
-        self.put("plan", p)
+        if not practice_only:
+            item["latest_attempt_id"] = a["id"]
+            if passed:
+                item.update(status="completed", completed_at=a["completed_at"])
+            lesson["status"] = "in_progress"
+            self.put("plan", p)
         return 201, self.put("attempt", a)
 
     def today(self):

@@ -305,6 +305,7 @@ def create_app(settings=None):
         assessment_id: Annotated[UUID | None, Form()] = None,
         task_id: Annotated[UUID | None, Form()] = None,
         plan_item_id: Annotated[UUID | None, Form()] = None,
+        practice_only: Annotated[bool, Form()] = False,
     ):
         s.auth()
         fields = {
@@ -313,6 +314,8 @@ def create_app(settings=None):
             "task_id": str(task_id) if task_id else None,
             "plan_item_id": str(plan_item_id) if plan_item_id else None,
         }
+        if practice_only:
+            fields["practice_only"] = True
         fingerprint, size = hashlib.sha256(), 0
         while chunk := file.file.read(1024 * 1024):
             size += len(chunk)
@@ -450,7 +453,24 @@ def create_app(settings=None):
     @app.post("/api/v1/exercise-attempts")
     def attempt(payload: AttemptInput, request: Request, s: S):
         values = payload.model_dump(mode="json")
+        if not values["practice_only"]:
+            values.pop("practice_only")  # Preserve legacy request fingerprints for retries across deploys.
         return mutate(s, request, values, lambda: s.attempt(values))
+
+    @app.get("/api/v1/exercise-attempts")
+    def attempt_history(
+        plan_item_id: UUID,
+        s: S,
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+    ):
+        s.find_item(plan_item_id)
+        page, next_cursor = s.paginate(
+            [a for a in s.all("attempt") if a["plan_item_id"] == str(plan_item_id)],
+            limit,
+            cursor,
+        )
+        return {"items": page, "next_cursor": next_cursor}
 
     @app.get("/api/v1/exercise-attempts/{attempt_id}")
     def attempt_by_id(attempt_id: UUID, s: S):

@@ -24,3 +24,12 @@ test('key reused for same body, new for different', () => {
   expect(nextKey(a, { x: 1 }).key).toBe(a.key)
   expect(nextKey(a, { x: 2 }).key).not.toBe(a.key)
 })
+
+
+test('audio retries retain a key but new takes with identical size and mime get a new key', () => {
+  const blob = new Blob(['first'], { type: 'audio/webm' })
+  const first = nextKey(null, { blob, mime: 'audio/webm' })
+  expect(nextKey(first, { blob, mime: 'audio/webm' }).key).toBe(first.key)
+  const second = new Blob(['other'], { type: 'audio/webm' })
+  expect(nextKey(first, { blob: second, mime: 'audio/webm' }).key).not.toBe(first.key)
+})

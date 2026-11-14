@@ -56,9 +56,9 @@ REPORT = {
     "limitations": ["Demo data, not a real analysis."],
     "priorities": [
         {"tag": "pace", "reason": "Pace is above the target range.", "exercise_ids": ["E06"]},
-        {"tag": "pauses", "reason": "Pauses are shorter than the target.", "exercise_ids": ["E07"]},
+        {"tag": "pauses", "reason": "Pauses are shorter than the target.", "exercise_ids": ["E08"]},
     ],
-    "recommended_exercise_ids": ["E06", "E07"],
+    "recommended_exercise_ids": ["E06", "E08"],
 }
 
 
@@ -100,7 +100,7 @@ def seed(s):
                 "demo": {"enabled": True, "date_override_used": False, "prepared_data": True},
             },
         }
-        p = generate_plan(a, REPORT, 2 if previous else 1)
+        p = generate_plan(a, REPORT, 2 if previous else 1, s.all("plan"))
         p["created_at"] = at
         if previous:
             for day, lesson in enumerate(p["lessons"][:6]):

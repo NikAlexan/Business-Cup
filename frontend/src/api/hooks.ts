@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { request } from './api'
 import type { Assessment, Attempt, Exercise, Job, Me, Plan, Progress, Recording, Today } from './types'
 
@@ -30,3 +30,16 @@ export const useAttempt = (id: string | null | undefined) =>
 
 export const useRecording = (id: string | null | undefined) =>
   useQuery({ queryKey: ['recording', id], queryFn: () => request<Recording>('/recordings/' + id), enabled: !!id })
+
+export const useAttemptHistory = (planItemId: string | undefined) =>
+  useInfiniteQuery({
+    queryKey: ['attempt-history', planItemId],
+    enabled: !!planItemId,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const query = new URLSearchParams({ plan_item_id: planItemId!, limit: '20' })
+      if (pageParam) query.set('cursor', pageParam)
+      return request<{ items: Attempt[]; next_cursor: string | null }>('/exercise-attempts?' + query)
+    },
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+  })

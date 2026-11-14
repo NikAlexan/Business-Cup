@@ -92,3 +92,19 @@ Sol 6.1 Max reviewed `f2e04a6`: overall 6.6/10. Content had real improvements, i
 3. Extend daily feedback beyond the basic quality check with useful, clearly sourced observations and reflection.
 4. Expand real browser journeys to full sessions, retries/network loss, settings/history and multiple viewport/theme states.
 5. Request another Max review after these product changes and browser evidence are available. Do not claim 9.5 without independent evidence.
+
+## Iteration 4: personalized sessions and repeatable practice
+
+- Catalog-v5 has 288 original variants: 24 per type, including 14 intermediate variants so experienced users can practice a full plan without repeating one variant inside it. Articulation now maps to appropriate vowel/consonant/word-ending work, not just a warm-up.
+- Explicitly recommended skills anchor each day. A pace recommendation for E06 appears daily; complementary skills rotate rather than always inserting E11 first. Two priorities are each represented in a session.
+- Completed intermediate practice is retained in later plans for that exercise. Unpracticed scheduled tasks do not imply experience. Levels describe the practice, not proven vocal mastery. Selection avoids repeats inside a plan before balancing historical usage. Vowel time estimates include all requested rounds.
+- Added explicit `practice_only` uploads/attempts for already completed owned exercises, including archived plan items. Extra practice never mutates the original plan/lesson/completion timestamp or grants notes. A rejected extra take leaves completion intact.
+- Unique accepted repeat recordings contribute recorded seconds once. Reusing an accepted recording with another key is rejected; same-key retries replay safely. Untimed extra confirmations still have unknown time and add no invented seconds. Extra attempts share the configured daily recording limit.
+- Added owned-item cursor-paginated take history and UI selection/playback. Latest repeat feedback survives reload; original takes remain available. Canceling a repeat preserves completed feedback.
+- Fixed upload key identity for Blob variables: the same Blob after a transport failure retains its key, but a new take gets a new operation key even with the same size/MIME. Explicit operation reset clears a failed key. Explicit false practice mode preserves old server fingerprints across deploys.
+- Fixed the baseline recorder's Retry path to start job polling; failed checks preserve the captured take. Missing account/limit responses now show a retryable error rather than silent missing controls or an unsupported-browser message.
+- Updated Postman with extra upload/save/history requests and current reward/time fields; removed the obsolete short-timer failure example. The collection has 32 requests and 88 examples (85 JSON bodies, with private audio/no-content examples separate).
+
+Iteration 4 verification: full backend run 147 passed; Ruff lint/format and diff whitespace checks passed. Frontend 43 tests and TypeScript/Vite/PWA build passed. Fresh Chromium tests passed against the isolated real API/worker: the mobile scenario now also records extra practice, verifies unchanged notes and increased recorded time, reloads its feedback, then selects and plays the original take. Browser checks still do not exercise a paid qualitative voice analysis.
+
+Next: independent Max review of the current product, then strengthen useful daily feedback beyond audio-quality confirmation and optional pace; extend real user journeys to full-session completion and error/recovery cases. Target 9.5 remains unproven.

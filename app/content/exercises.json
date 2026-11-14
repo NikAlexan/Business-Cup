@@ -1,9 +1,9 @@
 {
-  "catalog_version": "catalog-v4",
+  "catalog_version": "catalog-v5",
   "items": [
     {
       "id": "E01",
-      "version": 3,
+      "version": 4,
       "title": "Articulation warm-up",
       "goal": "Did the final sentence feel easier and relaxed, without extra effort?",
       "instruction": "Follow the movement sequence gently at speaking volume. Finish after the listed repetitions; there is no timer requirement. Skip any movement that feels uncomfortable.",
@@ -221,6 +221,46 @@
           "repetitions": 1,
           "action_duration_seconds": 40,
           "reflection_prompt": "Did the final sentence feel easier and relaxed, without extra effort?"
+        },
+        {
+          "id": "e01-v4-21",
+          "label": "Light changes",
+          "difficulty": "intermediate",
+          "text": "Say pa, ta, ka in four relaxed rounds. Say the paper is on the table twice, once emphasizing paper and once table. Keep your face and jaw easy throughout.",
+          "instruction": "Follow the movement sequence gently at speaking volume. Finish after the listed repetitions; there is no timer requirement. Skip any movement that feels uncomfortable.",
+          "repetitions": 1,
+          "action_duration_seconds": 40,
+          "reflection_prompt": "Did the final sentence feel easier and relaxed, without extra effort?"
+        },
+        {
+          "id": "e01-v4-22",
+          "label": "Phrase handoff",
+          "difficulty": "intermediate",
+          "text": "Say mee, nee, lee slowly for four rounds. Follow each round with meet me near the library. Release your tongue between rounds rather than pushing for speed.",
+          "instruction": "Follow the movement sequence gently at speaking volume. Finish after the listed repetitions; there is no timer requirement. Skip any movement that feels uncomfortable.",
+          "repetitions": 1,
+          "action_duration_seconds": 40,
+          "reflection_prompt": "Did the final sentence feel easier and relaxed, without extra effort?"
+        },
+        {
+          "id": "e01-v4-23",
+          "label": "Word edge reset",
+          "difficulty": "intermediate",
+          "text": "Say pack a bag, take a map, and close the gate. Complete four easy rounds. Between rounds, relax your jaw and let your lips return to their resting position.",
+          "instruction": "Follow the movement sequence gently at speaking volume. Finish after the listed repetitions; there is no timer requirement. Skip any movement that feels uncomfortable.",
+          "repetitions": 1,
+          "action_duration_seconds": 40,
+          "reflection_prompt": "Did the final sentence feel easier and relaxed, without extra effort?"
+        },
+        {
+          "id": "e01-v4-24",
+          "label": "Conversational warm-up",
+          "difficulty": "intermediate",
+          "text": "Say bay, bee, bow gently three times. Say today we begin together at conversational volume, then repeat it with a different word emphasized. Complete three rounds without forcing your voice.",
+          "instruction": "Follow the movement sequence gently at speaking volume. Finish after the listed repetitions; there is no timer requirement. Skip any movement that feels uncomfortable.",
+          "repetitions": 1,
+          "action_duration_seconds": 40,
+          "reflection_prompt": "Did the final sentence feel easier and relaxed, without extra effort?"
         }
       ],
       "content_locale": "en-US",
@@ -228,7 +268,7 @@
     },
     {
       "id": "E02",
-      "version": 4,
+      "version": 5,
       "title": "Comfortable vowels",
       "goal": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar.",
       "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
@@ -239,7 +279,8 @@
       },
       "duration_seconds": 35,
       "tags": [
-        "clarity"
+        "clarity",
+        "articulation"
       ],
       "verification": {
         "type": "self_confirmation",
@@ -446,6 +487,46 @@
           "repetitions": 3,
           "action_duration_seconds": 35,
           "reflection_prompt": "Could you keep the words distinct while allowing the neighboring vowels to connect?"
+        },
+        {
+          "id": "e02-v5-21",
+          "label": "Vowels with changing stress",
+          "difficulty": "intermediate",
+          "text": "We can meet after the meal. The team will leave when the street is clear. A little time together made the difficult week feel lighter.",
+          "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
+          "repetitions": 3,
+          "action_duration_seconds": 35,
+          "reflection_prompt": "Were the vowels still distinct as the stressed word changed?"
+        },
+        {
+          "id": "e02-v5-22",
+          "label": "Rounded vowels in connected speech",
+          "difficulty": "intermediate",
+          "text": "Who knew the route would loop through the woods? We took a blue canoe to the pool below the hill. The view grew wider as we moved.",
+          "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
+          "repetitions": 3,
+          "action_duration_seconds": 35,
+          "reflection_prompt": "Did the rounded vowels connect without swallowing a word?"
+        },
+        {
+          "id": "e02-v5-23",
+          "label": "Vowels in a short explanation",
+          "difficulty": "intermediate",
+          "text": "A map shows the shape of a place. A name helps us remember it. Together, the map and the name turn an unfamiliar space into somewhere we can describe.",
+          "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
+          "repetitions": 3,
+          "action_duration_seconds": 35,
+          "reflection_prompt": "Could you hear the contrast between map, name and place in the explanation?"
+        },
+        {
+          "id": "e02-v5-24",
+          "label": "Contrast in a story",
+          "difficulty": "intermediate",
+          "text": "Kate kept the red pen in a plain case. When she opened it on the train, a folded note fell out. The note named a place she had never seen.",
+          "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
+          "repetitions": 3,
+          "action_duration_seconds": 35,
+          "reflection_prompt": "Were the vowel differences clear while the passage still sounded like a story?"
         }
       ],
       "content_locale": "en-US",
@@ -453,7 +534,7 @@
     },
     {
       "id": "E03",
-      "version": 3,
+      "version": 4,
       "title": "Clear word endings",
       "goal": "Can you hear the final word of each phrase without it sounding pushed?",
       "instruction": "Record two passes. First, make each final sound easy to hear; next, keep those endings in natural connected speech. Do not add an extra vowel or hit the consonants hard.",
@@ -464,7 +545,8 @@
       },
       "duration_seconds": 70,
       "tags": [
-        "clarity"
+        "clarity",
+        "articulation"
       ],
       "verification": {
         "type": "recording",
@@ -671,6 +753,46 @@
           "repetitions": 2,
           "action_duration_seconds": null,
           "reflection_prompt": "Can you hear the final word of each phrase without it sounding pushed?"
+        },
+        {
+          "id": "e03-v4-21",
+          "label": "Precise handover",
+          "difficulty": "intermediate",
+          "text": "The first group left the signed forms at the front desk. The next shift checked the dates, counted the sheets, and placed each set in a separate box. Nothing moved until the final list matched.",
+          "instruction": "Record two passes. First, make each final sound easy to hear; next, keep those endings in natural connected speech. Do not add an extra vowel or hit the consonants hard.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Can you hear the final word of each phrase without it sounding pushed?"
+        },
+        {
+          "id": "e03-v4-22",
+          "label": "Closing sounds in contrast",
+          "difficulty": "intermediate",
+          "text": "She said the shop was closed, not that it had moved. The lights were off, the shelves were full, and a short note named the next opening date. We decided to come back on the first bus.",
+          "instruction": "Record two passes. First, make each final sound easy to hear; next, keep those endings in natural connected speech. Do not add an extra vowel or hit the consonants hard.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Can you hear the final word of each phrase without it sounding pushed?"
+        },
+        {
+          "id": "e03-v4-23",
+          "label": "A clear final line",
+          "difficulty": "intermediate",
+          "text": "The guide described the path, the steps, and the steep slope beside the lake. Most visitors listened without a word. Before we left, she added one last request: keep the gate shut.",
+          "instruction": "Record two passes. First, make each final sound easy to hear; next, keep those endings in natural connected speech. Do not add an extra vowel or hit the consonants hard.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Can you hear the final word of each phrase without it sounding pushed?"
+        },
+        {
+          "id": "e03-v4-24",
+          "label": "Natural endings through a paragraph",
+          "difficulty": "intermediate",
+          "text": "At dusk, the last guests crossed the yard and thanked the host. A child picked up a lost glove. Someone checked the lights. Then the door clicked shut, and the house settled into the quiet of the night.",
+          "instruction": "Record two passes. First, make each final sound easy to hear; next, keep those endings in natural connected speech. Do not add an extra vowel or hit the consonants hard.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Can you hear the final word of each phrase without it sounding pushed?"
         }
       ],
       "content_locale": "en-US",
@@ -678,7 +800,7 @@
     },
     {
       "id": "E04",
-      "version": 3,
+      "version": 4,
       "title": "Consonant combinations",
       "goal": "Which consonant combination stayed clear when you returned to conversational speed?",
       "instruction": "Record two passes: first slowly, then at conversational pace. Keep the consonant transitions clear without tightening your jaw. Accuracy matters more than speed.",
@@ -689,7 +811,8 @@
       },
       "duration_seconds": 64,
       "tags": [
-        "clarity"
+        "clarity",
+        "articulation"
       ],
       "verification": {
         "type": "recording",
@@ -896,6 +1019,46 @@
           "repetitions": 2,
           "action_duration_seconds": null,
           "reflection_prompt": "Which consonant combination stayed clear when you returned to conversational speed?"
+        },
+        {
+          "id": "e04-v4-21",
+          "label": "Several cluster families",
+          "difficulty": "intermediate",
+          "text": "The bright street display stood beside a small glass shelter. Fresh prints, plain cloth bags, and folded maps filled the shelves. Three travelers stopped to ask which path crossed the stream.",
+          "instruction": "Record two passes: first slowly, then at conversational pace. Keep the consonant transitions clear without tightening your jaw. Accuracy matters more than speed.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which consonant combination stayed clear when you returned to conversational speed?"
+        },
+        {
+          "id": "e04-v4-22",
+          "label": "Careful technical language",
+          "difficulty": "intermediate",
+          "text": "Please check the printed instructions before adjusting the spring. The first step releases the clamp; the next lets the bracket slide. Keep the spare screws in a shallow tray beside the workbench.",
+          "instruction": "Record two passes: first slowly, then at conversational pace. Keep the consonant transitions clear without tightening your jaw. Accuracy matters more than speed.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which consonant combination stayed clear when you returned to conversational speed?"
+        },
+        {
+          "id": "e04-v4-23",
+          "label": "Clusters through a story",
+          "difficulty": "intermediate",
+          "text": "A brisk wind swept through the playground. Grace grabbed the striped blanket while Clive stacked the plastic cups. Across the square, three friends struggled to fold a large blue groundsheet before the rain began.",
+          "instruction": "Record two passes: first slowly, then at conversational pace. Keep the consonant transitions clear without tightening your jaw. Accuracy matters more than speed.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which consonant combination stayed clear when you returned to conversational speed?"
+        },
+        {
+          "id": "e04-v4-24",
+          "label": "Clear without separating every word",
+          "difficulty": "intermediate",
+          "text": "The school orchestra practiced through a crowded spring schedule. String players shared the small rehearsal room with brass players. By Thursday, the first strong phrase sounded clear from the farthest seat in the hall.",
+          "instruction": "Record two passes: first slowly, then at conversational pace. Keep the consonant transitions clear without tightening your jaw. Accuracy matters more than speed.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which consonant combination stayed clear when you returned to conversational speed?"
         }
       ],
       "content_locale": "en-US",
@@ -903,7 +1066,7 @@
     },
     {
       "id": "E05",
-      "version": 3,
+      "version": 4,
       "title": "Tongue twister",
       "goal": "Did any sound disappear as you sped up? Choose one phrase to keep slower next time.",
       "instruction": "Record three rounds, leaving a normal breath between rounds. Begin slowly. Increase the pace only if every word stays clear; a slower clean round is a useful result.",
@@ -915,7 +1078,8 @@
       "duration_seconds": 79,
       "tags": [
         "clarity",
-        "pace"
+        "pace",
+        "articulation"
       ],
       "verification": {
         "type": "recording",
@@ -1122,6 +1286,46 @@
           "repetitions": 3,
           "action_duration_seconds": null,
           "reflection_prompt": "Did any sound disappear as you sped up? Choose one phrase to keep slower next time."
+        },
+        {
+          "id": "e05-v4-21",
+          "label": "Prints and plates",
+          "difficulty": "intermediate",
+          "text": "Priya printed plain plans on plastic plates. The plain plans pleased the patient printer. Priya placed the printed plates beside the plain paper plans.",
+          "instruction": "Record three rounds, leaving a normal breath between rounds. Begin slowly. Increase the pace only if every word stays clear; a slower clean round is a useful result.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did any sound disappear as you sped up? Choose one phrase to keep slower next time."
+        },
+        {
+          "id": "e05-v4-22",
+          "label": "Mixed bright sounds",
+          "difficulty": "intermediate",
+          "text": "Brisk breezes brushed the broad green branches. Bright birds brought brief bursts of song. Beneath the branches, three friends spread fresh bread on blue plates.",
+          "instruction": "Record three rounds, leaving a normal breath between rounds. Begin slowly. Increase the pace only if every word stays clear; a slower clean round is a useful result.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did any sound disappear as you sped up? Choose one phrase to keep slower next time."
+        },
+        {
+          "id": "e05-v4-23",
+          "label": "Specific shelves",
+          "difficulty": "intermediate",
+          "text": "Six small silver shelves stood straight. Stella stacked six specific sets of shells. Each silver shelf supported six small sets, and each set stayed separate.",
+          "instruction": "Record three rounds, leaving a normal breath between rounds. Begin slowly. Increase the pace only if every word stays clear; a slower clean round is a useful result.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did any sound disappear as you sped up? Choose one phrase to keep slower next time."
+        },
+        {
+          "id": "e05-v4-24",
+          "label": "Ribbons and rails",
+          "difficulty": "intermediate",
+          "text": "Rory regularly rolled red ribbons round the rail. Lily rarely rolled yellow ribbons round it. Red ribbons rolled left; yellow ribbons rolled right.",
+          "instruction": "Record three rounds, leaving a normal breath between rounds. Begin slowly. Increase the pace only if every word stays clear; a slower clean round is a useful result.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did any sound disappear as you sped up? Choose one phrase to keep slower next time."
         }
       ],
       "content_locale": "en-US",
@@ -1129,7 +1333,7 @@
     },
     {
       "id": "E06",
-      "version": 3,
+      "version": 4,
       "title": "Steady reading pace",
       "goal": "Did the listener have time to follow the ideas, especially at the end of each sentence?",
       "instruction": "Read the passage once at an even conversational pace. The 120–150 wpm practice band is an optional pacing drill, not a universal ideal or a pass/fail rule. Stop when the passage ends.",
@@ -1349,6 +1553,46 @@
           "repetitions": 1,
           "action_duration_seconds": null,
           "reflection_prompt": "Did the listener have time to follow the ideas, especially at the end of each sentence?"
+        },
+        {
+          "id": "e06-v4-21",
+          "label": "Making instructions usable",
+          "difficulty": "intermediate",
+          "text": "The original instructions made sense to the people who wrote them. They had built the device and knew the purpose of every part. A new user had none of that background. When the team watched someone follow the guide, they found several missing steps. The revision used simpler words, clearer pictures, and one action at a time. It was longer on paper and faster to use.",
+          "instruction": "Read the passage once at an even conversational pace. The 120–150 wpm practice band is an optional pacing drill, not a universal ideal or a pass/fail rule. Stop when the passage ends.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the listener have time to follow the ideas, especially at the end of each sentence?"
+        },
+        {
+          "id": "e06-v4-22",
+          "label": "Two kinds of progress",
+          "difficulty": "intermediate",
+          "text": "At the end of the month, the project had produced fewer finished pieces than expected. The team had also discovered a method that reduced mistakes. The first figure looked disappointing; the second explained why the work had taken longer. In their report, they included both. A useful account of progress needed to describe what had been completed and what had been learned.",
+          "instruction": "Read the passage once at an even conversational pace. The 120–150 wpm practice band is an optional pacing drill, not a universal ideal or a pass/fail rule. Stop when the passage ends.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the listener have time to follow the ideas, especially at the end of each sentence?"
+        },
+        {
+          "id": "e06-v4-23",
+          "label": "A careful public update",
+          "difficulty": "intermediate",
+          "text": "The repairs are almost complete, but the bridge will remain closed until the final inspection. Pedestrians can use the temporary crossing beside the park. Drivers should follow the signs through the village. We will publish another update on Thursday afternoon, even if the opening date has not changed. That way, everyone will know when the information was last checked.",
+          "instruction": "Read the passage once at an even conversational pace. The 120–150 wpm practice band is an optional pacing drill, not a universal ideal or a pass/fail rule. Stop when the passage ends.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the listener have time to follow the ideas, especially at the end of each sentence?"
+        },
+        {
+          "id": "e06-v4-24",
+          "label": "A place for questions",
+          "difficulty": "intermediate",
+          "text": "The speaker planned to finish with a short summary. Instead, a question from the audience led to a more useful ending. Someone asked which part of the proposal remained uncertain. She set the final slide aside and explained the limits of the evidence. The discussion became more specific. People left with a clearer understanding of both the idea and the decisions still to be made.",
+          "instruction": "Read the passage once at an even conversational pace. The 120–150 wpm practice band is an optional pacing drill, not a universal ideal or a pass/fail rule. Stop when the passage ends.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the listener have time to follow the ideas, especially at the end of each sentence?"
         }
       ],
       "content_locale": "en-US",
@@ -1356,7 +1600,7 @@
     },
     {
       "id": "E07",
-      "version": 3,
+      "version": 4,
       "title": "Explore different tempos",
       "goal": "Which pace best supported the meaning? Did clarity change between passes?",
       "instruction": "Read the whole passage twice in one take. Make the first pass deliberately unhurried and the second conversational. Keep both comfortable; compare the effect rather than racing.",
@@ -1574,6 +1818,46 @@
           "repetitions": 2,
           "action_duration_seconds": null,
           "reflection_prompt": "Which pace best supported the meaning? Did clarity change between passes?"
+        },
+        {
+          "id": "e07-v4-21",
+          "label": "An urgent opening and calm resolution",
+          "difficulty": "intermediate",
+          "text": "The alarm sounded before anyone could see the problem. Staff moved toward the entrance, checked the rooms, and called the building manager. A faulty sensor was found in the kitchen. Once it was replaced, everyone returned to the meeting.",
+          "instruction": "Read the whole passage twice in one take. Make the first pass deliberately unhurried and the second conversational. Keep both comfortable; compare the effect rather than racing.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which pace best supported the meaning? Did clarity change between passes?"
+        },
+        {
+          "id": "e07-v4-22",
+          "label": "A slowly emerging clue",
+          "difficulty": "intermediate",
+          "text": "At first, the marks looked accidental. They appeared along the edge of every second page. We copied them into a notebook and stepped back from the desk. Only then did the shape of a small map begin to emerge.",
+          "instruction": "Read the whole passage twice in one take. Make the first pass deliberately unhurried and the second conversational. Keep both comfortable; compare the effect rather than racing.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which pace best supported the meaning? Did clarity change between passes?"
+        },
+        {
+          "id": "e07-v4-23",
+          "label": "Momentum without rushing",
+          "difficulty": "intermediate",
+          "text": "The team unpacked the equipment, checked the cables, and tested the microphone. One connection failed. They replaced the cable, repeated the check, and opened the doors. The audience arrived to find a quiet room that was ready.",
+          "instruction": "Read the whole passage twice in one take. Make the first pass deliberately unhurried and the second conversational. Keep both comfortable; compare the effect rather than racing.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which pace best supported the meaning? Did clarity change between passes?"
+        },
+        {
+          "id": "e07-v4-24",
+          "label": "The value of a pause",
+          "difficulty": "intermediate",
+          "text": "He reached the final sentence and stopped. There was no missing word and no forgotten line. He wanted the room to consider the question before hearing his answer. When he continued, the same words carried a different weight.",
+          "instruction": "Read the whole passage twice in one take. Make the first pass deliberately unhurried and the second conversational. Keep both comfortable; compare the effect rather than racing.",
+          "repetitions": 2,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Which pace best supported the meaning? Did clarity change between passes?"
         }
       ],
       "content_locale": "en-US",
@@ -1581,7 +1865,7 @@
     },
     {
       "id": "E08",
-      "version": 3,
+      "version": 4,
       "title": "Meaningful pauses",
       "goal": "Did the pauses clarify the ideas, or did any pause interrupt a thought?",
       "instruction": "Read the passage once. Each slash suggests a thought boundary: pause only long enough for the meaning to land. Do not say the slash aloud. Keep the phrases connected.",
@@ -1800,6 +2084,46 @@
           "repetitions": 1,
           "action_duration_seconds": null,
           "reflection_prompt": "Did the pauses clarify the ideas, or did any pause interrupt a thought?"
+        },
+        {
+          "id": "e08-v4-21",
+          "label": "Nested ideas",
+          "difficulty": "intermediate",
+          "text": "The plan looks simple / if we consider only the first step. Once we include maintenance / training / and the time needed for repairs / the choice becomes less obvious. We need to compare the whole service / rather than the opening day.",
+          "instruction": "Read the passage once. Each slash suggests a thought boundary: pause only long enough for the meaning to land. Do not say the slash aloud. Keep the phrases connected.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the pauses clarify the ideas, or did any pause interrupt a thought?"
+        },
+        {
+          "id": "e08-v4-22",
+          "label": "An important distinction",
+          "difficulty": "intermediate",
+          "text": "The survey tells us what people reported / during one particular week. It does not tell us why they answered that way / or whether they would answer differently next month. Those are useful questions / for a separate study.",
+          "instruction": "Read the passage once. Each slash suggests a thought boundary: pause only long enough for the meaning to land. Do not say the slash aloud. Keep the phrases connected.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the pauses clarify the ideas, or did any pause interrupt a thought?"
+        },
+        {
+          "id": "e08-v4-23",
+          "label": "A delayed discovery",
+          "difficulty": "intermediate",
+          "text": "Behind the photograph / hidden between the frame and its backing / was a second picture. It showed the same room / from the opposite corner. The doorway we had been searching for / had been there all along.",
+          "instruction": "Read the passage once. Each slash suggests a thought boundary: pause only long enough for the meaning to land. Do not say the slash aloud. Keep the phrases connected.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the pauses clarify the ideas, or did any pause interrupt a thought?"
+        },
+        {
+          "id": "e08-v4-24",
+          "label": "Speaking to the room",
+          "difficulty": "intermediate",
+          "text": "Before I describe the results / I want to explain what we measured. We counted completed journeys / not planned journeys. That difference matters / because a service can look available on paper / and still fail the people waiting for it.",
+          "instruction": "Read the passage once. Each slash suggests a thought boundary: pause only long enough for the meaning to land. Do not say the slash aloud. Keep the phrases connected.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the pauses clarify the ideas, or did any pause interrupt a thought?"
         }
       ],
       "content_locale": "en-US",
@@ -1807,7 +2131,7 @@
     },
     {
       "id": "E09",
-      "version": 3,
+      "version": 4,
       "title": "Statement, question, list",
       "goal": "Could a listener tell which lines were questions without seeing the punctuation?",
       "instruction": "Read once. Make the statements sound settled, the repeated question genuinely curious, and the list easy to follow. Explore a comfortable pitch range; not every question needs a rising ending.",
@@ -2025,6 +2349,46 @@
           "repetitions": 1,
           "action_duration_seconds": null,
           "reflection_prompt": "Could a listener tell which lines were questions without seeing the punctuation?"
+        },
+        {
+          "id": "e09-v4-21",
+          "label": "Question inside a narrative",
+          "difficulty": "intermediate",
+          "text": "She said the whole road was closed. The whole road was closed? We had checked the bridge, the crossing, and the station entrance. Could we still reach the square on foot? The answer changed our plans.",
+          "instruction": "Read once. Make the statements sound settled, the repeated question genuinely curious, and the list easy to follow. Explore a comfortable pitch range; not every question needs a rising ending.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Could a listener tell which lines were questions without seeing the punctuation?"
+        },
+        {
+          "id": "e09-v4-22",
+          "label": "A list with a final contrast",
+          "difficulty": "intermediate",
+          "text": "We can repair the handle. We can repair the handle? Yes: the hinge, the catch, and the loose screw are all replaceable. What cannot be repaired? The glass will need to be replaced.",
+          "instruction": "Read once. Make the statements sound settled, the repeated question genuinely curious, and the list easy to follow. Explore a comfortable pitch range; not every question needs a rising ending.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Could a listener tell which lines were questions without seeing the punctuation?"
+        },
+        {
+          "id": "e09-v4-23",
+          "label": "Certainty that changes",
+          "difficulty": "intermediate",
+          "text": "The parcel arrived yesterday. The parcel arrived yesterday? The receipt lists the date, the address, and a signature. Whose signature is it? That is the part we still need to confirm.",
+          "instruction": "Read once. Make the statements sound settled, the repeated question genuinely curious, and the list easy to follow. Explore a comfortable pitch range; not every question needs a rising ending.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Could a listener tell which lines were questions without seeing the punctuation?"
+        },
+        {
+          "id": "e09-v4-24",
+          "label": "Genuine curiosity",
+          "difficulty": "intermediate",
+          "text": "You learned the whole piece by listening. You learned the whole piece by listening? The rhythm, the melody, and the quiet changes between phrases? How did you remember the opening? I would like to hear the story.",
+          "instruction": "Read once. Make the statements sound settled, the repeated question genuinely curious, and the list easy to follow. Explore a comfortable pitch range; not every question needs a rising ending.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Could a listener tell which lines were questions without seeing the punctuation?"
         }
       ],
       "content_locale": "en-US",
@@ -2032,7 +2396,7 @@
     },
     {
       "id": "E10",
-      "version": 3,
+      "version": 4,
       "title": "Change the emphasis",
       "goal": "How did moving the emphasis change what the listener would understand?",
       "instruction": "Read the passage three times. On the first pass, emphasize who or what; on the second, the action or contrast; on the third, the detail that matters most to you. Use timing and pitch, not extra loudness.",
@@ -2251,6 +2615,46 @@
           "repetitions": 3,
           "action_duration_seconds": null,
           "reflection_prompt": "How did moving the emphasis change what the listener would understand?"
+        },
+        {
+          "id": "e10-v4-21",
+          "label": "Changing the implied question",
+          "difficulty": "intermediate",
+          "text": "We asked the designer to revise the entrance. We did not ask her to rebuild the entire plan. The change should make the doorway easier to find and the route easier to follow.",
+          "instruction": "Read the passage three times. On the first pass, emphasize who or what; on the second, the action or contrast; on the third, the detail that matters most to you. Use timing and pitch, not extra loudness.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "How did moving the emphasis change what the listener would understand?"
+        },
+        {
+          "id": "e10-v4-22",
+          "label": "A contrast without accusation",
+          "difficulty": "intermediate",
+          "text": "I wanted to understand your decision. I was not asking you to defend it. If we can explain the reasons clearly, the rest of the team will have a better starting point.",
+          "instruction": "Read the passage three times. On the first pass, emphasize who or what; on the second, the action or contrast; on the third, the detail that matters most to you. Use timing and pitch, not extra loudness.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "How did moving the emphasis change what the listener would understand?"
+        },
+        {
+          "id": "e10-v4-23",
+          "label": "Evidence and limits",
+          "difficulty": "intermediate",
+          "text": "This recording shows how you read today. It does not predict how every audience will respond. Listen for the phrases that carried the meaning, then choose one detail to explore in your next take.",
+          "instruction": "Read the passage three times. On the first pass, emphasize who or what; on the second, the action or contrast; on the third, the detail that matters most to you. Use timing and pitch, not extra loudness.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "How did moving the emphasis change what the listener would understand?"
+        },
+        {
+          "id": "e10-v4-24",
+          "label": "A decision with several meanings",
+          "difficulty": "intermediate",
+          "text": "They chose to keep the old building. The rooms would change, and the entrance would move, but the structure would remain. The decision preserved something familiar while making room for a different use.",
+          "instruction": "Read the passage three times. On the first pass, emphasize who or what; on the second, the action or contrast; on the third, the detail that matters most to you. Use timing and pitch, not extra loudness.",
+          "repetitions": 3,
+          "action_duration_seconds": null,
+          "reflection_prompt": "How did moving the emphasis change what the listener would understand?"
         }
       ],
       "content_locale": "en-US",
@@ -2258,7 +2662,7 @@
     },
     {
       "id": "E11",
-      "version": 3,
+      "version": 4,
       "title": "Comfortable breath groups",
       "goal": "Did the ends of the phrases stay easy and audible? Where would an extra breath help?",
       "instruction": "Read once, using each slash as a possible place for a normal breath. Take extra breaths whenever needed; never hold your breath or squeeze out a phrase. Do not say the slash aloud.",
@@ -2476,6 +2880,46 @@
           "repetitions": 1,
           "action_duration_seconds": null,
           "reflection_prompt": "Did the ends of the phrases stay easy and audible? Where would an extra breath help?"
+        },
+        {
+          "id": "e11-v4-21",
+          "label": "Long thought, easy delivery",
+          "difficulty": "intermediate",
+          "text": "The guide asked us to notice the shape of the valley. / From the bridge, its steep sides looked almost straight. / Higher on the path, a second curve appeared behind the trees. / The view changed because we had moved.",
+          "instruction": "Read once, using each slash as a possible place for a normal breath. Take extra breaths whenever needed; never hold your breath or squeeze out a phrase. Do not say the slash aloud.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the ends of the phrases stay easy and audible? Where would an extra breath help?"
+        },
+        {
+          "id": "e11-v4-22",
+          "label": "Phrasing an explanation",
+          "difficulty": "intermediate",
+          "text": "A clear explanation begins with what the listener already knows. / It adds one useful detail before introducing the next. / If the sentence becomes difficult to carry comfortably, there is usually room to divide the thought. / Meaning matters more than a long breath.",
+          "instruction": "Read once, using each slash as a possible place for a normal breath. Take extra breaths whenever needed; never hold your breath or squeeze out a phrase. Do not say the slash aloud.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the ends of the phrases stay easy and audible? Where would an extra breath help?"
+        },
+        {
+          "id": "e11-v4-23",
+          "label": "A story with short resets",
+          "difficulty": "intermediate",
+          "text": "The room looked empty. / Then the curtain moved beside the window. / Someone had left a small table behind it, with two cups and an unfinished letter. / We stopped at the doorway. / It no longer felt like an unused room.",
+          "instruction": "Read once, using each slash as a possible place for a normal breath. Take extra breaths whenever needed; never hold your breath or squeeze out a phrase. Do not say the slash aloud.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the ends of the phrases stay easy and audible? Where would an extra breath help?"
+        },
+        {
+          "id": "e11-v4-24",
+          "label": "Ending with enough ease",
+          "difficulty": "intermediate",
+          "text": "The work took longer than anyone expected. / Several ideas failed before a simple change solved the problem. / Looking back, the team could explain every step. / At the time, they had only known which question to try next.",
+          "instruction": "Read once, using each slash as a possible place for a normal breath. Take extra breaths whenever needed; never hold your breath or squeeze out a phrase. Do not say the slash aloud.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Did the ends of the phrases stay easy and audible? Where would an extra breath help?"
         }
       ],
       "content_locale": "en-US",
@@ -2483,7 +2927,7 @@
     },
     {
       "id": "E12",
-      "version": 3,
+      "version": 4,
       "title": "New narrator read",
       "goal": "Where did the story change? Could you hear that turn in your delivery?",
       "instruction": "Read once to one interested listener. Identify the change or discovery in the story, and let it shape your pace and emphasis. Use your natural voice, then listen back before moving on.",
@@ -2697,6 +3141,46 @@
           "label": "The last light",
           "difficulty": "intermediate",
           "text": "Most windows on the street were dark when the storm ended. One kitchen still glowed at the corner. Inside, neighbors who usually exchanged only greetings shared tea from mismatched cups. The power returned before midnight, and people began to collect their coats. Someone suggested meeting again without waiting for another storm. This time, they chose a date before leaving.",
+          "instruction": "Read once to one interested listener. Identify the change or discovery in the story, and let it shape your pace and emphasis. Use your natural voice, then listen back before moving on.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Where did the story change? Could you hear that turn in your delivery?"
+        },
+        {
+          "id": "e12-v4-21",
+          "label": "The empty chair",
+          "difficulty": "intermediate",
+          "text": "For the first few meetings, one chair at the table stayed empty. The invitation had reached everyone, but the meeting time conflicted with the last bus from the outlying village. When the organizer finally asked about the empty place, the answer was simple. The next meeting began an hour earlier. A new participant arrived carrying a folder of questions the group had not yet considered.",
+          "instruction": "Read once to one interested listener. Identify the change or discovery in the story, and let it shape your pace and emphasis. Use your natural voice, then listen back before moving on.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Where did the story change? Could you hear that turn in your delivery?"
+        },
+        {
+          "id": "e12-v4-22",
+          "label": "A different kind of archive",
+          "difficulty": "intermediate",
+          "text": "The museum asked residents to bring objects that told a story about the town. Some arrived with carefully preserved photographs. Others brought a chipped cup, a bus ticket, or a key to a demolished shop. The labels took longer to write than expected. Every ordinary object opened a conversation. By the end of the week, the display had become less a collection of things than a record of people explaining why they had kept them.",
+          "instruction": "Read once to one interested listener. Identify the change or discovery in the story, and let it shape your pace and emphasis. Use your natural voice, then listen back before moving on.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Where did the story change? Could you hear that turn in your delivery?"
+        },
+        {
+          "id": "e12-v4-23",
+          "label": "The sound behind the wall",
+          "difficulty": "intermediate",
+          "text": "The old theater had been quiet for years when a builder heard music behind the stage wall. A small rehearsal room, sealed off during an earlier renovation, still held a working radio. Nobody could explain who had left it there. The discovery made a good newspaper story. What mattered more to the local choir was the room itself: dry, bright, and just large enough for a dozen voices.",
+          "instruction": "Read once to one interested listener. Identify the change or discovery in the story, and let it shape your pace and emphasis. Use your natural voice, then listen back before moving on.",
+          "repetitions": 1,
+          "action_duration_seconds": null,
+          "reflection_prompt": "Where did the story change? Could you hear that turn in your delivery?"
+        },
+        {
+          "id": "e12-v4-24",
+          "label": "The final correction",
+          "difficulty": "intermediate",
+          "text": "The guidebook was ready to print when an elderly reader returned a marked copy. Most corrections were small: a spelling, a date, the name of a shop. One note changed a larger story. The person credited with saving the village records had not worked alone. Three neighbors had carried the boxes out together. The editor added their names and delayed the printing by a day. It was a correction worth making.",
           "instruction": "Read once to one interested listener. Identify the change or discovery in the story, and let it shape your pace and emphasis. Use your natural voice, then listen back before moving on.",
           "repetitions": 1,
           "action_duration_seconds": null,

@@ -161,6 +161,8 @@ export type Job = {
 }
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
+  practice_only?: boolean
+  created_at?: string
   recording_id?: string | null
   id: string
   plan_item_id: string

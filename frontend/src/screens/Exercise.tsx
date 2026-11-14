@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, post, useMutationWithKey } from '../api/api'
-import { useAttempt, useJob, useMe, usePlan, useRecording, useToday } from '../api/hooks'
+import { useAttempt, useAttemptHistory, useJob, useMe, usePlan, useRecording, useToday } from '../api/hooks'
 import type { Attempt, Lesson, PlanItem } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
@@ -18,7 +18,7 @@ import { formatEstimate } from '../lib/format'
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const REASON = { exercise_completed: 'Exercise complete', quality_bonus: 'Clean recording bonus' }
 
-type Body = { plan_item_id: string; elapsed_seconds?: number; self_confirmed?: boolean; recording_id?: string }
+type Body = { plan_item_id: string; practice_only?: boolean; elapsed_seconds?: number; self_confirmed?: boolean; recording_id?: string }
 
 function TimerCheck({ text, min, onFinish, busy }: { text: string; min: number; onFinish: (s: number) => void; busy: boolean }) {
   const [running, setRunning] = useState(false)
@@ -71,7 +71,7 @@ function SelfCheck({ onFinish, busy }: { onFinish: () => void; busy: boolean }) 
   )
 }
 
-function RecordCheck({ item, accepted, serverLimit, onRecorded, busy }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean }) {
+function RecordCheck({ item, accepted, serverLimit, onRecorded, busy, practiceOnly }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean }) {
   const max = Math.min(item.task.verification.max_recording_seconds ?? 90, serverLimit)
   const r = useRecorder({ maxSeconds: max, accepted })
   const [job, setJob] = useState<{ id: string; rec: string } | null>(null)
@@ -79,7 +79,7 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, busy }: { item: 
   const [checkedRecording, setCheckedRecording] = useState<string | null>(null)
   useEffect(() => setCheckedRecording(null), [r.blob])
   const [checkError, setCheckError] = useState<string | null>(null)
-  const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) => uploadRecording({ purpose: 'exercise', plan_item_id: item.id }, v.blob, v.mime, key))
+  const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) => uploadRecording({ purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}) }, v.blob, v.mime, key))
   useEffect(() => {
     const s = j.data?.status
     if (s === 'failed') {
@@ -139,12 +139,20 @@ export default function Exercise() {
   useRedirectOn401(today.error)
   const found = locate(planItemId, [today.data?.lesson, ...(plan.data?.lessons ?? [])])
   const [localResult, setResult] = useState<Attempt | null>(null)
+  const [repeatFor, setRepeatFor] = useState<string | null>(null)
+  const practicingAgain = repeatFor === planItemId
+  const latestLocal = localResult?.plan_item_id === planItemId ? localResult : null
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const completed = found?.item.status === 'completed' || latestLocal?.status === 'passed'
+  const history = useAttemptHistory(completed ? found?.item.id : undefined)
+  const takes = history.data?.pages.flatMap((page) => page.items) ?? []
+  const selected = selectedId ? takes.find((take) => take.id === selectedId) : takes[0]
   const savedAttempt = useAttempt(found?.item.latest_attempt_id)
-  const result = localResult ?? savedAttempt.data ?? null
+  const result = latestLocal ?? selected ?? savedAttempt.data ?? null
   const savedRecording = useRecording(result?.recording_id)
   const attempt = useMutationWithKey((b: Body, key) => post<Attempt>('/exercise-attempts', b, key))
 
-  useEffect(() => setResult(null), [planItemId])
+  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null) }, [planItemId])
 
   if (today.isPending || plan.isPending) return <Frame><Skeleton height={360} /></Frame>
   if (!found) return <Frame><ErrorBanner text="This exercise is not in your plan." /><Link className="rs-link" to="/today">Back to today</Link></Frame>
@@ -154,10 +162,14 @@ export default function Exercise() {
   const v = item.task.verification
   const submit = (b: Omit<Body, 'plan_item_id'>) =>
     attempt.mutate(
-      { plan_item_id: item.id, ...b },
+      { plan_item_id: item.id, ...(practicingAgain ? { practice_only: true } : {}), ...b },
       {
         onSuccess: (a) => {
           setResult(a)
+          setSelectedId(a.id)
+          if (a.status === 'passed') setRepeatFor(null)
+          void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] })
+          void qc.invalidateQueries({ queryKey: ['progress'] })
           void qc.invalidateQueries({ queryKey: ['today'] })
           void qc.invalidateQueries({ queryKey: ['plan'] })
           void qc.invalidateQueries({ queryKey: ['me'] })
@@ -167,7 +179,7 @@ export default function Exercise() {
         },
       },
     )
-  const passed = result?.status === 'passed' || (item.status === 'completed' && !result)
+  const showOutcome = completed && !practicingAgain
   const progress = Math.round(((lesson.items.filter((x) => x.status === 'completed').length) / lesson.items.length) * 100)
 
   return (
@@ -185,7 +197,7 @@ export default function Exercise() {
 
               <span>About {formatEstimate(item.estimated_duration_seconds)}</span>
               <span>{item.difficulty ?? ''}</span>
-              <span>+{item.notes_available} notes</span>
+              <span>{completed ? 'Completion already credited' : `+${item.notes_available} notes`}</span>
             </div>
             {item.variant_label && <h2 className="rs-h" style={{ fontSize: 22 }}>{item.variant_label}</h2>}
             <p style={{ margin: 0, color: 'var(--muted)' }}>{item.task.instruction}</p>
@@ -202,18 +214,21 @@ export default function Exercise() {
             )}
           </div>
           <div className="rs-stack" style={{ gap: 16 }}>
-            {(v.type === 'self_confirmation' || passed) && (
+            {(v.type === 'self_confirmation' || showOutcome) && (
               <div className="rs-card" style={{ padding: 28 }}>
                 {item.task.steps?.length ? <ol>{item.task.steps.map((step, n) => <li key={n}>{step}</li>)}</ol> : <ScriptText text={item.task.text} />}
               </div>
             )}
-            {passed ? (
+            {showOutcome ? (
               <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }} role="status">
-                <h2 className="rs-h" style={{ fontSize: 22 }}>{result ? 'Practice complete' : 'Already done'}</h2>
+                <h2 className="rs-h" style={{ fontSize: 22 }}>{result?.status === 'needs_retry' ? 'Take needs another try' : result?.practice_only ? 'Extra practice saved' : result ? 'Practice complete' : 'Already done'}</h2>
                 {result && <p style={{ margin: 0 }}>{result.feedback.summary}</p>}
+                {result?.practice_only && <p style={{ margin: 0 }}>Extra practice does not add notes or complete the session again.</p>}
+                {result?.status === 'needs_retry' && <p>Your exercise remains completed. This take needs another try.</p>}
+                {result?.feedback.issues.map((issue) => <p key={issue.code} style={{ margin: 0 }}>{issue.message}</p>)}
                 {typeof result?.feedback.metrics?.speaking_rate_wpm?.value === 'number' && <p style={{ margin: 0 }}>Measured pace: {Math.round(result.feedback.metrics.speaking_rate_wpm.value)} words/min</p>}
-                {savedAttempt.isPending && item.latest_attempt_id && !localResult && <p>Loading your saved feedback…</p>}
-                {savedAttempt.error && !localResult && <ErrorBanner error={savedAttempt.error} onRetry={() => savedAttempt.refetch()} />}
+                {savedAttempt.isPending && item.latest_attempt_id && !latestLocal && <p>Loading your saved feedback…</p>}
+                {savedAttempt.error && !latestLocal && <ErrorBanner error={savedAttempt.error} onRetry={() => savedAttempt.refetch()} />}
                 {savedRecording.data?.audio_url && <audio controls preload="metadata" aria-label="Your completed take" src={savedRecording.data.audio_url} style={{ width: '100%' }} />}
                 {savedRecording.error && <ErrorBanner error={savedRecording.error} onRetry={() => savedRecording.refetch()} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
@@ -222,12 +237,16 @@ export default function Exercise() {
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
                   </div>
                 ))}
+                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
+                  Practice again — no extra notes
+                </button>
                 <button className="rs-btn rs-btn--wide" type="button" onClick={goNext} style={{ alignSelf: 'flex-start' }}>
                   {nextItem ? 'Next exercise' : 'Finish session'}
                 </button>
               </div>
             ) : (
               <>
+                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.</span><button className="rs-link" type="button" disabled={attempt.isPending} onClick={() => { setRepeatFor(null); setResult(null); attempt.reset() }}>Cancel extra practice</button></div>}
                 {result?.status === 'needs_retry' && (
                   <div className="rs-banner rs-banner--warn" role="status">
                     <div className="rs-stack" style={{ gap: 2 }}>
@@ -241,9 +260,22 @@ export default function Exercise() {
                 {attempt.error && !(attempt.error instanceof ApiError && attempt.error.code === 'plan_item_already_completed') && <ErrorBanner error={attempt.error} />}
                 {v.type === 'timer' && <TimerCheck key={result?.id} text={item.task.text} min={v.min_elapsed_seconds ?? 30} busy={attempt.isPending} onFinish={(s) => submit({ elapsed_seconds: s })} />}
                 {v.type === 'self_confirmation' && <SelfCheck key={item.id} busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
-                {v.type === 'recording' && me.data && <RecordCheck key={item.id} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending} onRecorded={(id) => submit({ recording_id: id })} />}
+                {v.type === 'recording' && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
+                {v.type === 'recording' && me.isPending && <Skeleton height={160} />}
+                {v.type === 'recording' && me.data && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending} onRecorded={(id) => submit({ recording_id: id })} />}
               </>
             )}
+            {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>
+              <h2 className="rs-h" style={{ fontSize: 22 }}>Your takes</h2>
+              {history.isPending && <p>Loading your takes…</p>}
+              {history.error && <ErrorBanner error={history.error} onRetry={() => history.refetch()} />}
+              <ol className="rs-stack" style={{ paddingLeft: 22, gap: 10 }}>
+                {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending} onClick={() => { setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
+                  {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US') : ''}
+                </button></li>)}
+              </ol>
+              {history.hasNextPage && <button className="rs-btn rs-btn--secondary" type="button" disabled={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>Load earlier takes</button>}
+            </section>}
           </div>
         </div>
       </main>

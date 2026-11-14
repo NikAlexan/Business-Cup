@@ -1,6 +1,6 @@
 # Exercise catalog and plan snapshots
 
-Catalog `catalog-v4`, task schema 2. There are 12 exercise types and 20 original variants per type (240 total). The ten beginner and ten intermediate variants have separate identities, labels, texts, repetitions and listening/reflection prompts. The categories are original speaking practice based on vocal variety and comfortable voice use, not validated medical treatments.
+Catalog `catalog-v5`, task schema 2. There are 12 exercise types and 24 original variants per type (288 total). The ten beginner and fourteen intermediate variants have separate identities, labels, texts, repetitions and listening/reflection prompts. The categories are original speaking practice based on vocal variety and comfortable voice use, not validated medical treatments.
 
 ## Content and practice
 
@@ -29,12 +29,21 @@ Catalog `catalog-v4`, task schema 2. There are 12 exercise types and 20 original
 
 ## Rotation and feedback
 
-Plan generation considers variant usage across prior plans, chooses the least-used variant within the day's difficulty, and updates usage within the new plan. The first and second halves introduce beginner and intermediate material. Exhausted pools rotate evenly; issued snapshots and history stay unchanged.
+Plan generation considers variant usage across prior plans, chooses the least-used variant within the day's difficulty, and updates usage within the new plan. The first and second halves introduce beginner and intermediate material for new practitioners. A completed intermediate task preserves that practice level for its exercise in the next plan; issued-but-unpracticed tasks do not imply experience or mastery. Recommended skills anchor each day; complementary skills rotate rather than always favoring breath work. Exhausted pools rotate evenly; issued snapshots and history stay unchanged.
 
 Audio issues such as silence or clipping require another take. Pace outside the drill's band is coaching, not a failed attempt. Missing credentials, rate limits or other expected provider failures during optional exercise transcription preserve accepted audio and return unavailable measurements with a reason. The full baseline/check-in assessment still requires its analysis to succeed.
 
-The exercise screen restores saved attempt feedback through `latest_attempt_id`, shows available measured pace, and preserves the checked take for resending an attempt after a transport error. Completed takes can be played beside their saved feedback, including after reload. A full qualitative AI review and uncredited optional repeat after completion remain further work; quality checks do not claim to score diction or expression.
+The exercise screen restores saved attempt feedback through `latest_attempt_id`, shows available measured pace, and preserves the checked take for resending an attempt after a transport error. Completed takes can be played beside their saved feedback, including after reload. A full qualitative AI review remains further work; quality checks do not claim to score diction or expression.
 
 ## Validation
 
 `tests/test_content.py` checks catalog uniqueness, minimum variant counts, timing and snapshots, all single/pair priority combinations, six plan cycles and pool exhaustion. `tests/test_exercise_completion.py` covers advisory pace, optional transcription failures, removed live catalog entries, legacy timers and honest time accounting.
+
+
+## Extra practice and take history
+
+The first successful attempt retains the plan item's completion timestamp and `latest_attempt_id`. Additional practice requires explicit `practice_only=true` in the upload form and attempt JSON, and an already completed owned item. Completed items from archived plans are eligible through the API; locked/pending items cannot use this mode. Recording mode must match the upload. A passed recording can be used once; network retries must reuse their Idempotency-Key. Explicit false preserves the original request fingerprint for existing clients.
+
+Extra attempts keep their own feedback, recording ID and timestamps. They award zero notes and do not mutate the saved plan, lesson status, completion date, streak or reassessment availability. A failed repeat leaves the exercise completed. Recorded duration from a genuinely new accepted take contributes to recorded-time totals once; untimed confirmations add no guessed duration. Additional attempts per local day are capped by the configured daily recording limit.
+
+`GET /api/v1/exercise-attempts?plan_item_id=UUID&limit=20&cursor=…` lists owned-item attempts newest first with `next_cursor`. The exercise screen restores the latest result, allows earlier-take playback, loads more history, and explains that repeat practice is uncredited.
