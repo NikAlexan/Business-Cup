@@ -42,6 +42,8 @@ python-multipart==0.0.33
 requests==2.34.2
 scikit-learn==1.9.1
 scipy==1.18.1
+sherpa-onnx==2.0.1
+sherpa-onnx-core==2.0.1
 soundfile==0.14.0
 soxr==1.1.0
 sqlalchemy==2.1.8
@@ -51,3 +53,4 @@ typing-extensions==4.16.0
 typing-inspection==0.4.5
 urllib3==2.8.0
 uvicorn==0.54.0
+websockets==17.4

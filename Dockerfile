@@ -1,6 +1,6 @@
 FROM python:3.12.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
-    AUDIO_DATA=/data/audio VAD_MODEL_PATH=/app/models/silero_vad.onnx \
+    AUDIO_DATA=/data/audio VAD_MODEL_PATH=/app/models/silero_vad.onnx ASR_MODEL_DIR=/app/models/asr \
     NUMBA_CACHE_DIR=/tmp/numba
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl libgomp1 \

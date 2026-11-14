@@ -79,13 +79,15 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
   }, [j.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
   const recording = r.state === 'recording'
   const follow = useSpeechFollow(item.task.text, recording)
+  const [playT, setPlayT] = useState<number | null>(null)
+  useEffect(() => setPlayT(null), [r.state])
   const wpm = item.task.verification.target_wpm
   const pacer = wpm && recording ? (r.seconds * (wpm.min + wpm.max)) / 2 / 60 : undefined
   const send = () => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJob({ id: d.job_id, rec: d.recording.id }) })
   return (
     <>
       <div className="rs-card rs-stack" style={{ padding: 28, gap: 12 }}>
-        <ScriptText text={item.task.text} read={recording ? follow.read : 0} pacer={pacer} />
+        <ScriptText text={item.task.text} read={recording ? follow.read : playT !== null ? follow.readAt(playT) : 0} pacer={pacer} />
         {recording && (follow.supported || pacer !== undefined) && (
           <span className="rs-label">
             {[follow.supported && 'Read words turn green', pacer !== undefined && 'the blue mark moves at the target pace'].filter(Boolean).join(' · ')}
@@ -94,7 +96,7 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
       </div>
       {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
       {j.data?.status === 'failed' && <ErrorBanner text={j.data.error?.message ?? 'The recording check failed.'} />}
-      <RecorderDock r={r} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" />
+      <RecorderDock r={r} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" onPlayTime={setPlayT} />
     </>
   )
 }

@@ -4,9 +4,11 @@ from datetime import timedelta
 from uuid import uuid4
 
 import numpy as np
+import pytest
 import soundfile as sf
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
+from starlette.websockets import WebSocketDisconnect
 
 from app.db import Idempotency, Job, Resource, iso, utcnow
 from app.provider import ProviderFailure
@@ -477,3 +479,28 @@ def test_conflicts_carry_user_message(client, worker, speech_file):
         assert r.status_code == 409
         err = r.json()["error"]
         assert err["code"] == code and err["message"] and isinstance(err["details"], dict)
+
+
+def test_speech_follow_streams_transcript(client, speech_file):
+    with pytest.raises(WebSocketDisconnect):  # no guest session
+        with client.websocket_connect("/api/v1/speech-follow") as ws:
+            ws.receive_json()
+    guest(client)
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(
+            "/api/v1/speech-follow", headers={"Origin": "https://evil.example"}
+        ) as ws:
+            ws.receive_json()
+    samples, rate = sf.read(speech_file, dtype="float32")
+    step = rate // 10
+    with client.websocket_connect(f"/api/v1/speech-follow?rate={rate}") as ws:
+        for i in range(0, len(samples), step):
+            ws.send_bytes(samples[i : i + step].astype("<f4").tobytes())
+            words = ws.receive_json()["words"]
+        with pytest.raises(WebSocketDisconnect):  # malformed frame
+            ws.send_bytes(b"abc")
+            ws.receive_json()
+    text = " ".join(w for w, _ in words)
+    assert "COMFORTABLE PACE" in text
+    starts = [t for _, t in words]
+    assert starts == sorted(starts) and 0 < starts[-1] < len(samples) / rate
