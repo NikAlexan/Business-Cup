@@ -15,3 +15,6 @@ a:hover { color: var(--primary-edge); }
 button.rs-btn { font-family: var(--font-display); }
 .rs-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .rs-tabs { position: sticky; bottom: 0; z-index: 5; }
+.rs-spin { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--sky); border-right-color: transparent; animation: rs-rot 0.9s linear infinite; flex: none; }
+@keyframes rs-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rs-spin { animation-duration: 3s; } }

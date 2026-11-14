@@ -1,12 +1,14 @@
 import { ApiError } from '../api/api'
 
-export function ErrorBanner({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorBanner({ error, onRetry, text }: { error?: unknown; onRetry?: () => void; text?: string }) {
   const message =
+    text ??
+    (
     error instanceof ApiError
       ? error.message
       : error instanceof TypeError
         ? 'No connection. Check your network and try again.'
-        : 'Something went wrong.'
+        : 'Something went wrong.')
   return (
     <div className="rs-banner rs-banner--danger" role="alert">
       <span>{message}</span>
