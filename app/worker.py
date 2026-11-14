@@ -16,6 +16,7 @@ from app.audio import (
     quality_check,
     timing_metrics,
 )
+from app.coaching import timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
@@ -25,7 +26,7 @@ from app.service import Service
 log = logging.getLogger("voice.worker")
 
 
-MEASUREMENT_VERSION = "voice-metrics-v2"
+MEASUREMENT_VERSION = "voice-metrics-v3"
 
 
 class WorkCancelled(Exception):
@@ -35,6 +36,8 @@ class WorkCancelled(Exception):
 def assessments_comparable(before, after):
     return bool(
         before
+        and not before.get("analysis_metadata", {}).get("demo", {}).get("prepared_data", False)
+        and not after.get("analysis_metadata", {}).get("demo", {}).get("prepared_data", False)
         and before.get("protocol_version")
         and before.get("recording_conditions") is not None
         and before.get("recording_conditions") == after.get("recording_conditions")
@@ -83,6 +86,8 @@ def compare(before, after, measurements):
                 "after_audio_url": f"/api/v1/recordings/{t['recording_id']}/audio",
             }
             for t in after["tasks"]
+            if t.get("recording_id")
+            and any(b["kind"] == t["kind"] and b.get("recording_id") for b in before["tasks"])
         ],
     }
 
@@ -174,9 +179,10 @@ class Worker:
             s, _ = self.locked(db, claim)
             return s.get(rid, kind)
 
-    def publish_recording(self, claim, rec, quality, measurements=None):
+    def publish_recording(self, claim, rec, quality, measurements=None, speech_feedback=None):
         with self.database.session.begin() as db:
             s, job = self.locked(db, claim)
+            rec = s.get(rec["id"], "recording")  # Preserve a dismissal made while processing.
             rec.update(
                 status="completed" if quality["status"] == "accepted" else "needs_rerecord",
                 duration_seconds=quality["duration_seconds"],
@@ -184,6 +190,8 @@ class Worker:
             )
             if measurements is not None:
                 rec["measurements"] = measurements
+            if speech_feedback is not None:
+                rec["speech_feedback"] = speech_feedback
             s.put("recording", rec)
             if rec["assessment_id"]:
                 a = s.get(rec["assessment_id"], "assessment")
@@ -220,6 +228,7 @@ class Worker:
                     self.settings.max_recording_seconds, item["task"]["verification"]["max_recording_seconds"]
                 )
         path = self.settings.audio_data / claim["guest_id"] / rec["id"]
+        speech_feedback = None
         try:
             signal = decode(path, self.settings, max_seconds)
             self.stage(claim, "quality_check")
@@ -238,14 +247,22 @@ class Worker:
                         .get("verification", {})
                         .get("required_metrics", [])
                     )
-                if "speaking_rate_wpm" in required:
+                if set(required) & {"speaking_rate_wpm", "pause_ratio", "pause_count"}:
                     self.stage(claim, "transcription")
                     provider = None
                     try:
                         provider = self.provider_factory(self.settings)
-                        transcript = provider.transcribe(signal, item["task"]["text"])
+                        transcript = provider.transcribe(
+                            signal, " ".join([item["task"]["text"]] * item["task"].get("repetitions", 1))
+                        )
                         measurements = timing_metrics(
                             signal, segments, transcript["word_count"], transcript["words"]
+                        )
+                        speech_feedback = timing_feedback(
+                            transcript,
+                            measurements,
+                            item["task"]["verification"],
+                            quality["duration_seconds"],
                         )
                         with self.database.session.begin() as db:
                             s, _ = self.locked(db, claim)
@@ -275,7 +292,7 @@ class Worker:
                 "issues": [{"code": exc.code, "message": exc.message}],
             }
             measurements = None
-        self.publish_recording(claim, rec, quality, measurements)
+        self.publish_recording(claim, rec, quality, measurements, speech_feedback)
 
     def assessment(self, claim):
         a = self.snapshot(claim, claim["job"]["assessment_id"], "assessment")
@@ -298,7 +315,12 @@ class Worker:
             transcripts = [provider.transcribe(signals[i], a["tasks"][i]["text"]) for i in (0, 1)]
             measurements = {
                 **pitch_metrics,
-                **combine_timing(*((t["word_count"], t["words"]) for t in transcripts)),
+                **combine_timing(
+                    *(
+                        (t["word_count"], t["words"], len(signals[i]) / 16000)
+                        for i, t in enumerate(transcripts)
+                    )
+                ),
                 "intonation_range_semitones": intonation,
             }
             previous = (
@@ -311,9 +333,9 @@ class Worker:
             self.stage(claim, "ai_analysis")
             report = provider.report(signals, a, measurements, comparison, interpretation)
             transcript = {"verified": all(t["verified"] for t in transcripts)}
-            if not transcript["verified"]:
+            if not transcript["verified"] or not measurements["speaking_rate_wpm"]["available"]:
                 report["limitations"].append(
-                    "Pace could not be measured reliably because transcription did not align with the task."
+                    "Pace and pauses could not be measured reliably from transcript timing."
                 )
             usage = copy.deepcopy(provider.usage)
         finally:

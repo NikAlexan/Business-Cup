@@ -1,5 +1,5 @@
 {
-  "catalog_version": "catalog-v5",
+  "catalog_version": "catalog-v6",
   "items": [
     {
       "id": "E01",
@@ -1865,7 +1865,7 @@
     },
     {
       "id": "E08",
-      "version": 4,
+      "version": 5,
       "title": "Meaningful pauses",
       "goal": "Did the pauses clarify the ideas, or did any pause interrupt a thought?",
       "instruction": "Read the passage once. Each slash suggests a thought boundary: pause only long enough for the meaning to land. Do not say the slash aloud. Keep the phrases connected.",
@@ -1882,7 +1882,10 @@
       "verification": {
         "type": "recording",
         "min_elapsed_seconds": null,
-        "required_metrics": []
+        "required_metrics": [
+          "pause_ratio",
+          "pause_count"
+        ]
       },
       "difficulty_variants": [
         {

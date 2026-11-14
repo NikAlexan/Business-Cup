@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/api'
 import { useMe } from '../api/hooks'
 import { ChartIcon, GearIcon, HomeIcon, Logo } from './Icons'
+import { DemoNotice } from './DemoNotice'
 import { RewardChips } from './RewardChips'
 import { UpdateBanner } from './UpdateBanner'
 
@@ -49,6 +50,7 @@ export function AppShell({ children, chips = true }: { children: ReactNode; chip
         {chips ? <Chips /> : <span />}
       </header>
       <main className="rs-wrap" style={{ paddingTop: 28, paddingBottom: 40 }}>
+        <DemoNotice prepared={me.data?.data_provenance?.prepared_demo_history} enabled={me.data?.demo_mode} />
         {children}
       </main>
       <UpdateBanner />

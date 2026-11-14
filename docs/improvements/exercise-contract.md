@@ -1,6 +1,6 @@
 # Exercise catalog and plan snapshots
 
-Catalog `catalog-v5`, task schema 2. There are 12 exercise types and 24 original variants per type (288 total). The ten beginner and fourteen intermediate variants have separate identities, labels, texts, repetitions and listening/reflection prompts. The categories are original speaking practice based on vocal variety and comfortable voice use, not validated medical treatments.
+Catalog `catalog-v6`, task schema 2. There are 12 exercise types and 24 original variants per type (288 total). The ten beginner and fourteen intermediate variants have separate identities, labels, texts, repetitions and listening/reflection prompts. The categories are original speaking practice based on vocal variety and comfortable voice use, not validated medical treatments.
 
 ## Content and practice
 
@@ -47,3 +47,16 @@ The first successful attempt retains the plan item's completion timestamp and `l
 Extra attempts keep their own feedback, recording ID and timestamps. They award zero notes and do not mutate the saved plan, lesson status, completion date, streak or reassessment availability. A failed repeat leaves the exercise completed. Recorded duration from a genuinely new accepted take contributes to recorded-time totals once; untimed confirmations add no guessed duration. Additional attempts per local day are capped by the configured daily recording limit.
 
 `GET /api/v1/exercise-attempts?plan_item_id=UUID&limit=20&cursor=…` lists owned-item attempts newest first with `next_cursor`. The exercise screen restores the latest result, allows earlier-take playback, loads more history, and explains that repeat practice is uncredited.
+
+
+## Recoverable listening and revision loop
+
+`GET /plan-items/{id}` resolves the issued task in its original owned plan, including archives. Completed-day rows and progress history link back to feedback/repeat practice. Pending archived tasks stay readable but cannot create ordinary completion attempts.
+
+An accepted upload persists its check job pointer. The item endpoint returns the newest unsubmitted, undismissed take for the current completion/practice mode. The client resumes polling and saves that recording after reload; attempt/reward safeguards prevent duplicate credit. Polling and attempt errors expose retry controls. `PUT /recordings/{id}/dismiss` idempotently cancels recovery of an unfinished exercise take while retaining its audio. Worker publication preserves dismissal made during processing. Audio that has not reached the server is not recoverable.
+
+`PUT /exercise-attempts/{id}/reflection` stores a trimmed subjective note (500 characters maximum). A repeat can reference `based_on_attempt_id`; upload snapshots the source note into `practice_focus`, which survives reload and later edits of the original note. The repeat result offers the previous private recording beside its own playback. Compatible timing feedback is shown side by side without claiming that a numerical change means improvement.
+
+Catalog-v6 adds optional pause timing to E08; E06 already requests pace. Their feedback schema `speech-timing-feedback-v1` labels transcript-derived pace, pause share, a recognized word boundary and a playable audio interval, plus one small next step. It never scores pronunciation, emotion or expression. Other exercise types keep quality checks and listening/reflection prompts. Transcription unavailability remains advisory. This iteration does not implement a qualitative daily audio-model review.
+
+Timing validates each word interval against the decoded duration and matches the word count to intervals, as well as checking finite, ordered, nonoverlapping timestamps. Invalid timing is unavailable, not a low score. Assessment measurement version is now `voice-metrics-v3`; previous versions and prepared demo baselines are not comparable to current real measurements. Check-in playback only returns pairs with actual recording IDs on both sides.

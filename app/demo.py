@@ -118,6 +118,7 @@ def seed(s):
                         "created_at": iso(done),
                         "completed_at": iso(done),
                         "plan_item_status": "completed",
+                        "prepared_demo": True,
                         "practice_seconds": item["estimated_duration_seconds"],
                         "reward": {"notes": 3, "parts": [{"notes": 3, "reason": "exercise_completed"}]},
                         "feedback": {"summary": "Practice completed.", "metrics": None, "issues": []},

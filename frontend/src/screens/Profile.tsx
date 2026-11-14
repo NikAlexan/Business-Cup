@@ -53,6 +53,15 @@ export default function Profile() {
             <span>{d.comparison.summary}</span>
           </div>
         )}
+        {re && d.comparison && <section className="rs-card rs-stack" aria-label="Before and after recordings" style={{ padding: 24, gap: 16 }}>
+          <h2 className="rs-h" style={{ fontSize: 22 }}>Listen before and after</h2>
+          {!d.comparison.audio_pairs?.length && <p>Matching recordings are not available for this check-in.</p>}
+          {d.comparison.audio_pairs?.map((pair) => <div key={pair.kind} className="rs-stack" style={{ gap: 8 }}>
+            <h3 className="rs-h" style={{ fontSize: 18 }}>{pair.kind.replace(/_/g, ' ')}</h3>
+            <label className="rs-stack" style={{ gap: 6 }}>Before<audio controls preload="metadata" aria-label={'Before: ' + pair.kind} src={pair.before_audio_url} style={{ width: '100%' }} /></label>
+            <label className="rs-stack" style={{ gap: 6 }}>After<audio controls preload="metadata" aria-label={'After: ' + pair.kind} src={pair.after_audio_url} style={{ width: '100%' }} /></label>
+          </div>)}
+        </section>}
         <div className="rs-cols">
           <div className="rs-card rs-stack" style={{ gap: 10, padding: 24 }}>
             <h2 className="rs-h" style={{ fontSize: 20 }}>What we noticed</h2>

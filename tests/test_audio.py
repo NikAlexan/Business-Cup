@@ -29,13 +29,21 @@ def test_no_words_means_unavailable_not_zero():
 def test_combine_timing():
     from app.audio import combine_timing
 
-    a = (10, W((0, 2), (3, 5)))  # 5 s span, 1 s pause
-    b = (20, W((0, 4), (6, 10)))  # 10 s span, 2 s pause
+    a = (
+        10,
+        W(*[(i * 0.4 + (1 if i >= 5 else 0), (i + 1) * 0.4 + (1 if i >= 5 else 0)) for i in range(10)]),
+        5,
+    )  # 5 s span, 1 s pause
+    b = (
+        20,
+        W(*[(i * 0.4 + (2 if i >= 10 else 0), (i + 1) * 0.4 + (2 if i >= 10 else 0)) for i in range(20)]),
+        10,
+    )  # 10 s span, 2 s pause
     m = combine_timing(a, b)
     assert m["speaking_rate_wpm"]["value"] == 120
     assert m["pause_ratio"]["value"] == 0.2 and m["pause_count"]["value"] == 2
     assert m["articulation_rate_wpm"]["value"] == 150
-    assert all(not v["available"] for v in combine_timing(a, (None, [])).values())
+    assert all(not v["available"] for v in combine_timing(a, (None, [], 10)).values())
 
 
 def test_interpretation_ignores_incomparable_baseline():
@@ -84,3 +92,23 @@ def test_invalid_word_timestamps_are_unavailable_without_partial_metrics():
         result = timing_metrics(np.zeros(16000), [], 2, words)
         assert all(not m["available"] and m["value"] is None for m in result.values())
         assert result["speaking_rate_wpm"]["unavailable_reason"] == "transcription_invalid_timestamps"
+
+
+def test_timing_is_bounded_by_the_decoded_audio_and_requires_complete_word_intervals():
+    signal = np.zeros(16000 * 5)
+    for count, spans in [(2, W((0, 1), (10000, 10001))), (200, W((0, 1), (2, 3)))]:
+        measured = timing_metrics(signal, [], count, spans)
+        assert all(not v["available"] and v["value"] is None for v in measured.values())
+
+
+def test_prepared_demo_measurements_are_not_a_baseline_for_real_comparisons():
+    from app.worker import MEASUREMENT_VERSION, comparable_measurements
+
+    before = {
+        "measurements": {},
+        "recording_conditions": {"environment": "quiet_room"},
+        "protocol_version": "v2",
+        "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION, "demo": {"prepared_data": True}},
+    }
+    after = {**before, "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION}}
+    assert comparable_measurements(before, after) is None

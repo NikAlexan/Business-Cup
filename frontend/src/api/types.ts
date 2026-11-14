@@ -15,6 +15,7 @@ export type Reassessment = {
 export type Streak = { current_days: number; longest_days: number; last_practice_on: string | null }
 export type Me = {
   guest_id: string
+  data_provenance?: { prepared_demo_history: boolean }
   preferences: { goal: string; timezone: string; locale: string }
   demo_mode: boolean
   limits: {
@@ -116,6 +117,7 @@ export type AssessmentTask = {
   quality_status: string | null
 }
 export type Comparison = {
+  audio_pairs?: { kind: string; before_audio_url: string; after_audio_url: string }[]
   comparable: boolean
   summary: string
   limitations: string[]
@@ -161,6 +163,8 @@ export type Job = {
 }
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
+  reflection?: { note: string; updated_at: string }
+  practice_focus?: { attempt_id: string; note: string } | null
   practice_only?: boolean
   created_at?: string
   recording_id?: string | null
@@ -169,7 +173,7 @@ export type Attempt = {
   status: 'passed' | 'needs_retry'
   reward: Reward
   practice_seconds: number
-  feedback: { summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
+  feedback: { version?: string; scope?: string; insights?: { code: string; source: string; message: string; evidence: { quote: string; start_seconds: number; end_seconds: number } | null }[]; next_step?: string | null; summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
 }
 export type Completion = {
   lesson_id: string
@@ -205,3 +209,6 @@ export type Exercise = {
   duration_seconds: number
   tags: string[]
 }
+
+export type PendingTake = { based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
+export type PlanItemState = { plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }

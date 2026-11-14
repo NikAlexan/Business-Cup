@@ -128,3 +128,23 @@ def test_transcription_with_malformed_timestamps_stays_unavailable(timestamps):
         assert all(not value["available"] and value["value"] is None for value in measured.values())
     finally:
         p.close()
+
+
+def test_numeric_words_count_consistently_with_their_timestamp_intervals():
+    p = provider(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "text": "We met in 2026.",
+                "words": [
+                    {"word": word, "start": i, "end": i + 0.5}
+                    for i, word in enumerate(["We", "met", "in", "2026"])
+                ],
+            },
+        )
+    )
+    try:
+        transcript = p.transcribe(np.zeros(16000 * 5), "We met in 2026.")
+        assert transcript["word_count"] == len(transcript["words"]) == 4
+    finally:
+        p.close()

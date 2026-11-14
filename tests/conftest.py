@@ -131,7 +131,16 @@ class FakeProvider:
         for w in text.split():
             words.append({"start": t, "end": t + 0.3})
             t += 0.3 + (0.5 if w[-1] in ".?!" else 0.05)
-        return {"text": text, "word_count": len(words), "verified": True, "words": words}
+        scale = min(1, (len(signal) / 16000 - 0.1) / words[-1]["end"])
+        for word in words:
+            word.update(start=word["start"] * scale, end=word["end"] * scale)
+        return {
+            "text": text,
+            "word_count": len(words),
+            "verified": True,
+            "words": words,
+            "recognized_words": text.split(),
+        }
 
     def report(self, signals, assessment, measurements, comparison, interpretation=None):
         return {

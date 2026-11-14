@@ -25,7 +25,7 @@ def wav_bytes(signal):
 
 
 def words(text):
-    return re.findall(r"[a-zA-Z]+(?:'[a-zA-Z]+)?", text.lower())
+    return re.findall(r"[a-zA-Z0-9]+(?:'[a-zA-Z]+)?", text.lower())
 
 
 class OpenAIAudioProvider:
@@ -96,6 +96,12 @@ class OpenAIAudioProvider:
             "word_count": len(actual) if verified else None,
             "words": [
                 {"start": w.get("start"), "end": w.get("end")} if isinstance(w, dict) else {}
+                for w in (data.get("words") if isinstance(data.get("words"), list) else [])
+            ]
+            if verified
+            else [],
+            "recognized_words": [
+                w.get("word", "") if isinstance(w, dict) else ""
                 for w in (data.get("words") if isinstance(data.get("words"), list) else [])
             ]
             if verified

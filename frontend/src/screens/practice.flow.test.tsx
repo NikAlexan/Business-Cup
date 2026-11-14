@@ -10,6 +10,8 @@ import Exercise from './Exercise'
 import Main from './Main'
 import MicCheck from './MicCheck'
 import Record from './Record'
+import Home from './Home'
+import Profile from './Profile'
 
 vi.mock('../components/UpdateBanner', () => ({ UpdateBanner: () => null }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
@@ -19,6 +21,8 @@ function open(path: string) {
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/" element={<Main />} />
     <Route path="/exercise/:planItemId" element={<Exercise />} />
+    <Route path="/today" element={<Home />} />
+    <Route path="/profile/:assessmentId" element={<Profile />} />
     <Route path="/record" element={<Record />} />
     <Route path="/setup" element={<MicCheck />} />
     <Route path="/mic-check" element={<h1>Microphone setup destination</h1>} />
@@ -48,7 +52,8 @@ function setup(item: PlanItem, intercept?: (path: string, init?: RequestInit) =>
     const handled = intercept?.(path, init)
     if (handled) return handled
     const data: Record<string, unknown> = {
-      '/api/v1/me': { limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } },
+      '/api/v1/me': { preferences: { timezone: 'UTC' }, progress: { notes_total: 0, practice_seconds_total: 0, current_streak_days: 0 }, limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } },
+      '/api/v1/plan-items/item': { item, lesson, item_index: 0, pending_take: null, plan_id: 'plan', plan_status: 'active' },
       '/api/v1/today': { lesson }, '/api/v1/plan': { lessons: [lesson] },
       '/api/v1/exercise-attempts/attempt': savedAttempt,
       '/api/v1/exercise-attempts?plan_item_id=item&limit=20': { items: [savedAttempt], next_cursor: null },
@@ -199,7 +204,7 @@ test('extra practice sends explicit mode, shows zero reward and keeps the origin
   fireEvent.click(screen.getByRole('button', { name: 'Practice again — no extra notes' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Check my take' }))
   await screen.findByRole('heading', { name: 'Extra practice saved' })
-  expect(body).toEqual({ plan_item_id: 'item', recording_id: 'extra-recording', practice_only: true })
+  expect(body).toEqual({ plan_item_id: 'item', recording_id: 'extra-recording', practice_only: true, based_on_attempt_id: 'attempt' })
   expect(screen.queryByText('Clean recording bonus')).toBeNull()
   expect((await screen.findByLabelText('Your completed take')).getAttribute('src')).toBe('/api/v1/recordings/extra-recording/audio')
   fireEvent.click(await screen.findByRole('button', { name: /First completion attempt · saved/ }))
@@ -263,4 +268,152 @@ test('a rejected extra take restores its feedback without reopening the complete
   expect(screen.queryByRole('button', { name: 'Start recording' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: /First completion attempt · saved/ }))
   await screen.findByRole('heading', { name: 'Practice complete' })
+})
+
+
+test('a recovered take survives polling and save failures without uploading the file again', async () => {
+  vi.spyOn(recorder, 'useRecorder').mockReturnValue({
+    state: 'idle', level: { level: 0, status: 'waiting' }, seconds: 0, mime: null, blob: null, url: null, error: null, limitReached: false,
+    start: vi.fn(), stop: vi.fn(), reset: vi.fn(),
+  })
+  const pending = { ...baseItem, status: 'pending' as const, latest_attempt_id: null }
+  let online = false
+  let saves = 0
+  const headers: unknown[] = []
+  setup(pending, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json({ item: saves > 1 ? baseItem : pending, lesson: { id: 'lesson', items: [baseItem] }, item_index: 0,
+      pending_take: saves > 1 ? null : { recording_id: 'recording', job_id: 'recover', practice_only: false, status: 'queued' } })
+    if (path === '/api/v1/jobs/recover') return online ? Response.json({ status: 'completed', poll_after_ms: null }) : Response.json({ error: { message: 'Polling is offline' } }, { status: 503 })
+    if (path === '/api/v1/exercise-attempts') {
+      saves++; headers.push(init?.headers)
+      return saves === 1 ? Response.json({ error: { message: 'Save is offline' } }, { status: 503 }) : Response.json(savedAttempt)
+    }
+    if (path === '/api/v1/recordings') throw Error('Must not upload again')
+  })
+  open('/exercise/item')
+  await screen.findByText('Polling is offline')
+  expect(saves).toBe(0)
+  online = true
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+  await screen.findByText('Save is offline')
+  fireEvent.click(await screen.findByRole('button', { name: 'Save checked take' }))
+  await screen.findByRole('heading', { name: 'Practice complete' })
+  expect(saves).toBe(2)
+  expect(headers[0]).toEqual(headers[1])
+})
+
+test('saved reflection becomes the next takes focus and is restored when selecting its source', async () => {
+  vi.spyOn(recorder, 'useRecorder').mockReturnValue({
+    state: 'recorded', level: { level: 0, status: 'waiting' }, seconds: 25, mime: 'audio/webm', blob: new Blob(['take']), url: 'blob:take', error: null, limitReached: false,
+    start: vi.fn(), stop: vi.fn(), reset: vi.fn(),
+  })
+  const note = 'Let the final word land.'
+  let original = savedAttempt as typeof savedAttempt & { reflection?: { note: string; updated_at: string } }
+  const extra = { ...savedAttempt, id: 'extra', practice_only: true, practice_focus: { attempt_id: 'attempt', note }, recording_id: 'extra-recording', reward: { notes: 0, parts: [] } }
+  let rows: unknown[] = [original]
+  setup(baseItem, (path, init) => {
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: rows, next_cursor: null })
+    if (path === '/api/v1/exercise-attempts/attempt/reflection') {
+      expect(init?.method).toBe('PUT')
+      original = { ...original, reflection: { note: JSON.parse(String(init?.body)).note, updated_at: '2026-11-14T12:00:00Z' } }
+      rows = [original]; return Response.json(original)
+    }
+    if (path === '/api/v1/recordings') {
+      expect((init?.body as FormData).get('based_on_attempt_id')).toBe('attempt')
+      return Response.json({ job_id: 'focus-job', recording: { id: 'extra-recording' } }, { status: 202 })
+    }
+    if (path === '/api/v1/recordings/extra-recording') return Response.json({ audio_url: '/api/v1/recordings/extra-recording/audio' })
+    if (path === '/api/v1/jobs/focus-job') return Response.json({ status: 'completed', poll_after_ms: null })
+    if (path === '/api/v1/exercise-attempts') { rows = [extra, original]; return Response.json(extra) }
+  })
+  open('/exercise/item')
+  const reflection = await screen.findByRole('textbox', { name: 'What did you hear, and what will you try next?' })
+  fireEvent.change(reflection, { target: { value: note } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  await screen.findByText('Reflection saved with this take.')
+  fireEvent.click(screen.getByRole('button', { name: 'Practice again — no extra notes' }))
+  expect(screen.getByText('Your saved focus:', { exact: false })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Check my take' }))
+  await screen.findByRole('heading', { name: 'Extra practice saved' })
+  expect(screen.getByText('Your focus for this take:')).toBeTruthy()
+  fireEvent.click(await screen.findByRole('button', { name: /First completion attempt · saved/ }))
+  await waitFor(() => expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(note))
+})
+
+test('a timing observation seeks its saved audio to the cited moment', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
+  const observed = { ...savedAttempt, feedback: { ...savedAttempt.feedback,
+    insights: [{ code: 'longest_pause', source: 'transcript_timing', message: 'Longest word gap: 1.2 seconds.', evidence: { quote: 'one … change', start_seconds: 2.5, end_seconds: 5.0 } }],
+    next_step: 'Let one sentence settle.' } }
+  setup(baseItem, (path) => path.startsWith('/api/v1/exercise-attempts?') ? Response.json({ items: [observed], next_cursor: null }) : undefined)
+  open('/exercise/item')
+  const hear = await screen.findByRole('button', { name: /Hear this moment/ })
+  await waitFor(() => expect((hear as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(hear)
+  expect((screen.getByLabelText('Your completed take') as HTMLAudioElement).currentTime).toBe(2.5)
+  expect(play).toHaveBeenCalledOnce()
+})
+
+test.each([true, false])('repeat comparison restores source playback and only compares compatible timings: %s', async (compatible) => {
+  const before = { ...savedAttempt, feedback: { ...savedAttempt.feedback, version: 'speech-timing-feedback-v1' } }
+  const extra = { ...savedAttempt, id: 'extra', practice_only: true, practice_focus: { attempt_id: 'attempt', note: 'Let the final word land.' },
+    feedback: { ...savedAttempt.feedback, version: compatible ? 'speech-timing-feedback-v1' : 'older-timing',
+      metrics: { speaking_rate_wpm: { available: true, value: 140, unit: 'words/min', unavailable_reason: null } } } }
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(before)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [extra, before], next_cursor: null })
+  })
+  open('/exercise/item')
+  expect((await screen.findByLabelText('Previous take for comparison')).getAttribute('src')).toBe('/api/v1/recordings/recording/audio')
+  if (compatible) {
+    expect(screen.getByRole('cell', { name: '165 words/min' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: '140 words/min' })).toBeTruthy()
+  } else expect(screen.queryByRole('table')).toBeNull()
+})
+
+test('a recovered retryable job resumes the saved check without uploading audio again', async () => {
+  const item = { ...baseItem, status: 'pending' as const, latest_attempt_id: null }
+  let retried = false
+  let uploads = 0
+  setup(item, (path) => {
+    if (path === '/api/v1/plan-items/item') return Response.json({ plan_status: 'active', item, lesson: { id: 'lesson', items: [item] }, item_index: 0,
+      pending_take: { recording_id: 'recording', job_id: 'saved-check', practice_only: false, status: 'failed' } })
+    if (path === '/api/v1/jobs/saved-check') return Response.json(retried ? { status: 'completed' } : { status: 'failed', retryable: true, error: { message: 'Temporary decoder failure' } })
+    if (path === '/api/v1/jobs/saved-check/retry') { retried = true; return Response.json({ job_id: 'saved-check' }, { status: 202 }) }
+    if (path === '/api/v1/recordings') { uploads++; throw Error('Saved audio must not be uploaded again') }
+    if (path === '/api/v1/exercise-attempts') return Response.json(savedAttempt)
+  })
+  open('/exercise/item')
+  await screen.findByText('Temporary decoder failure')
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+  await screen.findByRole('heading', { name: 'Practice complete' })
+  expect(retried).toBe(true)
+  expect(uploads).toBe(0)
+})
+
+test('a completed day still exposes its exercises for review and marks prepared history', async () => {
+  const lesson = { id: 'lesson', day_index: 1, status: 'completed', items: [baseItem], estimated_duration_seconds: 90 }
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/me') return Response.json({ preferences: { timezone: 'UTC' }, data_provenance: { prepared_demo_history: true }, progress: { notes_total: 4, practice_seconds_total: 30, current_streak_days: 1 }, limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } })
+    if (path === '/api/v1/today') return Response.json({ lesson, daily_status: 'completed', timezone: 'UTC', reassessment: {} })
+    if (path === '/api/v1/plan') return Response.json({ lessons: [lesson], total_lessons: 14 })
+    if (path === '/api/v1/progress') return Response.json({ activity: [] })
+  })
+  open('/today')
+  await screen.findByRole('heading', { name: 'Review or practice again' })
+  expect(screen.getByText('Prepared demo history is included. New takes use uploaded audio.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('link', { name: 'Steady reading pace, done' }))
+  await screen.findByRole('button', { name: 'Practice again — no extra notes' })
+})
+
+test('check-in exposes paired private baseline and current audio', async () => {
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/assessments/checkin') return Response.json({ id: 'checkin', kind: 'reassessment', status: 'completed', measurements: {}, report: { summary: '', observations: [], priorities: [] }, comparison: {
+      summary: 'Listen to both takes.', metrics: {}, audio_pairs: [{ kind: 'control_text', before_audio_url: '/api/v1/recordings/before/audio', after_audio_url: '/api/v1/recordings/after/audio' }],
+    } })
+    if (path === '/api/v1/exercises') return Response.json({ items: [] })
+  })
+  open('/profile/checkin')
+  expect((await screen.findByLabelText('Before: control_text')).getAttribute('src')).toBe('/api/v1/recordings/before/audio')
+  expect(screen.getByLabelText('After: control_text').getAttribute('src')).toBe('/api/v1/recordings/after/audio')
 })

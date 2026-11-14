@@ -59,6 +59,7 @@ class Empty(Input):
 class AttemptInput(Input):
     plan_item_id: UUID
     practice_only: bool = False
+    based_on_attempt_id: UUID | None = None
     elapsed_seconds: float | None = Field(default=None, ge=0, le=3600, allow_inf_nan=False)
     self_confirmed: bool | None = None
     recording_id: UUID | None = None
@@ -90,3 +91,7 @@ class VoiceReport(Input):
     limitations: list[str] = Field(min_length=1, max_length=8)
     priorities: list[Priority] = Field(min_length=1, max_length=2)
     recommended_exercise_ids: list[str] = Field(min_length=1, max_length=12)
+
+
+class ReflectionInput(Input):
+    note: str = Field(max_length=500)

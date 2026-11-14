@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { request } from './api'
-import type { Assessment, Attempt, Exercise, Job, Me, Plan, Progress, Recording, Today } from './types'
+import type { Assessment, Attempt, Exercise, Job, Me, Plan, PlanItemState, Progress, Recording, Today } from './types'
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => request<Me>('/me') })
 export const useToday = () => useQuery({ queryKey: ['today'], queryFn: () => request<Today>('/today') })
@@ -43,3 +43,6 @@ export const useAttemptHistory = (planItemId: string | undefined) =>
     },
     getNextPageParam: (page) => page.next_cursor ?? undefined,
   })
+
+export const usePlanItem = (id: string) =>
+  useQuery({ queryKey: ['plan-item', id], queryFn: () => request<PlanItemState>('/plan-items/' + id), enabled: !!id })

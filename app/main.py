@@ -21,7 +21,15 @@ from app.config import Settings
 from app.content import CATALOG, EXERCISES
 from app.db import Database, Guest, iso, new_id
 from app.errors import ApiError, fail
-from app.schemas import AssessmentInput, AttemptInput, CompleteInput, Empty, GuestInput, Preferences
+from app.schemas import (
+    AssessmentInput,
+    AttemptInput,
+    CompleteInput,
+    Empty,
+    GuestInput,
+    Preferences,
+    ReflectionInput,
+)
 from app.service import COOKIE, Service, digest
 
 logger = logging.getLogger(__name__)
@@ -306,6 +314,7 @@ def create_app(settings=None):
         task_id: Annotated[UUID | None, Form()] = None,
         plan_item_id: Annotated[UUID | None, Form()] = None,
         practice_only: Annotated[bool, Form()] = False,
+        based_on_attempt_id: Annotated[UUID | None, Form()] = None,
     ):
         s.auth()
         fields = {
@@ -316,6 +325,8 @@ def create_app(settings=None):
         }
         if practice_only:
             fields["practice_only"] = True
+        if based_on_attempt_id:
+            fields["based_on_attempt_id"] = str(based_on_attempt_id)
         fingerprint, size = hashlib.sha256(), 0
         while chunk := file.file.read(1024 * 1024):
             size += len(chunk)
@@ -363,6 +374,10 @@ def create_app(settings=None):
     @app.get("/api/v1/recordings/{recording_id}")
     def recording(recording_id: UUID, s: S):
         return s.get(recording_id, "recording")
+
+    @app.put("/api/v1/recordings/{recording_id}/dismiss")
+    def dismiss_recording(recording_id: UUID, payload: Empty, s: S):
+        return s.dismiss_recording(recording_id)
 
     @app.get("/api/v1/recordings/{recording_id}/audio")
     def audio(recording_id: UUID, request: Request, s: S):
@@ -450,9 +465,15 @@ def create_app(settings=None):
     def today(s: S):
         return s.today()
 
+    @app.get("/api/v1/plan-items/{item_id}")
+    def plan_item(item_id: UUID, s: S):
+        return s.item_state(item_id)
+
     @app.post("/api/v1/exercise-attempts")
     def attempt(payload: AttemptInput, request: Request, s: S):
         values = payload.model_dump(mode="json")
+        if values["based_on_attempt_id"] is None:
+            values.pop("based_on_attempt_id")
         if not values["practice_only"]:
             values.pop("practice_only")  # Preserve legacy request fingerprints for retries across deploys.
         return mutate(s, request, values, lambda: s.attempt(values))
@@ -471,6 +492,15 @@ def create_app(settings=None):
             cursor,
         )
         return {"items": page, "next_cursor": next_cursor}
+
+    @app.put("/api/v1/exercise-attempts/{attempt_id}/reflection")
+    def reflection(attempt_id: UUID, payload: ReflectionInput, s: S):
+        attempt = s.get(attempt_id, "attempt")
+        note = payload.note.strip()
+        if attempt.get("reflection", {}).get("note") != note:
+            attempt["reflection"] = {"note": note, "updated_at": iso()}
+            s.put("attempt", attempt)
+        return attempt
 
     @app.get("/api/v1/exercise-attempts/{attempt_id}")
     def attempt_by_id(attempt_id: UUID, s: S):

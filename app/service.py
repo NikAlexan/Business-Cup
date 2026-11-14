@@ -222,6 +222,12 @@ class Service:
             "onboarding_status": "assessment_in_progress"
             if active
             else ("ready" if previous else "needs_assessment"),
+            "data_provenance": {
+                "prepared_demo_history": any(
+                    a.get("analysis_metadata", {}).get("demo", {}).get("prepared_data", False)
+                    for a in self.assessments()
+                )
+            },
             "active_assessment_id": active["id"] if active else None,
             "latest_assessment_id": previous["id"] if previous else None,
             "current_plan_id": p["id"] if p else None,
@@ -472,12 +478,76 @@ class Service:
                         return p, lesson, item
         fail(404, "not_found", "Plan item not found.")
 
+    def item_state(self, item_id):
+        plan, lesson, item = self.find_item(item_id)
+        attempted = {a.get("recording_id") for a in self.all("attempt") if a["plan_item_id"] == item["id"]}
+        records = [
+            r
+            for r in self.all("recording")
+            if r["purpose"] == "exercise"
+            and r["plan_item_id"] == item["id"]
+            and r["id"] not in attempted
+            and not r.get("dismissed_at")
+            and bool(r.get("practice_only")) == (item["status"] == "completed")
+        ]
+        pending = None
+        if records:
+            record = max(records, key=lambda r: (r["created_at"], r["id"]))
+            job_id = record.get("check_job_id")
+            if not job_id:  # Legacy uploads did not persist the job pointer.
+                job_id = next(
+                    (
+                        j.id
+                        for j in self.db.scalars(select(Job).where(Job.guest_id == self.guest.id))
+                        if j.data.get("recording_id") == record["id"] and j.data["type"] == "recording_check"
+                    ),
+                    None,
+                )
+            if job_id:
+                pending = {
+                    "recording_id": record["id"],
+                    "job_id": job_id,
+                    "practice_only": bool(record.get("practice_only")),
+                    "based_on_attempt_id": (record.get("practice_focus") or {}).get("attempt_id"),
+                    "practice_focus": record.get("practice_focus"),
+                    "status": record["status"],
+                }
+        return {
+            "plan_id": plan["id"],
+            "plan_status": plan["status"],
+            "lesson": lesson,
+            "item": item,
+            "item_index": next(n for n, value in enumerate(lesson["items"]) if value["id"] == item["id"]),
+            "pending_take": pending,
+        }
+
+    def dismiss_recording(self, recording_id):
+        record = self.get(recording_id, "recording")
+        if record["purpose"] != "exercise":
+            fail(422, "validation_error", "Only an unfinished exercise take can be dismissed.")
+        if any(a.get("recording_id") == record["id"] for a in self.all("attempt")):
+            fail(409, "recording_already_used", "This take is already part of your history.")
+        if not record.get("dismissed_at"):
+            record["dismissed_at"] = iso()
+            self.put("recording", record)
+        return {"recording_id": record["id"], "dismissed_at": record["dismissed_at"]}
+
+    def practice_source(self, source_id, item_id, practice_only):
+        if not source_id:
+            return None
+        if not practice_only:
+            fail(422, "validation_error", "A previous-take focus applies only to extra practice.")
+        source = self.get(source_id, "attempt")
+        if source["plan_item_id"] != item_id:
+            fail(404, "not_found", "The source take does not belong to this exercise.")
+        return {"attempt_id": source["id"], "note": source.get("reflection", {}).get("note", "")}
+
     def upload(self, upload, fields, mime_type):
         self.auth("daily_training" if fields["purpose"] == "exercise" else "assessment")
         purpose = fields["purpose"]
         a = task = item = None
         if purpose == "assessment":
-            if fields.get("practice_only"):
+            if fields.get("practice_only") or fields.get("based_on_attempt_id"):
                 fail(422, "validation_error", "Extra practice applies only to completed exercises.")
             if not fields["assessment_id"] or not fields["task_id"] or fields["plan_item_id"]:
                 fail(422, "validation_error", "Assessment upload requires only assessment_id and task_id.")
@@ -497,6 +567,11 @@ class Service:
             )
             if item["task"]["verification"]["type"] != "recording":
                 fail(422, "validation_error", "This exercise does not accept recordings.")
+        practice_focus = self.practice_source(
+            fields.get("based_on_attempt_id"),
+            item["id"] if item else None,
+            fields.get("practice_only", False),
+        )
         used = sum(self.local_date(r["created_at"]) == self.local_date() for r in self.all("recording"))
         if used >= self.settings.max_uploads_per_day:
             fail(429, "rate_limit_exceeded", "Daily recording limit reached.", {"retry_after_seconds": 3600})
@@ -514,6 +589,7 @@ class Service:
             data = {
                 "id": rid,
                 **fields,
+                "practice_focus": practice_focus,
                 "status": "queued",
                 "mime_type": mime_type,
                 "bytes": path.stat().st_size,
@@ -528,6 +604,8 @@ class Service:
                 task["last_upload_id"] = rid
                 self.put("assessment", a)
             j = self.queue("recording_check", assessment_id=fields["assessment_id"], recording_id=rid)
+            data["check_job_id"] = j["id"]
+            self.put("recording", data)
             return 202, {"recording": data, "job_id": j["id"], "poll_after_ms": 2000}
         except BaseException:
             path.unlink(missing_ok=True)
@@ -552,6 +630,7 @@ class Service:
                 "Daily extra-practice limit reached.",
                 {"retry_after_seconds": 3600},
             )
+        practice_focus = self.practice_source(payload.get("based_on_attempt_id"), item["id"], practice_only)
         v = item["task"]["verification"]
         kind = v["type"]
         fields = {
@@ -565,11 +644,20 @@ class Service:
         if fields != {required}:
             fail(422, "validation_error", "Fields do not match the assigned verification type.")
         issues, metrics, coaching = [], None, []
+        speech_feedback = {
+            "scope": {
+                "self_confirmation": "self_confirmed",
+                "timer": "reported_time",
+                "recording": "audio_quality_only",
+            }[kind],
+            "insights": [],
+            "next_step": None,
+        }
         if kind == "self_confirmation" and payload["self_confirmed"] is not True:
             issues = [{"code": "not_confirmed", "message": "Confirm completion after practicing."}]
         elif kind == "recording":
             rec = self.get(payload["recording_id"], "recording")
-            if rec["purpose"] != "exercise" or rec["plan_item_id"] != item["id"]:
+            if rec["purpose"] != "exercise" or rec["plan_item_id"] != item["id"] or rec.get("dismissed_at"):
                 fail(404, "not_found", "Recording not found for this plan item.")
             if bool(rec.get("practice_only")) != practice_only:
                 fail(422, "practice_mode_mismatch", "Use a recording made for this practice mode.")
@@ -585,19 +673,24 @@ class Service:
                 fail(409, "recording_not_ready", "Wait for the recording check to finish.")
             if rec["status"] == "failed":
                 fail(409, "recording_not_ready", "Retry the failed recording check first.")
+            if rec.get("practice_focus"):
+                if practice_focus and practice_focus["attempt_id"] != rec["practice_focus"]["attempt_id"]:
+                    fail(422, "practice_focus_mismatch", "This take was made with a different saved focus.")
+                practice_focus = rec["practice_focus"]
             issues = rec["quality"]["issues"]
             metrics = rec.get("measurements")
+            speech_feedback = rec.get("speech_feedback") or speech_feedback
             target = v.get("target_wpm")
-            if target and not issues:
+            if (target or v.get("required_metrics")) and not issues:
                 rate = (metrics or {}).get("speaking_rate_wpm", {})
                 if not rate.get("available"):
                     coaching = [
                         {
                             "code": "measurement_unavailable",
-                            "message": "Pace was not measured reliably. Your take is saved; use the listening prompt to reflect on it.",
+                            "message": "Timing could not be measured reliably. Your take is saved; use the listening prompt to reflect on it.",
                         }
                     ]
-                elif not target["min"] <= rate["value"] <= target["max"]:
+                elif target and not target["min"] <= rate["value"] <= target["max"]:
                     coaching = [
                         {
                             "code": "pace_outside_target",
@@ -609,6 +702,7 @@ class Service:
             "id": new_id(),
             "plan_item_id": item["id"],
             "practice_only": practice_only,
+            "practice_focus": practice_focus,
             "reward": {"notes": 0, "parts": []},
             "practice_seconds": 0,
             "practice_seconds_source": {
@@ -629,6 +723,7 @@ class Service:
                     if passed
                     else "Please try this exercise again."
                 ),
+                **speech_feedback,
                 "coaching": coaching,
                 "metrics": metrics,
                 "issues": issues,

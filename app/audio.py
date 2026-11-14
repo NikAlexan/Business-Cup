@@ -190,7 +190,7 @@ def pitch(signal):
 def timing_metrics(signal, segments, word_count=None, words=None):
     # Pauses are gaps between transcribed words: Silero VAD holds speech probability through
     # sentence pauses, and edge silence must not dilute pace. segments stay for quality checks.
-    return combine_timing((word_count, words))
+    return combine_timing((word_count, words, len(signal) / SAMPLE_RATE))
 
 
 def valid_word_timestamps(words):
@@ -213,17 +213,26 @@ def valid_word_timestamps(words):
 
 
 def combine_timing(*parts):
-    """Timing pooled over (word_count, words) parts; unavailable if any part lacks words, never partial."""
+    """Timing pooled over (word_count, words, decoded_duration) parts; unavailable if any part lacks words, never partial."""
     total_words = span = pause_time = pause_count = 0
-    for word_count, words in parts:
+    for word_count, words, duration in parts:
         if not word_count or not words or len(words) < 2:
             return {k: metric(None, u, "transcription_unavailable") for k, u in TIMING_UNITS.items()}
-        if not valid_word_timestamps(words):
+        if (
+            not valid_word_timestamps(words)
+            or isinstance(word_count, bool)
+            or not isinstance(word_count, int)
+            or word_count != len(words)
+            or not math.isfinite(duration)
+            or duration <= 0
+            or words[-1]["end"] > duration + 0.05
+            or words[-1]["start"] >= duration
+        ):
             return {k: metric(None, u, "transcription_invalid_timestamps") for k, u in TIMING_UNITS.items()}
         pauses = [b["start"] - a["end"] for a, b in zip(words, words[1:])]
         pauses = [g for g in pauses if g >= 0.3]
         total_words += word_count
-        span += words[-1]["end"] - words[0]["start"]
+        span += min(duration, words[-1]["end"]) - words[0]["start"]
         pause_time += sum(pauses)
         pause_count += len(pauses)
     return {

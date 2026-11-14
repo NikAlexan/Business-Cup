@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { request } from '../api/api'
 import { usePlan, useProgress } from '../api/hooks'
@@ -19,7 +20,7 @@ function Takes({ tz }: { tz: string }) {
     queryFn: ({ pageParam }) => request<P>('/progress?days=1&recordings_limit=10' + (pageParam ? '&recordings_cursor=' + encodeURIComponent(pageParam) : '')),
     getNextPageParam: (p) => p.next_recordings_cursor ?? undefined,
   })
-  const titles = new Map(plan.data?.lessons.flatMap((l) => l.items.map((i) => [i.id, `${i.exercise_id} · ${i.title}`] as const)) ?? [])
+  const titles = new Map(plan.data?.lessons.flatMap((l) => l.items.map((i) => [i.id, i.title] as const)) ?? [])
   const recs = q.data?.pages.flatMap((p) => p.recordings).filter((r) => r.status === 'completed') ?? []
   return (
     <div className="rs-stack" style={{ gap: 10 }}>
@@ -37,6 +38,7 @@ function Takes({ tz }: { tz: string }) {
               {formatDate(r.created_at, tz)} · {clock(r.duration_seconds)}
             </span>
           </span>
+          {r.plan_item_id && <Link className="rs-link" to={'/exercise/' + r.plan_item_id}>Feedback and practice again</Link>}
           <audio controls preload="none" src={r.audio_url} style={{ width: '100%', maxWidth: 280, height: 36 }} aria-label="Play take" />
         </div>
       ))}

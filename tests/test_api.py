@@ -128,7 +128,7 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
         "f0_median_hz",
     }
     assert a["analysis_metadata"]["targets_version"] == "targets-v1"
-    assert a["analysis_metadata"]["measurement_version"] == "voice-metrics-v2"
+    assert a["analysis_metadata"]["measurement_version"] == "voice-metrics-v3"
     scope = [t["id"] for t in a["tasks"][:2]]
     assert a["measurement_scope"]["pace_and_pauses_task_ids"] == scope
     assert a["measurements"]["pause_count"]["value"] >= 8  # sentence ends in both reading passages

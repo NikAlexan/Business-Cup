@@ -1,13 +1,16 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ApiError, post, useMutationWithKey } from '../api/api'
-import { useAttempt, useAttemptHistory, useJob, useMe, usePlan, useRecording, useToday } from '../api/hooks'
-import type { Attempt, Lesson, PlanItem } from '../api/types'
+import { ApiError, post, request, useMutationWithKey } from '../api/api'
+import { useAttempt, useAttemptHistory, useJob, useMe, usePlanItem, useRecording } from '../api/hooks'
+import type { Attempt, PendingTake, PlanItem } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
+import { DemoNotice } from '../components/DemoNotice'
 import { FlowHeader } from '../components/FlowHeader'
 import { NoteIcon } from '../components/Icons'
 import { RecorderDock } from '../components/RecorderDock'
+import { TakeReflection } from '../components/TakeReflection'
+import { TakeComparison } from '../components/TakeComparison'
 import { ScriptText } from '../components/ScriptText'
 import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
@@ -18,7 +21,7 @@ import { formatEstimate } from '../lib/format'
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const REASON = { exercise_completed: 'Exercise complete', quality_bonus: 'Clean recording bonus' }
 
-type Body = { plan_item_id: string; practice_only?: boolean; elapsed_seconds?: number; self_confirmed?: boolean; recording_id?: string }
+type Body = { plan_item_id: string; practice_only?: boolean; based_on_attempt_id?: string; elapsed_seconds?: number; self_confirmed?: boolean; recording_id?: string }
 
 function TimerCheck({ text, min, onFinish, busy }: { text: string; min: number; onFinish: (s: number) => void; busy: boolean }) {
   const [running, setRunning] = useState(false)
@@ -71,19 +74,24 @@ function SelfCheck({ onFinish, busy }: { onFinish: () => void; busy: boolean }) 
   )
 }
 
-function RecordCheck({ item, accepted, serverLimit, onRecorded, busy, practiceOnly }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean }) {
+function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void }) {
+  const qc = useQueryClient()
   const max = Math.min(item.task.verification.max_recording_seconds ?? 90, serverLimit)
   const r = useRecorder({ maxSeconds: max, accepted })
-  const [job, setJob] = useState<{ id: string; rec: string } | null>(null)
+  const [job, setJob] = useState<{ id: string; rec: string } | null>(() => pendingTake ? { id: pendingTake.job_id, rec: pendingTake.recording_id } : null)
   const j = useJob(job?.id)
   const [checkedRecording, setCheckedRecording] = useState<string | null>(null)
   useEffect(() => setCheckedRecording(null), [r.blob])
   const [checkError, setCheckError] = useState<string | null>(null)
-  const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) => uploadRecording({ purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}) }, v.blob, v.mime, key))
+  const [failedJob, setFailedJob] = useState<{ id: string; rec: string; retryable: boolean } | null>(null)
+  const retryCheck = useMutationWithKey((id: string, key) => post<{ job_id: string }>('/jobs/' + id + '/retry', {}, key))
+  useEffect(() => { setFailedJob(null); setCheckError(null); retryCheck.reset() }, [r.blob]) // eslint-disable-line react-hooks/exhaustive-deps
+  const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) => uploadRecording({ purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(basedOn ? { based_on_attempt_id: basedOn } : {}) }, v.blob, v.mime, key))
   useEffect(() => {
     const s = j.data?.status
-    if (s === 'failed') {
-      setCheckError(j.data?.error?.message ?? 'The recording check failed. Please send your take again.')
+    if (s === 'failed' && job) {
+      setFailedJob({ ...job, retryable: !!j.data?.retryable })
+      setCheckError(j.data?.error?.message ?? 'The recording check failed. Retry the check or record a new take.')
       setJob(null)
     }
     if (job && (s === 'completed' || s === 'needs_rerecord')) {
@@ -100,9 +108,17 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, busy, practiceOn
   const wpm = item.task.verification.target_wpm
   const pacer = wpm && recording ? (r.seconds * (wpm.min + wpm.max)) / 2 / 60 : undefined
   const send = () => {
+    if (failedJob?.retryable) {
+      retryCheck.mutate(failedJob.id, { onSuccess: () => {
+        qc.setQueryData(['job', failedJob.id], { status: 'queued', poll_after_ms: 2000 })
+        setJob({ id: failedJob.id, rec: failedJob.rec }); setFailedJob(null); setCheckError(null)
+        void qc.invalidateQueries({ queryKey: ['job', failedJob.id] })
+      } })
+      return
+    }
     setCheckError(null)
     if (checkedRecording) { onRecorded(checkedRecording); return }
-    if (r.blob && r.mime) upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJob({ id: d.job_id, rec: d.recording.id }) })
+    if (r.blob && r.mime) upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => { setJob({ id: d.job_id, rec: d.recording.id }); onUploaded({ job_id: d.job_id, recording_id: d.recording.id, practice_only: practiceOnly, status: 'queued' }) } })
   }
   return (
     <>
@@ -114,33 +130,38 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, busy, practiceOn
           </span>
         )}
       </div>
+      {j.error && <ErrorBanner error={j.error} onRetry={() => j.refetch()} />}
+      {job && !r.blob && <p role="status">Checking your saved take. You can return here after leaving this page.</p>}
       {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
-      {checkError && <ErrorBanner text={checkError} onRetry={send} />}
-      <RecorderDock r={r} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" onPlayTime={setPlayT} />
+      {retryCheck.error && <ErrorBanner error={retryCheck.error} onRetry={send} />}
+      {checkError && <ErrorBanner text={checkError} onRetry={!retryCheck.isPending && (failedJob?.retryable || r.blob) ? send : undefined} />}
+      {checkedRecording && !r.blob ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
+        <audio controls aria-label="Your checked take" src={'/api/v1/recordings/' + checkedRecording + '/audio'} />
+        <button className="rs-btn" type="button" disabled={busy} onClick={send}>{busy ? 'Saving…' : 'Save checked take'}</button>
+      </div> : !job || r.blob ? <RecorderDock r={r} sending={busy || upload.isPending || retryCheck.isPending || !!job} onSend={send} sendLabel="Check my take" onPlayTime={setPlayT} /> : null}
     </>
   )
-}
-
-function locate(id: string, lessons: (Lesson | null | undefined)[]) {
-  for (const l of lessons) {
-    const i = l?.items.findIndex((x) => x.id === id) ?? -1
-    if (l && i >= 0) return { lesson: l, item: l.items[i], index: i }
-  }
-  return null
 }
 
 export default function Exercise() {
   const { planItemId = '' } = useParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const today = useToday()
-  const plan = usePlan()
+  const itemState = usePlanItem(planItemId)
   const me = useMe()
-  useRedirectOn401(today.error)
-  const found = locate(planItemId, [today.data?.lesson, ...(plan.data?.lessons ?? [])])
+  useRedirectOn401(itemState.error ?? me.error)
+  const found = itemState.data ? { lesson: itemState.data.lesson, item: itemState.data.item, index: itemState.data.item_index } : null
   const [localResult, setResult] = useState<Attempt | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const canceling = useRef(false)
+  const [repeatSource, setRepeatSource] = useState<string | null>(null)
   const [repeatFor, setRepeatFor] = useState<string | null>(null)
-  const practicingAgain = repeatFor === planItemId
+  const [localPending, setLocalPending] = useState<{ itemId: string; take: PendingTake } | null>(null)
+  const [ignored, setIgnored] = useState<Set<string>>(() => new Set())
+  const candidate = localPending?.itemId === planItemId ? localPending.take : itemState.data?.pending_take ?? null
+  const pendingTake = candidate && !ignored.has(candidate.recording_id) ? candidate : null
+  const practicingAgain = repeatFor === planItemId || !!pendingTake?.practice_only
+  const basedOn = pendingTake?.based_on_attempt_id ?? repeatSource ?? undefined
   const latestLocal = localResult?.plan_item_id === planItemId ? localResult : null
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const completed = found?.item.status === 'completed' || latestLocal?.status === 'passed'
@@ -150,24 +171,31 @@ export default function Exercise() {
   const savedAttempt = useAttempt(found?.item.latest_attempt_id)
   const result = latestLocal ?? selected ?? savedAttempt.data ?? null
   const savedRecording = useRecording(result?.recording_id)
+  const dismiss = useMutation({ mutationFn: (id: string) => request('/recordings/' + id + '/dismiss', { method: 'PUT', body: {} }) })
   const attempt = useMutationWithKey((b: Body, key) => post<Attempt>('/exercise-attempts', b, key))
 
-  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null) }, [planItemId])
+  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null); setLocalPending(null); setIgnored(new Set()); setRepeatSource(null); canceling.current = false }, [planItemId])
 
-  if (today.isPending || plan.isPending) return <Frame><Skeleton height={360} /></Frame>
+  if (itemState.isPending) return <Frame><Skeleton height={360} /></Frame>
+  if (itemState.error) return <Frame><ErrorBanner error={itemState.error} onRetry={() => itemState.refetch()} /><Link className="rs-link" to="/today">Back to today</Link></Frame>
   if (!found) return <Frame><ErrorBanner text="This exercise is not in your plan." /><Link className="rs-link" to="/today">Back to today</Link></Frame>
   const { lesson, item, index } = found
   const nextItem = lesson.items.find((x, i) => i !== index && x.status !== 'completed')
-  const goNext = () => navigate(nextItem ? '/exercise/' + nextItem.id : '/done/' + lesson.id)
+  const closedLesson = lesson.status === 'completed' || itemState.data?.plan_status === 'archived'
+  const readOnlyTask = itemState.data?.plan_status === 'archived' && item.status !== 'completed'
+  const goNext = () => navigate(closedLesson ? '/today' : nextItem ? '/exercise/' + nextItem.id : '/done/' + lesson.id)
   const v = item.task.verification
   const submit = (b: Omit<Body, 'plan_item_id'>) =>
     attempt.mutate(
-      { plan_item_id: item.id, ...(practicingAgain ? { practice_only: true } : {}), ...b },
+      { plan_item_id: item.id, ...(practicingAgain ? { practice_only: true, ...(basedOn ? { based_on_attempt_id: basedOn } : {}) } : {}), ...b },
       {
         onSuccess: (a) => {
           setResult(a)
           setSelectedId(a.id)
-          if (a.status === 'passed') setRepeatFor(null)
+          setIgnored((old) => new Set([...old, ...(pendingTake ? [pendingTake.recording_id] : []), ...(a.recording_id ? [a.recording_id] : [])]))
+          setLocalPending(null)
+          setRepeatFor(a.practice_only && a.status === 'needs_retry' ? planItemId : null)
+          void qc.invalidateQueries({ queryKey: ['plan-item', item.id] })
           void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] })
           void qc.invalidateQueries({ queryKey: ['progress'] })
           void qc.invalidateQueries({ queryKey: ['today'] })
@@ -175,10 +203,22 @@ export default function Exercise() {
           void qc.invalidateQueries({ queryKey: ['me'] })
         },
         onError: (e) => {
-          if (e instanceof ApiError && e.code === 'plan_item_already_completed') goNext()
+          if (e instanceof ApiError && ['plan_item_already_completed', 'recording_already_used'].includes(e.code)) {
+            setRepeatFor(null)
+            setLocalPending(null)
+            if (pendingTake) setIgnored((old) => new Set([...old, pendingTake.recording_id]))
+            void qc.invalidateQueries({ queryKey: ['plan-item', item.id] })
+            void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] })
+          }
         },
       },
     )
+  const cancelRepeat = () => {
+    canceling.current = true
+    const finish = () => { setRepeatFor(null); setResult(null); attempt.reset(); setLocalPending(null); if (pendingTake) setIgnored((old) => new Set([...old, pendingTake.recording_id])); void itemState.refetch() }
+    if (pendingTake) dismiss.mutate(pendingTake.recording_id, { onSuccess: finish, onError: () => { canceling.current = false } })
+    else finish()
+  }
   const showOutcome = completed && !practicingAgain
   const progress = Math.round(((lesson.items.filter((x) => x.status === 'completed').length) / lesson.items.length) * 100)
 
@@ -190,6 +230,7 @@ export default function Exercise() {
         </div>
       </FlowHeader>
       <main className="rs-wrap" style={{ paddingTop: 20, paddingBottom: 48 }}>
+        <DemoNotice prepared={me.data?.data_provenance?.prepared_demo_history} enabled={me.data?.demo_mode} />
         <div className="rs-cols" style={{ gridTemplateColumns: 'minmax(0, .8fr) minmax(0, 1.2fr)' }}>
           <div className="rs-stack" style={{ gap: 12 }}>
             <h1 className="rs-h rs-h1">{item.title}</h1>
@@ -214,14 +255,14 @@ export default function Exercise() {
             )}
           </div>
           <div className="rs-stack" style={{ gap: 16 }}>
-            {(v.type === 'self_confirmation' || showOutcome) && (
+            {(v.type === 'self_confirmation' || showOutcome || readOnlyTask) && (
               <div className="rs-card" style={{ padding: 28 }}>
                 {item.task.steps?.length ? <ol>{item.task.steps.map((step, n) => <li key={n}>{step}</li>)}</ol> : <ScriptText text={item.task.text} />}
               </div>
             )}
-            {showOutcome ? (
-              <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }} role="status">
-                <h2 className="rs-h" style={{ fontSize: 22 }}>{result?.status === 'needs_retry' ? 'Take needs another try' : result?.practice_only ? 'Extra practice saved' : result ? 'Practice complete' : 'Already done'}</h2>
+            {readOnlyTask ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}><p>This older task is saved for reference. Continue practice in your current plan.</p><Link className="rs-link" to="/today">Back to current plan</Link></div> : showOutcome ? (
+              <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }}>
+                <h2 className="rs-h" aria-live="polite" style={{ fontSize: 22 }}>{result?.status === 'needs_retry' ? 'Take needs another try' : result?.practice_only ? 'Extra practice saved' : result ? 'Practice complete' : 'Already done'}</h2>
                 {result && <p style={{ margin: 0 }}>{result.feedback.summary}</p>}
                 {result?.practice_only && <p style={{ margin: 0 }}>Extra practice does not add notes or complete the session again.</p>}
                 {result?.status === 'needs_retry' && <p>Your exercise remains completed. This take needs another try.</p>}
@@ -229,24 +270,37 @@ export default function Exercise() {
                 {typeof result?.feedback.metrics?.speaking_rate_wpm?.value === 'number' && <p style={{ margin: 0 }}>Measured pace: {Math.round(result.feedback.metrics.speaking_rate_wpm.value)} words/min</p>}
                 {savedAttempt.isPending && item.latest_attempt_id && !latestLocal && <p>Loading your saved feedback…</p>}
                 {savedAttempt.error && !latestLocal && <ErrorBanner error={savedAttempt.error} onRetry={() => savedAttempt.refetch()} />}
-                {savedRecording.data?.audio_url && <audio controls preload="metadata" aria-label="Your completed take" src={savedRecording.data.audio_url} style={{ width: '100%' }} />}
+                {savedRecording.data?.audio_url && <audio controls preload="metadata" aria-label="Your completed take" ref={audioRef} src={savedRecording.data.audio_url} style={{ width: '100%' }} />}
                 {savedRecording.error && <ErrorBanner error={savedRecording.error} onRetry={() => savedRecording.refetch()} />}
+                {!!result?.feedback.insights?.length && <section className="rs-stack" aria-label="Measured timing notes" style={{ gap: 10 }}>
+                  <h3 className="rs-h" style={{ fontSize: 20 }}>Measured timing notes</h3>
+                  {result.feedback.insights.map((insight) => <div key={insight.code}>
+                    <p style={{ margin: 0 }}>{insight.message}</p>
+                    {insight.evidence && <button className="rs-link" type="button" disabled={!savedRecording.data?.audio_url} onClick={() => { const audio = audioRef.current; if (audio) { audio.currentTime = insight.evidence!.start_seconds; void audio.play().catch(() => {}) } }}>Hear this moment: “{insight.evidence.quote}”</button>}
+                  </div>)}
+                  <span className="rs-label">Based on transcript timings. Playback helps you check the word boundary.</span>
+                </section>}
+                {result?.feedback.next_step && <p><strong>Try next:</strong> {result.feedback.next_step}</p>}
+                {result?.practice_focus?.note && <p><strong>Your focus for this take:</strong> {result.practice_focus.note}</p>}
+                {result?.practice_focus && <TakeComparison take={result} />}
+                {result && <TakeReflection key={result.id} attempt={result} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }); void qc.invalidateQueries({ queryKey: ['attempt', result.id] }) }} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
                   </div>
                 ))}
-                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
+                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { canceling.current = false; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
                   Practice again — no extra notes
                 </button>
                 <button className="rs-btn rs-btn--wide" type="button" onClick={goNext} style={{ alignSelf: 'flex-start' }}>
-                  {nextItem ? 'Next exercise' : 'Finish session'}
+                  {closedLesson ? 'Back to today' : nextItem ? 'Next exercise' : 'Finish session'}
                 </button>
               </div>
             ) : (
               <>
-                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.</span><button className="rs-link" type="button" disabled={attempt.isPending} onClick={() => { setRepeatFor(null); setResult(null); attempt.reset() }}>Cancel extra practice</button></div>}
+                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.{(pendingTake?.practice_focus?.note || result?.reflection?.note) && <span> Your saved focus: {pendingTake?.practice_focus?.note || result?.reflection?.note}</span>}</span><button className="rs-link" type="button" disabled={attempt.isPending || dismiss.isPending} onClick={cancelRepeat}>Cancel extra practice</button></div>}
+                {dismiss.error && <ErrorBanner error={dismiss.error} onRetry={cancelRepeat} />}
                 {result?.status === 'needs_retry' && (
                   <div className="rs-banner rs-banner--warn" role="status">
                     <div className="rs-stack" style={{ gap: 2 }}>
@@ -262,7 +316,7 @@ export default function Exercise() {
                 {v.type === 'self_confirmation' && <SelfCheck key={item.id} busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
                 {v.type === 'recording' && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
                 {v.type === 'recording' && me.isPending && <Skeleton height={160} />}
-                {v.type === 'recording' && me.data && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending} onRecorded={(id) => submit({ recording_id: id })} />}
+                {v.type === 'recording' && me.data && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} pendingTake={pendingTake} onUploaded={(take) => { canceling.current = false; setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
               </>
             )}
             {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>
@@ -271,7 +325,7 @@ export default function Exercise() {
               {history.error && <ErrorBanner error={history.error} onRetry={() => history.refetch()} />}
               <ol className="rs-stack" style={{ paddingLeft: 22, gap: 10 }}>
                 {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending} onClick={() => { setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
-                  {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US') : ''}
+                  {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US', { timeZone: me.data?.preferences?.timezone ?? 'UTC' }) : ''}
                 </button></li>)}
               </ol>
               {history.hasNextPage && <button className="rs-btn rs-btn--secondary" type="button" disabled={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>Load earlier takes</button>}

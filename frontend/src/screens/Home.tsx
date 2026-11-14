@@ -86,16 +86,16 @@ export default function Home() {
             {checkIn && <span className="rs-label">Check-in on {formatDate(checkIn, t.timezone)} · 14 days after your baseline</span>}
           </div>
 
-          {open && lesson && (
+          {(open || t.daily_status === 'completed') && lesson && (
             <div className="rs-stack" style={{ gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <h2 className="rs-h" style={{ fontSize: 22 }}>Today's session</h2>
+                <h2 className="rs-h" style={{ fontSize: 22 }}>{open ? "Today's session" : 'Review or practice again'}</h2>
                 <span className="rs-label">About {mins(lesson.estimated_duration_seconds)}</span>
               </div>
               {lesson.items.map((i) => (
                 <ItemRow key={i.id} item={i} />
               ))}
-              {next ? (
+              {open && (next ? (
                 <Link className="rs-btn rs-btn--wide" to={'/exercise/' + next.id} style={{ alignSelf: 'flex-start', marginTop: 6 }}>
                   {t.daily_status === 'in_progress' ? 'Continue' : 'Start'} session {lesson.day_index}
                 </Link>
@@ -103,7 +103,7 @@ export default function Home() {
                 <Link className="rs-btn rs-btn--wide" to={'/done/' + lesson.id} style={{ alignSelf: 'flex-start', marginTop: 6 }}>
                   Finish session {lesson.day_index}
                 </Link>
-              )}
+              ))}
             </div>
           )}
           {t.daily_status === 'completed' && (
