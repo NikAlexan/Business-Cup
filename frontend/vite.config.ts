@@ -32,5 +32,5 @@ export default defineConfig({
       },
     }),
   ],
-  server: { proxy: { '/api': api, '/health': api } },
+  server: { proxy: { '/api': { target: api, ws: true }, '/health': api } },
 })

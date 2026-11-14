@@ -47,6 +47,8 @@ requests==2.34.2
 ruff==0.17.5
 scikit-learn==1.9.1
 scipy==1.18.1
+sherpa-onnx==2.0.1
+sherpa-onnx-core==2.0.1
 soundfile==0.14.0
 soxr==1.1.0
 SQLAlchemy==2.1.8
@@ -56,3 +58,4 @@ typing-inspection==0.4.5
 typing_extensions==4.16.0
 urllib3==2.8.0
 uvicorn==0.54.0
+websockets==17.4

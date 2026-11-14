@@ -61,6 +61,7 @@ def settings(tmp_path, monkeypatch):
         openai_api_key="",
         app_secret="test-secret-that-is-at-least-32-characters-long",
         vad_model_path=Path("models/silero_vad.onnx"),
+        asr_model_dir=Path("models/asr"),
     )
 
 

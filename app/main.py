@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, File, Form, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -15,6 +16,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException
 
+from app.asr import feed, recognizer
 from app.config import Settings
 from app.content import CATALOG, EXERCISES
 from app.db import Database, Guest, iso, new_id
@@ -382,6 +384,36 @@ def create_app(settings=None):
             content_disposition_type="inline",
             headers={"Cache-Control": "private, no-store"},
         )
+
+    @app.websocket("/api/v1/speech-follow")
+    async def speech_follow(ws: WebSocket, rate: int = 16000):
+        """Live transcript of the take being recorded, used only to highlight read words.
+
+        In: binary frames of float32 mono samples at `rate`.
+        Out after each frame: {"words": [[word, start_seconds], ...]} heard so far in this stream.
+        Audio is decoded in memory and never stored.
+        """
+        # Cookie-authenticated WebSockets bypass CORS: check Origin like the HTTP guard does.
+        origin = ws.headers.get("origin")
+        if origin and origin.rstrip("/") not in settings.origins:
+            return await ws.close(1008)
+        with database.session() as db:
+            guest = Service(db, settings, ws.cookies.get(COOKIE)).guest
+        rec = recognizer(settings.asr_model_dir)
+        if not guest or not rec or not 8000 <= rate <= 48000:
+            return await ws.close(1008 if rec else 1011)
+        await ws.accept()
+        stream, left = rec.create_stream(), rate * settings.max_recording_seconds
+        try:
+            while left > 0:
+                chunk = await ws.receive_bytes()
+                if len(chunk) % 4 or len(chunk) > rate * 4:  # whole samples, at most 1 s per frame
+                    return await ws.close(1003)
+                left -= len(chunk) // 4
+                await ws.send_json({"words": await run_in_threadpool(feed, rec, stream, rate, chunk)})
+            await ws.close(1000)  # recording limit reached
+        except WebSocketDisconnect:
+            pass
 
     @app.get("/api/v1/exercises")
     def exercises(s: S):

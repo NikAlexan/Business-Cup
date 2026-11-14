@@ -36,10 +36,12 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
   }, [job.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
   const busy = upload.isPending || !!jobId
   const follow = useSpeechFollow(task.text, r.state === 'recording')
+  const [playT, setPlayT] = useState<number | null>(null)
+  useEffect(() => setPlayT(null), [r.state])
   return (
     <>
       <div className="rs-card" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 28 }}>
-        <ScriptText text={task.text} read={r.state === 'recording' ? follow.read : 0} />
+        <ScriptText text={task.text} read={r.state === 'recording' ? follow.read : playT !== null ? follow.readAt(playT) : 0} />
         <span className="rs-label">
           Read it at your own pace — there's no time limit to chase.{follow.supported ? ' Words you read turn green.' : ''}
         </span>
@@ -47,8 +49,8 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
       {upload.error && <ErrorBanner error={upload.error} onRetry={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime })} />}
       <RecorderDock
         r={r}
-       
         sending={busy}
+        onPlayTime={setPlayT}
         onSend={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJobId(d.job_id) })}
       />
     </>

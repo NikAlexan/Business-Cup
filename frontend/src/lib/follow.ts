@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { getMic } from './recorder'
 
 export const tokenize = (text: string) =>
   text
@@ -9,15 +10,38 @@ export const tokenize = (text: string) =>
 
 const LOOKAHEAD = 3
 
+// A heard word matches a script word exactly, or as its 3+ letter beginning: streaming
+// recognition shows "quarter" before "quarterly".
+const same = (word: string, heard: string) => word === heard || (heard.length >= 3 && word.startsWith(heard))
+
 // How many script words have been read: each heard word may match within a short window ahead,
 // so a misheard or skipped word doesn't stall the cursor and a stray word doesn't jump it.
+// The recognizer also splits words ("to day", "quart early"), so two heard words may form one.
+// If the window misses (the start wasn't heard), two heard words in a row re-anchor further on.
 export function followWords(script: string[], heard: string[]): number {
   let pos = 0
-  for (const h of heard) {
-    const end = Math.min(script.length, pos + LOOKAHEAD + 1)
-    for (let j = pos; j < end; j++) {
-      if (script[j] === h) {
+  for (let k = 0; k < heard.length; k++) {
+    const h = heard[k]
+    const next = heard[k + 1]
+    let found = false
+    for (let j = pos; j < Math.min(script.length, pos + LOOKAHEAD + 1); j++) {
+      if (next !== undefined && script[j] === h + next) {
         pos = j + 1
+        k++
+        found = true
+        break
+      }
+      if (same(script[j], h)) {
+        pos = j + 1
+        found = true
+        break
+      }
+    }
+    if (found || next === undefined) continue
+    for (let j = pos + LOOKAHEAD + 1; j + 1 < script.length; j++) {
+      if (script[j] === h && same(script[j + 1], next)) {
+        pos = j + 2
+        k++
         break
       }
     }
@@ -25,71 +49,92 @@ export function followWords(script: string[], heard: string[]): number {
   return pos
 }
 
-type Rec = {
-  lang: string
-  continuous: boolean
-  interimResults: boolean
-  processLocally?: boolean
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onend: (() => void) | null
-  start(): void
-  stop(): void
-}
-type RecCtor = (new () => Rec) & {
-  available?: (o: { langs: string[]; processLocally: boolean }) => Promise<string>
-  install?: (o: { langs: string[]; processLocally: boolean }) => Promise<boolean>
-}
-
-const Ctor = (globalThis as unknown as { SpeechRecognition?: RecCtor; webkitSpeechRecognition?: RecCtor }).SpeechRecognition
-
-// Only on-device recognition: audio must not leave the browser for this reading aid.
-// ponytail: no highlighting where Chrome can't recognise locally; add a consented cloud mode if users ask.
-async function localRecognitionReady(lang: string) {
-  if (!Ctor?.available) return false
-  const o = { langs: [lang], processLocally: true }
-  try {
-    const state = await Ctor.available(o)
-    if (state === 'available') return true
-    // One-time on-device model download; highlighting starts once it is installed.
-    if ((state === 'downloadable' || state === 'downloading') && Ctor.install) return await Ctor.install(o)
-  } catch {
-    /* unsupported: plain text */
+// Batches ~100 ms of mono input per message instead of one per 128-sample render quantum.
+const TAP = `registerProcessor('tap', class extends AudioWorkletProcessor {
+  buf = new Float32Array(sampleRate / 10); n = 0
+  process([input]) {
+    const ch = input[0]
+    if (ch) for (let i = 0; i < ch.length; i++) {
+      this.buf[this.n++] = ch[i]
+      if (this.n === this.buf.length) { this.port.postMessage(this.buf); this.buf = new Float32Array(this.buf.length); this.n = 0 }
+    }
+    return true
   }
-  return false
-}
+})`
 
-export function useSpeechFollow(text: string, active: boolean, lang = 'en-US') {
+export type HeardWord = [word: string, start: number] // start: seconds from the take's start
+
+// Script words read by time `t` of the take, for highlighting during playback.
+export const readAt = (script: string[], words: HeardWord[], t: number) =>
+  followWords(
+    script,
+    words.filter(([, start]) => start <= t).flatMap(([w]) => tokenize(w)),
+  )
+
+// Streams the take to the server's recognizer and follows the script by the words it hears.
+// Words keep their timing, so `readAt(seconds)` replays the highlight while the take plays back.
+// Any failure (no model, socket closed, mic busy) just leaves the text unhighlighted.
+export function useSpeechFollow(text: string, active: boolean) {
   const [read, setRead] = useState(0)
-  const [supported, setSupported] = useState(false)
+  const [supported, setSupported] = useState(false) // the server accepted the stream at least once
+  const heard = useRef<HeardWord[]>([])
+  const take = useRef(0) // a late reply from the previous take must not overwrite the new one
   useEffect(() => {
-    if (active && !supported) void localRecognitionReady(lang).then(setSupported)
-  }, [active, supported, lang])
-  useEffect(() => {
-    if (!active || !supported || !Ctor) return
+    if (!active) return
     const script = tokenize(text)
-    const r = new Ctor()
-    r.lang = lang
-    r.continuous = true
-    r.interimResults = true
-    r.processLocally = true
-    let stopped = false
-    let before = '' // text from earlier sessions: Chrome ends a session on long pauses
-    let current = ''
-    r.onresult = (e) => {
-      current = Array.from(e.results, (x) => x[0].transcript).join(' ')
-      setRead(followWords(script, tokenize(before + ' ' + current)))
-    }
-    r.onend = () => {
-      before += ' ' + current
-      current = ''
-      if (!stopped) r.start()
-    }
+    const began = performance.now() // ≈ the recorder's start: this runs as its state turns 'recording'
+    let offset = 0 // seconds between the take's start and the first sample sent to the server
+    let stop = () => {}
+    let cancelled = false
     setRead(0)
-    r.start()
+    heard.current = []
+    const id = ++take.current
+    void (async () => {
+      // Own mic stream: the recorder keeps its stream; browsers share one permission.
+      const stream = await getMic()
+      // Native rate: Firefox can't resample a mic source; the server resamples.
+      // ponytail: 48 kHz float32 is ~190 KB/s up; downsample in the worklet if mobile data matters.
+      const ctx = new AudioContext()
+      stop = () => {
+        void ctx.close()
+        stream.getTracks().forEach((t) => t.stop())
+      }
+      if (cancelled) return stop()
+      const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/v1/speech-follow?rate=${ctx.sampleRate}`)
+      ws.binaryType = 'arraybuffer'
+      const pending: ArrayBuffer[] = [] // audio captured before the socket opened
+      ws.onopen = () => {
+        setSupported(true)
+        pending.splice(0).forEach((b) => ws.send(b))
+      }
+      ws.onmessage = (e) => {
+        if (id !== take.current) return
+        heard.current = (JSON.parse(e.data).words as HeardWord[]).map(([w, t]) => [w, t + offset])
+        setRead(followWords(script, heard.current.flatMap(([w]) => tokenize(w))))
+      }
+      const closeAudio = stop
+      stop = () => {
+        closeAudio()
+        if (ws.readyState !== WebSocket.OPEN) return ws.close()
+        // The recognizer lags ~0.5 s: flush the last words with silence, then close on the reply.
+        ws.addEventListener('message', () => ws.close())
+        setTimeout(() => ws.close(), 2000)
+        ws.send(new Float32Array(Math.round(ctx.sampleRate * 0.6)).buffer)
+      }
+      const url = URL.createObjectURL(new Blob([TAP], { type: 'text/javascript' }))
+      await ctx.audioWorklet.addModule(url)
+      URL.revokeObjectURL(url)
+      if (cancelled) return
+      const tap = new AudioWorkletNode(ctx, 'tap')
+      tap.port.onmessage = (e) => (ws.readyState === WebSocket.OPEN ? ws.send(e.data) : pending.push(e.data))
+      ctx.createMediaStreamSource(stream).connect(tap)
+      offset = (performance.now() - began) / 1000
+    })().catch(() => {}) // mic errors are shown by the recorder
     return () => {
-      stopped = true
-      r.stop()
+      cancelled = true
+      stop()
     }
-  }, [active, supported, text, lang])
-  return { read, supported }
+  }, [active, text])
+  const at = useCallback((t: number) => readAt(tokenize(text), heard.current, t), [text])
+  return { read, supported, readAt: at }
 }

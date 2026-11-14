@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     audio_data: Path = Path("audio_data")
     vad_model_path: Path = Path("models/silero_vad.onnx")
+    asr_model_dir: Path = Path("models/asr")
     ffmpeg_path: str = "ffmpeg"
     reassessment_days: int = Field(default=14, ge=1)
     max_recording_seconds: int = Field(default=180, ge=1, le=180)
