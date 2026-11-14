@@ -541,3 +541,19 @@ def test_interpretation_uses_assessment_goal(client, worker, speech_file):
     assert (
         a["interpretation"]["speaking_rate_wpm"]["target"]["min"] == 130
     )  # clear_speech, the goal at creation
+
+
+def test_demo_seed(settings):
+    from app.main import create_app
+    from fastapi.testclient import TestClient
+    from tests.conftest import guest
+
+    settings.demo_mode = True
+    with TestClient(create_app(settings)) as c:
+        guest(c)
+        me = c.post("/api/v1/demo/seed").json()
+        assert me["onboarding_status"] == "ready" and me["progress"]["completed_lessons"] == 6
+        assert me["progress"]["current_streak_days"] == 6
+        assert c.get("/api/v1/today").json()["daily_status"] == "available"
+        assert len(c.get("/api/v1/progress").json()["measurement_history"]) == 2
+        assert c.post("/api/v1/demo/seed").status_code == 200

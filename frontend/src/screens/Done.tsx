@@ -34,7 +34,7 @@ export default function Done() {
   const tz = today.data?.timezone ?? 'UTC'
   return (
     <div className="rs rs-page" style={{ background: 'var(--stage)', minHeight: '100dvh' }}>
-      <div className="rs-wrap" style={{ maxWidth: 760, paddingTop: 'clamp(48px, 18vh, 200px)', paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 14, color: '#fff' }}>
+      <div className="rs-wrap" style={{ maxWidth: 760, paddingTop: 'clamp(48px, 18vh, 200px)', paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 14, color: 'var(--stage-ink)' }}>
         {complete.isPending && <Skeleton height={240} />}
         {complete.error && !(complete.error instanceof ApiError && complete.error.code === 'lesson_incomplete') && (
           <>
@@ -50,11 +50,11 @@ export default function Done() {
               {c.streak.current_days > 1 ? ` — ${c.streak.current_days} days in a row` : ''}.
               {c.next_lesson_available_on ? ` Session ${c.completed_lessons + 1} opens ${formatDate(c.next_lesson_available_on, tz)}.` : ' Your check-in is next.'}
             </p>
-            <RewardChips streak={c.streak.current_days} notes={c.session_reward.notes} seconds={c.session_reward.practice_seconds} style={{ marginTop: 8, color: 'var(--ink)' }} />
+            <RewardChips streak={c.streak.current_days} notes={c.session_reward.notes} seconds={c.session_reward.practice_seconds} className="rs-arrive" style={{ marginTop: 8, color: 'var(--ink)' }} />
             <span style={{ fontSize: 15, opacity: 0.8 }}>Notes earned and recorded practice time. Untimed warm-ups are not included.</span>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginTop: 20 }} aria-hidden="true">
+            <div className="rs-bars" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginTop: 20 }} aria-hidden="true">
               {SHAPE.map((h, i) => (
-                <i key={i} style={{ flex: 1, height: h + '%', borderRadius: 6, background: i < c.completed_lessons ? 'var(--sun)' : 'rgba(255,255,255,.16)' }} />
+                <i key={i} className={i === c.completed_lessons - 1 ? 'rs-today' : undefined} style={{ '--i': i, flex: 1, height: h + '%', borderRadius: 6, background: i < c.completed_lessons ? 'var(--sun)' : 'rgba(255,255,255,.16)' } as React.CSSProperties} />
               ))}
             </div>
             <Link className="rs-btn rs-btn--sun rs-btn--wide" to="/today" style={{ alignSelf: 'flex-start', marginTop: 20 }}>
