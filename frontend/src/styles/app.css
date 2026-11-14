@@ -1,0 +1,17 @@
+/* App-only additions on top of design/screens/screens.css */
+body { margin: 0; background: var(--ground); }
+a { color: var(--ink); }
+a:hover { color: var(--primary-edge); }
+.rs-logo { width: 30px; height: 30px; border-radius: 50%; background: var(--stage); display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
+.rs-logo i { width: 3px; border-radius: 2px; }
+.rs-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; font: 600 21px var(--font-display); color: var(--ink); }
+.rs-banner--danger { background: var(--danger-tint); align-items: center; justify-content: space-between; }
+.rs-banner--warn { background: var(--warning-tint); }
+.rs-banner--info { background: var(--sky-tint); align-items: center; }
+.rs-btn--quiet { height: 40px; padding: 0 18px; font-size: 16px; background: var(--ground); color: var(--ink); box-shadow: 0 3px 0 var(--line); }
+.rs-skeleton { border-radius: 18px; background: linear-gradient(90deg, var(--surface), var(--line), var(--surface)); background-size: 200% 100%; animation: rs-shimmer 1.4s ease-in-out infinite; }
+@keyframes rs-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .rs-skeleton { animation: none; } }
+button.rs-btn { font-family: var(--font-display); }
+.rs-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.rs-tabs { position: sticky; bottom: 0; z-index: 5; }
