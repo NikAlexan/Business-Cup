@@ -5,7 +5,7 @@ import threading
 import time
 
 import numpy as np
-from sqlalchemy import and_, case, or_, select, update
+from sqlalchemy import and_, case, or_, select, text, update
 
 from app.audio import (
     QUALITY_RULES,
@@ -31,6 +31,13 @@ MEASUREMENT_VERSION = "voice-metrics-v3"
 
 class WorkCancelled(Exception):
     pass
+
+
+def serialize_sqlite(db):
+    # FOR UPDATE is ignored by SQLite. Acquire its writer lock before reading JSON
+    # that will later be replaced, matching API write transactions.
+    if db.bind.dialect.name == "sqlite":
+        db.execute(text("BEGIN IMMEDIATE"))
 
 
 def assessments_comparable(before, after):
@@ -101,6 +108,7 @@ class Worker:
     def claim(self):
         now = time.time()
         with self.database.session.begin() as db:
+            serialize_sqlite(db)
             row = db.scalar(
                 select(Job)
                 .where(
@@ -137,6 +145,7 @@ class Worker:
             }
 
     def locked(self, db, claim):
+        serialize_sqlite(db)
         guest = db.scalar(select(Guest).where(Guest.id == claim["guest_id"]).with_for_update())
         if not guest:
             raise WorkCancelled()

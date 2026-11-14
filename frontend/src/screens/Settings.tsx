@@ -6,6 +6,7 @@ import { useMe } from '../api/hooks'
 import { AppShell } from '../components/AppShell'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { useInstallPrompt } from '../lib/install'
+import { clearCancellationIntents } from '../lib/cancellationIntent'
 
 const GOALS = [
   ['clear_speech', 'Clearer speech'],
@@ -29,6 +30,7 @@ export default function Settings() {
   const wipe = useMutation({
     mutationFn: () => request('/guest-data', { method: 'DELETE' }),
     onSuccess: () => {
+      clearCancellationIntents()
       qc.clear()
       navigate('/', { replace: true })
     },

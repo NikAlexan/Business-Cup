@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { PlanItem } from '../api/types'
 import * as recorder from '../lib/recorder'
+import { clearCancellationIntents } from '../lib/cancellationIntent'
 import Exercise from './Exercise'
 import Main from './Main'
 import MicCheck from './MicCheck'
@@ -14,7 +15,7 @@ import Home from './Home'
 import Profile from './Profile'
 
 vi.mock('../components/UpdateBanner', () => ({ UpdateBanner: () => null }))
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); clearCancellationIntents(); vi.restoreAllMocks() })
 
 function open(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } })
@@ -52,7 +53,7 @@ function setup(item: PlanItem, intercept?: (path: string, init?: RequestInit) =>
     const handled = intercept?.(path, init)
     if (handled) return handled
     const data: Record<string, unknown> = {
-      '/api/v1/me': { preferences: { timezone: 'UTC' }, progress: { notes_total: 0, practice_seconds_total: 0, current_streak_days: 0 }, limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } },
+      '/api/v1/me': { guest_id: 'guest', preferences: { timezone: 'UTC' }, progress: { notes_total: 0, practice_seconds_total: 0, current_streak_days: 0 }, limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } },
       '/api/v1/plan-items/item': { item, lesson, item_index: 0, pending_take: null, plan_id: 'plan', plan_status: 'active' },
       '/api/v1/today': { lesson }, '/api/v1/plan': { lessons: [lesson] },
       '/api/v1/exercise-attempts/attempt': savedAttempt,
@@ -459,8 +460,9 @@ test.each([false, true])('canceling a delayed accepted upload cannot resurrect a
   if (failCancel) {
     await screen.findByText('Cancellation is offline')
     resolveUpload(Response.json({ recording: { id: 'late-recording' }, job_id: 'late-job' }, { status: 202 }))
-    await waitFor(() => expect(polls).toBe(1))
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Record again' }) as HTMLButtonElement).disabled).toBe(true))
+    await screen.findByText('Cancellation pending. The saved take will not be submitted while cancellation is being confirmed.')
+    expect(screen.queryByRole('button', { name: 'Record again' })).toBeNull()
+    expect(polls).toBe(0)
     expect(saves).toBe(0)
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
   }
@@ -499,6 +501,35 @@ test.each(['polling', 'failed'])('baseline resumes a saved quality check without
   await screen.findByRole('heading', { name: 'All 1 tasks recorded' })
   expect(uploads).toBe(0)
   expect(retries).toBe(mode === 'failed' ? 1 : 0)
+})
+
+test('reload replays a stored cancellation before a completed saved check can create an attempt', async () => {
+  const key = 'restore-cancel'
+  localStorage.setItem('voice.cancellation.guest.item', JSON.stringify({ guestId: 'guest', itemId: 'item', uploadKey: key }))
+  let online = false, canceled = false, cancellationCalls = 0, polls = 0, saves = 0
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/plan-items/item') return Response.json({ item: baseItem, lesson: { id: 'lesson', items: [baseItem] }, item_index: 0, plan_status: 'active', pending_take: canceled ? null : { recording_id: 'extra', job_id: 'completed-extra', practice_only: true, status: 'completed' } })
+    if (path === '/api/v1/recording-uploads/' + key + '/cancellation') {
+      cancellationCalls++
+      if (!online) return Response.json({ error: { message: 'Cancellation is offline' } }, { status: 503 })
+      canceled = true; return Response.json({ status: 'canceled', recording_id: 'extra' })
+    }
+    if (path === '/api/v1/jobs/completed-extra') { polls++; return Response.json({ status: 'completed' }) }
+    if (path === '/api/v1/exercise-attempts') { saves++; throw Error('Stored cancellation must prevent saving') }
+  })
+  const view = open('/exercise/item')
+  await screen.findByText('Cancellation is offline')
+  expect(screen.queryByRole('button', { name: 'Start recording' })).toBeNull()
+  expect(polls).toBe(0)
+  expect(saves).toBe(0)
+  view.unmount()
+  online = true
+  open('/exercise/item')
+  await screen.findByRole('heading', { name: 'Practice complete' })
+  expect(cancellationCalls).toBe(2)
+  expect(polls).toBe(0)
+  expect(saves).toBe(0)
+  expect(localStorage.getItem('voice.cancellation.guest.item')).toBeNull()
 })
 
 test('check-in restores the actual previous setup before recording', async () => {

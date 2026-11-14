@@ -569,12 +569,14 @@ class Service:
     def item_state(self, item_id):
         plan, lesson, item = self.find_item(item_id)
         attempted = {a.get("recording_id") for a in self.all("attempt") if a["plan_item_id"] == item["id"]}
+        canceled = {c["result"].get("recording_id") for c in self.all("upload_cancellation")}
         records = [
             r
             for r in self.all("recording")
             if r["purpose"] == "exercise"
             and r["plan_item_id"] == item["id"]
             and r["id"] not in attempted
+            and r["id"] not in canceled
             and not r.get("dismissed_at")
             and bool(r.get("practice_only")) == (item["status"] == "completed")
         ]
@@ -767,7 +769,15 @@ class Service:
             issues = [{"code": "not_confirmed", "message": "Confirm completion after practicing."}]
         elif kind == "recording":
             rec = self.get(payload["recording_id"], "recording")
-            if rec["purpose"] != "exercise" or rec["plan_item_id"] != item["id"] or rec.get("dismissed_at"):
+            canceled = any(
+                c["result"].get("recording_id") == rec["id"] for c in self.all("upload_cancellation")
+            )
+            if (
+                rec["purpose"] != "exercise"
+                or rec["plan_item_id"] != item["id"]
+                or rec.get("dismissed_at")
+                or canceled
+            ):
                 fail(404, "not_found", "Recording not found for this plan item.")
             if bool(rec.get("practice_only")) != practice_only:
                 fail(422, "practice_mode_mismatch", "Use a recording made for this practice mode.")

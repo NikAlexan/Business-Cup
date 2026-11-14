@@ -238,3 +238,57 @@ test('cancel during a delayed upload acknowledgment leaves no recoverable extra 
   expect(takes.items.some((take: { recording_id: string }) => take.recording_id === uploaded!.recording.id)).toBe(false)
   expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
 })
+
+test('unconfirmed cancellation survives reload before any completed extra take can auto-save', async ({ page }) => {
+  test.setTimeout(65_000)
+  const lesson = await seed(page)
+  const item = lesson.items.find((value) => value.task.verification.type === 'recording')!
+  await page.goto('/exercise/' + item.id)
+  const record = async () => {
+    await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+    await page.waitForTimeout(4000)
+    await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+    await page.getByRole('button', { name: 'Check my take' }).click()
+  }
+  await record()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  const before = await (await page.request.get('/api/v1/me')).json()
+  let release!: () => void
+  let uploaded: { recording: { id: string }; job_id: string } | undefined
+  await page.route('**/api/v1/recordings', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    const response = await route.fetch()
+    uploaded = await response.json()
+    await new Promise<void>((resolve) => { release = resolve })
+    await route.fulfill({ response })
+  })
+  const cancellationRoute = '**/api/v1/recording-uploads/*/cancellation'
+  let cancellations = 0
+  await page.route(cancellationRoute, (route) => { cancellations++; return route.abort('internetdisconnected') })
+  await page.getByRole('button', { name: 'Practice again — no extra notes' }).click()
+  await record()
+  await expect.poll(() => uploaded?.recording.id).toBeTruthy()
+  await page.getByRole('button', { name: 'Cancel extra practice' }).click()
+  await expect.poll(() => cancellations).toBe(1)
+  await expect(page.getByText('Cancellation pending. The saved take will not be submitted while cancellation is being confirmed.')).toBeVisible()
+  const acknowledgment = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/recordings' && response.request().method() === 'POST')
+  release()
+  await acknowledgment
+  await page.unroute('**/api/v1/recordings')
+  let extraJobPolls = 0
+  page.on('request', (request) => { if (new URL(request.url()).pathname === '/api/v1/jobs/' + uploaded!.job_id) extraJobPolls++ })
+  await page.reload()
+  await expect.poll(() => cancellations).toBe(2)
+  await expect(page.getByText('Cancellation pending. The saved take will not be submitted while cancellation is being confirmed.')).toBeVisible()
+  expect(extraJobPolls).toBe(0)
+  await expect(page.getByRole('button', { name: 'Start recording', exact: true })).toHaveCount(0)
+  await page.unroute(cancellationRoute)
+  await page.getByRole('button', { name: 'Cancel extra practice' }).click()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  const takes = await (await page.request.get('/api/v1/exercise-attempts?plan_item_id=' + item.id)).json()
+  expect(takes.items.some((take: { recording_id: string }) => take.recording_id === uploaded!.recording.id)).toBe(false)
+  expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
+})

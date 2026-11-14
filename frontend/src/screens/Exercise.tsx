@@ -17,6 +17,7 @@ import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { useRecorder } from '../lib/recorder'
 import { useRecordingCheck } from '../lib/recordingCheck'
+import { forgetCancellation, rememberCancellation, useCancellationIntent, type CancellationIntent } from '../lib/cancellationIntent'
 
 import { formatEstimate } from '../lib/format'
 
@@ -117,19 +118,23 @@ export default function Exercise() {
   const qc = useQueryClient()
   const itemState = usePlanItem(planItemId)
   const me = useMe()
+  const cancellation = useCancellationIntent(me.data?.guest_id, planItemId)
   useRedirectOn401(itemState.error ?? me.error)
   const found = itemState.data ? { lesson: itemState.data.lesson, item: itemState.data.item, index: itemState.data.item_index } : null
   const [localResult, setResult] = useState<Attempt | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const canceling = useRef(false)
   const uploadKey = useRef<string | null>(null)
+  const cancellationTried = useRef<string | null>(null)
+  const currentItem = useRef(planItemId)
+  currentItem.current = planItemId
   const [repeatSource, setRepeatSource] = useState<string | null>(null)
   const [repeatFor, setRepeatFor] = useState<string | null>(null)
   const [localPending, setLocalPending] = useState<{ itemId: string; take: PendingTake } | null>(null)
   const [ignored, setIgnored] = useState<Set<string>>(() => new Set())
   const candidate = localPending?.itemId === planItemId ? localPending.take : itemState.data?.pending_take ?? null
   const pendingTake = candidate && !ignored.has(candidate.recording_id) ? candidate : null
-  const practicingAgain = repeatFor === planItemId || !!pendingTake?.practice_only
+  const practicingAgain = repeatFor === planItemId || !!pendingTake?.practice_only || !!cancellation.intent
   const basedOn = pendingTake?.based_on_attempt_id ?? repeatSource ?? undefined
   const latestLocal = localResult?.plan_item_id === planItemId ? localResult : null
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -141,10 +146,27 @@ export default function Exercise() {
   const result = latestLocal ?? selected ?? savedAttempt.data ?? null
   const savedRecording = useRecording(result?.recording_id)
   const dismiss = useMutation({ mutationFn: (id: string) => request('/recordings/' + id + '/dismiss', { method: 'PUT', body: {} }) })
-  const cancelUpload = useMutation({ mutationFn: (key: string) => request('/recording-uploads/' + key + '/cancellation', { method: 'PUT', body: { plan_item_id: planItemId } }) })
+  const cancelUpload = useMutation({ mutationFn: (value: { key: string; itemId: string }) => request<{ recording_id: string | null }>('/recording-uploads/' + encodeURIComponent(value.key) + '/cancellation', { method: 'PUT', body: { plan_item_id: value.itemId } }) })
   const attempt = useMutationWithKey((b: Body, key) => post<Attempt>('/exercise-attempts', b, key))
 
-  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null); setLocalPending(null); setIgnored(new Set()); setRepeatSource(null); canceling.current = false; uploadKey.current = null }, [planItemId])
+  const finishCancellation = (recordingId?: string | null) => {
+    if (me.data?.guest_id) forgetCancellation(me.data.guest_id, planItemId)
+    if (currentItem.current !== planItemId) return
+    uploadKey.current = null; canceling.current = false
+    setRepeatFor(null); setResult(null); attempt.reset(); setLocalPending(null)
+    setIgnored((old) => new Set([...old, ...[pendingTake?.recording_id, cancellation.intent?.recordingId, recordingId].filter((id): id is string => !!id)]))
+    void itemState.refetch()
+  }
+  const sendCancellation = (intent: CancellationIntent) => {
+    canceling.current = true
+    cancellationTried.current = JSON.stringify(intent)
+    if (intent.uploadKey) cancelUpload.mutate({ key: intent.uploadKey, itemId: intent.itemId }, { onSuccess: (result) => finishCancellation(result.recording_id) })
+    else if (intent.recordingId) dismiss.mutate(intent.recordingId, { onSuccess: () => finishCancellation(intent.recordingId) })
+  }
+  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null); setLocalPending(null); setIgnored(new Set()); setRepeatSource(null); canceling.current = false; uploadKey.current = null; cancellationTried.current = null }, [planItemId])
+  useEffect(() => {
+    if (cancellation.intent && found && cancellationTried.current !== JSON.stringify(cancellation.intent)) sendCancellation(cancellation.intent)
+  }, [cancellation.intent?.uploadKey, cancellation.intent?.recordingId, found?.item.id, me.data?.guest_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (itemState.isPending) return <Frame><Skeleton height={360} /></Frame>
   if (itemState.error) return <Frame><ErrorBanner error={itemState.error} onRetry={() => itemState.refetch()} /><Link className="rs-link" to="/today">Back to today</Link></Frame>
@@ -185,11 +207,16 @@ export default function Exercise() {
       },
     )
   const cancelRepeat = () => {
+    const intent = cancellation.intent ?? ((uploadKey.current || pendingTake) ? {
+      guestId: me.data?.guest_id ?? '', itemId: planItemId,
+      ...(uploadKey.current ? { uploadKey: uploadKey.current } : {}),
+      ...(pendingTake ? { recordingId: pendingTake.recording_id } : {}),
+    } : null)
+    if (!intent) { finishCancellation(); return }
     canceling.current = true
-    const finish = () => { uploadKey.current = null; setRepeatFor(null); setResult(null); attempt.reset(); setLocalPending(null); if (pendingTake) setIgnored((old) => new Set([...old, pendingTake.recording_id])); void itemState.refetch() }
-    if (uploadKey.current) cancelUpload.mutate(uploadKey.current, { onSuccess: finish })
-    else if (pendingTake) dismiss.mutate(pendingTake.recording_id, { onSuccess: finish })
-    else finish()
+    cancellationTried.current = JSON.stringify(intent)
+    if (intent.guestId) rememberCancellation(intent)
+    sendCancellation(intent)
   }
   const showOutcome = completed && !practicingAgain
   const progress = Math.round(((lesson.items.filter((x) => x.status === 'completed').length) / lesson.items.length) * 100)
@@ -275,6 +302,8 @@ export default function Exercise() {
                 {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.{(pendingTake?.practice_focus?.note || result?.reflection?.note) && <span> Your saved focus: {pendingTake?.practice_focus?.note || result?.reflection?.note}</span>}</span><button className="rs-link" type="button" disabled={attempt.isPending || dismiss.isPending || cancelUpload.isPending} onClick={cancelRepeat}>Cancel extra practice</button></div>}
                 {dismiss.error && <ErrorBanner error={dismiss.error} onRetry={cancelRepeat} />}
                 {cancelUpload.error && <ErrorBanner error={cancelUpload.error} onRetry={cancelRepeat} />}
+                {cancellation.intent && <p role="status">Cancellation pending. The saved take will not be submitted while cancellation is being confirmed.</p>}
+                {cancellation.intent && !cancellation.persistent && (cancelUpload.error || dismiss.error) && <p role="alert">Cancellation could not be saved on this device. Keep this page open and retry.</p>}
                 {result?.status === 'needs_retry' && (
                   <div className="rs-banner rs-banner--warn" role="status">
                     <div className="rs-stack" style={{ gap: 2 }}>
@@ -290,7 +319,7 @@ export default function Exercise() {
                 {v.type === 'self_confirmation' && <SelfCheck key={item.id} busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
                 {v.type === 'recording' && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
                 {v.type === 'recording' && me.isPending && <Skeleton height={160} />}
-                {v.type === 'recording' && me.data && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
+                {v.type === 'recording' && me.data && !cancellation.intent && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
               </>
             )}
             {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>
