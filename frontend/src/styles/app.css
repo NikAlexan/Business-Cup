@@ -1,0 +1,24 @@
+/* App-only additions on top of design/screens/screens.css */
+body { margin: 0; background: var(--ground); }
+a { color: var(--ink); }
+a:hover { color: var(--primary-edge); }
+.rs-logo { width: 30px; height: 30px; border-radius: 50%; background: var(--stage); display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
+.rs-logo i { width: 3px; border-radius: 2px; }
+.rs-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; font: 600 21px var(--font-display); color: var(--ink); }
+.rs-banner--danger { background: var(--danger-tint); align-items: center; justify-content: space-between; }
+.rs-banner--warn { background: var(--warning-tint); }
+.rs-banner--info { background: var(--sky-tint); align-items: center; }
+.rs-btn--quiet { height: 40px; padding: 0 18px; font-size: 16px; background: var(--ground); color: var(--ink); box-shadow: 0 3px 0 var(--line); }
+.rs-skeleton { border-radius: 18px; background: linear-gradient(90deg, var(--surface), var(--line), var(--surface)); background-size: 200% 100%; animation: rs-shimmer 1.4s ease-in-out infinite; }
+@keyframes rs-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .rs-skeleton { animation: none; } }
+button.rs-btn { font-family: var(--font-display); }
+.rs-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.rs-tabs { position: sticky; bottom: 0; z-index: 5; }
+.rs-spin { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--sky); border-right-color: transparent; animation: rs-rot 0.9s linear infinite; flex: none; }
+@keyframes rs-rot { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rs-spin { animation-duration: 3s; } }
+.rs-update { position: fixed; left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 20; max-width: 520px; margin: 0 auto; box-shadow: 0 4px 0 var(--line); }
+.rs-word--read { color: var(--success); text-decoration: underline 3px var(--primary); text-underline-offset: 6px; transition: color 150ms ease-out; }
+.rs-word--pace { box-shadow: inset 0 -6px 0 var(--sky-tint); border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { .rs-word--read { transition: none; } }

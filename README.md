@@ -1,6 +1,6 @@
-# Business Cup — Voice Training Backend
+# Business Cup — Resonance, тренажёр голоса
 
-FastAPI-бэкенд тренажёра голоса: гостевая cookie-сессия, три контрольные записи, измерения аудио, ИИ-разбор и персональные 14 занятий. Фронтенд разрабатывается отдельно. Регистрации, XP и оплаты нет.
+FastAPI-бэкенд и веб-клиент (React SPA, устанавливается как PWA): гостевая cookie-сессия, три контрольные записи, измерения аудио, ИИ-разбор, персональные 14 занятий, ноты и минуты практики. Регистрации и оплаты нет.
 
 ## Запуск Docker Compose
 
@@ -13,16 +13,30 @@ python3 -c 'import secrets; print(secrets.token_hex(32))'
 docker compose up --build -d
 ```
 
-- API: http://localhost:8000/api/v1
-- Swagger UI: http://localhost:8000/docs
-- OpenAPI: http://localhost:8000/openapi.json
-- Готовность: http://localhost:8000/health/ready
+- Приложение: http://localhost:8080
+- API: http://localhost:8080/api/v1
+- Swagger UI: http://localhost:8080/docs
+- Готовность: http://localhost:8080/health/ready
 
-Compose запускает `web`, `worker` и PostgreSQL. Миграции Alembic применяются перед запуском web/worker; advisory lock сериализует миграторы. Общие volumes `audio_data` и `pg_data` сохраняются после обычного `docker compose down`. Команда `docker compose down -v` удаляет их.
+Compose запускает `frontend` (nginx: статика SPA и прокси `/api`, `/health`, `/docs` в `web`), `web`, `worker` и PostgreSQL. Наружу опубликован только `frontend` (`WEB_PORT`, по умолчанию 8080): фронт и API на одном origin, поэтому cookie сессии работает без CORS. Миграции Alembic применяются перед запуском web/worker; advisory lock сериализует миграторы. Общие volumes `audio_data` и `pg_data` сохраняются после обычного `docker compose down`. Команда `docker compose down -v` удаляет их.
 
-По умолчанию порты API и базы привязаны к localhost. Для внешней демонстрации поставить HTTPS reverse proxy и настроить `ALLOWED_ORIGINS` и `COOKIE_SECURE=true`. `getUserMedia` на удалённом HTTP-адресе не предназначен для записи микрофона.
+По умолчанию порты приложения и базы привязаны к localhost. Для внешней демонстрации поставить HTTPS reverse proxy и настроить `ALLOWED_ORIGINS` и `COOKIE_SECURE=true`. `getUserMedia` на удалённом HTTP-адресе не предназначен для записи микрофона.
 
 В контейнере `DATABASE_URL` указывает на Compose-сервис `db`; значение в `.env` используется для локального Python-процесса. При изменении пароля изменить `POSTGRES_PASSWORD` и локальный `DATABASE_URL` согласованно. Не менять пароль уже инициализированного volume без изменения роли в PostgreSQL.
+
+## Веб-клиент
+
+Разработка с hot reload (нужен Node 26; API берётся из запущенного compose через `localhost:8080`, другой адрес — `API_URL=...`):
+
+```bash
+cd frontend
+npm ci
+npm run dev     # http://localhost:5173
+npm test        # vitest, чистые функции
+npm run build   # tsc + vite build
+```
+
+Установка приложения: Chrome/Edge на ПК и Android — Settings → «Install app» или значок установки в адресной строке; iOS Safari — Share → Add to Home Screen. Микрофон и установка работают только на `localhost` или по HTTPS. Service worker кэширует только оболочку приложения; данные API и записи всегда идут из сети. Новая версия применяется по кнопке «Reload» в баннере.
 
 ```bash
 docker compose logs --tail=100 web worker

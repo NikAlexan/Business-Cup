@@ -18,6 +18,16 @@ ACTIVE = {"draft", "queued", "processing", "needs_rerecord"}
 TERMINAL = {"completed", "needs_rerecord", "failed"}
 
 
+def notes_for(item):
+    return (2 if item["exercise_id"] == "E01" else 3) + (item["task"]["verification"]["type"] == "recording")
+
+
+def annotate_notes(lesson):
+    for item in lesson["items"]:
+        item["notes_available"] = notes_for(item)
+    return lesson
+
+
 def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
@@ -165,6 +175,8 @@ class Service:
             for plan in self.all("plan")
             for lesson in plan["lessons"]
         )
+        for lesson in p["lessons"]:
+            annotate_notes(lesson)
         for i, lesson in enumerate(p["lessons"]):
             if lesson["status"] == "completed":
                 continue
@@ -182,6 +194,18 @@ class Service:
                 )
             break
         return p
+
+    def rewards(self, item_ids=None):
+        passed = [
+            a
+            for a in self.all("attempt")
+            if a["status"] == "passed" and (item_ids is None or a["plan_item_id"] in item_ids)
+        ]
+        return {
+            "notes_total": sum(a.get("reward", {}).get("notes", 0) for a in passed),
+            "practice_seconds_total": sum(a.get("practice_seconds", 0) for a in passed),
+            "rules_version": 1,
+        }
 
     def me(self):
         self.auth()
@@ -207,6 +231,7 @@ class Service:
                 "total_lessons": p["total_lessons"] if p else 0,
                 "current_streak_days": streak["current_days"],
                 "longest_streak_days": streak["longest_days"],
+                **self.rewards(),
             },
         }
 
@@ -544,6 +569,8 @@ class Service:
         a = {
             "id": new_id(),
             "plan_item_id": item["id"],
+            "reward": {"notes": 0, "parts": []},
+            "practice_seconds": 0,
             "exercise_id": item["exercise_id"],
             "status": "passed" if passed else "needs_retry",
             "verification_type": kind,
@@ -558,6 +585,16 @@ class Service:
             "completed_at": iso() if passed else None,
             "plan_item_status": "completed" if passed else "pending",
         }
+        if passed:
+            parts = [{"notes": 2 if item["exercise_id"] == "E01" else 3, "reason": "exercise_completed"}]
+            if kind == "recording":
+                parts.append({"notes": 1, "reason": "quality_bonus"})
+            a["reward"] = {"notes": sum(x["notes"] for x in parts), "parts": parts}
+            a["practice_seconds"] = {
+                "timer": lambda: payload["elapsed_seconds"],
+                "recording": lambda: round(rec["duration_seconds"]),
+                "self_confirmation": lambda: item["estimated_duration_seconds"],
+            }[kind]()
         if kind == "self_confirmation":
             a["self_confirmed"] = payload["self_confirmed"]
         item["latest_attempt_id"] = a["id"]
@@ -584,7 +621,7 @@ class Service:
                     None,
                 )
             if done:
-                lesson, status = done, "completed"
+                lesson, status = annotate_notes(done), "completed"
                 if p["completed_lessons"] < 14:
                     next_date = (self.local_date() + timedelta(days=1)).isoformat()
             else:
@@ -622,6 +659,10 @@ class Service:
             "completed_lessons": p["completed_lessons"],
             "total_lessons": 14,
             "streak": self.streak(),
+            "session_reward": {
+                "notes": (r := self.rewards({i["id"] for i in lesson["items"]}))["notes_total"],
+                "practice_seconds": r["practice_seconds_total"],
+            },
             "next_lesson_available_on": (
                 date.fromisoformat(lesson["completed_on"]) + timedelta(days=1)
             ).isoformat()
@@ -722,6 +763,7 @@ class Service:
                 "current_streak_days": streak["current_days"],
                 "longest_streak_days": streak["longest_days"],
                 "last_practice_on": streak["last_practice_on"],
+                **self.rewards(),
             },
             "activity": activity,
             "measurement_history": history,
