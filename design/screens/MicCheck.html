@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mic check — Resonance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="screens.css">
+<style>body{margin:0} a{color:#2b2b2b} a:hover{color:#0b7a6d}</style>
+</head>
+<body>
+<div class="rs rs-page" style="background: #ffffff; font-family: Rubik, system-ui, sans-serif; color: #2b2b2b; padding-bottom: 0">
+
+<header class="rs-nav" style="padding: 0 max(20px, calc((100% - 1200px) / 2 + 40px)); border-bottom: 0"><a class="rs-iconbtn" href="Main.html" aria-label="Back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a><div style="flex: 1; max-width: 520px"><span class="rs-label">Step 1 of 2 · Mic check</span></div><span class="d-only" style="width: 120px"></span></header>
+<div class="rs-wrap rs-narrow" style="padding-top: 24px; padding-bottom: 56px">
+<h1 class="rs-h rs-h1">Let's check your mic</h1>
+<p style="margin: 8px 0 28px; color: #69707c">Say a few words in your normal voice.</p>
+<div class="rs-cols" style="grid-template-columns: minmax(0,1fr) minmax(0,1fr)">
+<div class="rs-card" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 20px">
+<span style="width: 80px; height: 80px; border-radius: 50%; background: #e9f6f4; color: #0b7a6d; display: grid; place-items: center"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>
+<div class="rs-wave" style="height: 44px" role="img" aria-label="Input level: good"><i style="height:30%; background:#14b3a0"></i><i style="height:55%; background:#14b3a0"></i><i style="height:80%; background:#14b3a0"></i><i style="height:100%; background:#14b3a0"></i><i style="height:70%; background:#14b3a0"></i><i style="height:90%; background:#14b3a0"></i><i style="height:50%; background:#14b3a0"></i><i style="height:75%; background:#14b3a0"></i><i style="height:40%; background:#14b3a0"></i><i style="height:65%; background:#14b3a0"></i><i style="height:85%; background:#14b3a0"></i><i style="height:45%; background:#14b3a0"></i><i style="height:60%; background:#14b3a0"></i><i style="height:35%; background:#14b3a0"></i></div>
+<span class="rs-badge" style="background: #dff7f3; color: #0b7a6d">Good level</span>
+</div>
+<form class="rs-stack" style="gap: 16px" aria-label="Recording setup">
+<div class="rs-stack" style="gap: 4px"><h2 class="rs-h" style="font-size: 20px">Your recording setup</h2><p style="margin: 0; font-size: 15px; color: #69707c">We save it with your baseline and ask you to match it on day 14.</p></div>
+<div class="rs-stack" style="gap: 6px"><label for="dev" style="font: 500 15px Rubik">Microphone</label><select id="dev" style="height: 48px; border-radius: 14px; border: 2px solid #e5e5e5; padding: 0 14px; font: 400 16px Rubik; background: #ffffff; color: #2b2b2b"><option>MacBook Air Microphone (detected)</option></select></div>
+<div class="rs-stack" style="gap: 6px"><label for="dist" style="font: 500 15px Rubik">Distance to the mic</label><select id="dist" style="height: 48px; border-radius: 14px; border: 2px solid #e5e5e5; padding: 0 14px; font: 400 16px Rubik; background: #ffffff; color: #2b2b2b"><option>About a hand away (20 cm)</option><option>Arm's length (50 cm)</option></select></div>
+<fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px"><legend style="font: 500 15px Rubik; margin-bottom: 8px; padding: 0">Room</legend>
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><label class="rs-chip" style="background: #e9f6f4; border: 2px solid #0b7a6d; font: 500 15px Rubik; cursor: pointer"><input type="radio" name="env" checked style="accent-color: #0b7a6d; margin: 0 4px 0 0">Quiet room</label><label class="rs-chip" style="border: 2px solid #e5e5e5; background: #ffffff; font: 500 15px Rubik; cursor: pointer"><input type="radio" name="env" style="margin: 0 4px 0 0">Some noise</label><label class="rs-chip" style="border: 2px solid #e5e5e5; background: #ffffff; font: 500 15px Rubik; cursor: pointer"><input type="radio" name="env" style="margin: 0 4px 0 0">Noisy</label></div></fieldset>
+<a class="rs-btn rs-btn--wide" href="Record.html" style="align-self: flex-start; margin-top: 4px">Start the 3 tasks</a>
+</form>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
