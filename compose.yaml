@@ -1,0 +1,53 @@
+x-app: &app
+  image: business-cup-backend:local
+  build: .
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://voice:${POSTGRES_PASSWORD:-voice}@db:5432/voice
+    AUDIO_DATA: /data/audio
+    APP_SECRET: ${APP_SECRET:?Set APP_SECRET in .env}
+  volumes:
+    - audio_data:/data/audio
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+  init: true
+
+services:
+  db:
+    image: postgres:16.11-alpine
+    environment:
+      POSTGRES_USER: voice
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-voice}
+      POSTGRES_DB: voice
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voice -d voice"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  web:
+    <<: *app
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    <<: *app
+    command: ["sh", "-c", "alembic upgrade head && exec python -m app.worker"]
+    stop_grace_period: 120s
+
+volumes:
+  audio_data:
+  pg_data:
