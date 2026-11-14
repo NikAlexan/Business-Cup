@@ -42,6 +42,7 @@ export type PlanItem = {
   id: string
   exercise_id: string
   position: number
+  difficulty?: string
   title: string
   reason: string
   status: 'pending' | 'completed'

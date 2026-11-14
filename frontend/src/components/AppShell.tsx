@@ -2,8 +2,8 @@ import { useEffect, type ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/api'
 import { useMe } from '../api/hooks'
-import { formatMinutes } from '../lib/format'
-import { ChartIcon, ClockIcon, GearIcon, HomeIcon, Logo, NoteIcon, StreakIcon } from './Icons'
+import { ChartIcon, GearIcon, HomeIcon, Logo } from './Icons'
+import { RewardChips } from './RewardChips'
 
 const NAV = [
   { to: '/today', label: 'Today', icon: <HomeIcon /> },
@@ -22,20 +22,7 @@ export function Chips() {
   const { data } = useMe()
   if (!data) return null
   const p = data.progress
-  return (
-    <div className="rs-chips">
-      <span className="rs-chip" title="Streak">
-        <StreakIcon /> {p.current_streak_days}
-        <span className="d-only">&nbsp;days</span>
-      </span>
-      <span className="rs-chip" title="Notes">
-        <NoteIcon /> {p.notes_total}
-      </span>
-      <span className="rs-chip d-only" title="Practice time">
-        <ClockIcon /> {formatMinutes(p.practice_seconds_total)}
-      </span>
-    </div>
-  )
+  return <RewardChips streak={p.current_streak_days} notes={p.notes_total} seconds={p.practice_seconds_total} />
 }
 
 const gutter = { padding: '0 max(20px, calc((100% - 1200px) / 2 + 40px))' }
