@@ -46,5 +46,5 @@ The sources support the practice categories and general vocal comfort, not a cla
 
 - Frontend: 22 Vitest tests pass; TypeScript and Vite/PWA production build pass.
 - Backend: four new exercise-completion regression tests pass; Ruff lint/format pass.
-- Full backend rerun is in progress after installing the pinned streaming ASR dependency and checksum-verified models. Initial run exposed one obsolete pace-gate assertion (updated) and the missing local ASR installation.
+- Full backend suite: 46 tests pass after installing the pinned streaming ASR dependency and checksum-verified models. Initial run exposed one obsolete pace-gate assertion (updated) and the missing local ASR installation.
 - Node 24 was installed outside the repository for local tooling. No secrets or downloaded models are committed.
