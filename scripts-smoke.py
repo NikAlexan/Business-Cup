@@ -127,7 +127,7 @@ def run(base_url):
             kind = item["task"]["verification"]["type"]
             payload = {"plan_item_id": item["id"]}
             if kind == "timer":
-                payload["elapsed_seconds"] = max(60, item["task"]["verification"]["min_elapsed_seconds"])
+                payload["elapsed_seconds"] = 60
             elif kind == "self_confirmation":
                 payload["self_confirmed"] = True
             else:

@@ -6,22 +6,22 @@ import { AppShell, Chips, useRedirectOn401 } from '../components/AppShell'
 import { Check } from '../components/Icons'
 import { PlanWave } from '../components/PlanWave'
 import { ErrorBanner, Skeleton } from '../components/ui'
-import { formatDate } from '../lib/format'
+import { formatDate, formatEstimate } from '../lib/format'
 
 const VERIFY: Record<string, string> = { timer: 'timer', self_confirmation: 'self-check', recording: 'recording' }
-const mins = (s: number) => `${Math.max(1, Math.round(s / 60))} min`
+const mins = formatEstimate
 
 export function ItemRow({ item }: { item: PlanItem }) {
   const done = item.status === 'completed'
   return (
     <Link className="rs-opt" to={'/exercise/' + item.id} aria-label={`${item.title}${done ? ', done' : ''}`}>
       <span className="rs-opt__icon" style={done ? { background: 'var(--success-tint)', color: 'var(--success)' } : undefined}>
-        {done ? <Check /> : item.exercise_id}
+        {done ? <Check /> : item.position}
       </span>
       <span>
         <span className="rs-opt__title">{item.title}</span>
         <span className="rs-opt__meta">
-          {mins(item.estimated_duration_seconds)} · {VERIFY[item.task.verification.type]} · {done ? 'done' : `+${item.notes_available} notes`}
+          About {mins(item.estimated_duration_seconds)} · {VERIFY[item.task.verification.type]} · {done ? 'done' : `+${item.notes_available} notes`}
         </span>
       </span>
     </Link>

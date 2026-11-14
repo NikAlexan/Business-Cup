@@ -203,8 +203,12 @@ class Service:
         ]
         return {
             "notes_total": sum(a.get("reward", {}).get("notes", 0) for a in passed),
-            "practice_seconds_total": sum(a.get("practice_seconds", 0) for a in passed),
-            "rules_version": 1,
+            "practice_seconds_total": sum(
+                a.get("practice_seconds", 0)
+                for a in passed
+                if a.get("verification_type") != "self_confirmation"
+            ),
+            "rules_version": 2,
         }
 
     def me(self):
@@ -553,14 +557,14 @@ class Service:
                     coaching = [
                         {
                             "code": "measurement_unavailable",
-                            "message": "Read the assigned passage again so the pace can be measured.",
+                            "message": "Pace was not measured reliably. Your take is saved; use the listening prompt to reflect on it.",
                         }
                     ]
                 elif not target["min"] <= rate["value"] <= target["max"]:
                     coaching = [
                         {
                             "code": "pace_outside_target",
-                            "message": "Try reading within the target pace range.",
+                            "message": "For future practice, explore the suggested pace band without sacrificing clarity. This take counts.",
                         }
                     ]
         passed = not issues
@@ -569,6 +573,11 @@ class Service:
             "plan_item_id": item["id"],
             "reward": {"notes": 0, "parts": []},
             "practice_seconds": 0,
+            "practice_seconds_source": {
+                "recording": "audio_duration",
+                "timer": "self_reported",
+                "self_confirmation": "unknown",
+            }[kind],
             "exercise_id": item["exercise_id"],
             "status": "passed" if passed else "needs_retry",
             "verification_type": kind,
@@ -598,7 +607,7 @@ class Service:
             a["practice_seconds"] = {
                 "timer": lambda: payload["elapsed_seconds"],
                 "recording": lambda: round(rec["duration_seconds"]),
-                "self_confirmation": lambda: item["estimated_duration_seconds"],
+                "self_confirmation": lambda: 0,
             }[kind]()
         if kind == "self_confirmation":
             a["self_confirmed"] = payload["self_confirmed"]

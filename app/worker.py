@@ -219,14 +219,26 @@ class Worker:
         try:
             signal = decode(path, self.settings, max_seconds)
             self.stage(claim, "quality_check")
-            quality, segments = quality_check(signal, self.settings, rec["purpose"])
+            quality, segments = quality_check(
+                signal,
+                self.settings,
+                rec["purpose"],
+                item["task"]["verification"].get("quality_rules") if rec["purpose"] == "exercise" else None,
+            )
             measurements = timing_metrics(signal, segments) if rec["purpose"] == "exercise" else None
             if rec["purpose"] == "exercise" and quality["status"] == "accepted":
-                required = EXERCISES[item["exercise_id"]]["verification"]["required_metrics"]
+                required = item["task"]["verification"].get("required_metrics")
+                if required is None:  # Legacy snapshots predate required-metric persistence.
+                    required = (
+                        EXERCISES.get(item["exercise_id"], {})
+                        .get("verification", {})
+                        .get("required_metrics", [])
+                    )
                 if "speaking_rate_wpm" in required:
                     self.stage(claim, "transcription")
-                    provider = self.provider_factory(self.settings)
+                    provider = None
                     try:
+                        provider = self.provider_factory(self.settings)
                         transcript = provider.transcribe(signal, item["task"]["text"])
                         measurements = timing_metrics(
                             signal, segments, transcript["word_count"], transcript["words"]
@@ -242,8 +254,13 @@ class Worker:
                                     "calls": copy.deepcopy(provider.usage),
                                 },
                             )
+                    except ProviderFailure:
+                        # An optional coaching metric must not invalidate a usable daily take.
+                        for value in measurements.values():
+                            value["unavailable_reason"] = "transcription_provider_unavailable"
                     finally:
-                        provider.close()
+                        if provider is not None:
+                            provider.close()
         except AudioRejected as exc:
             quality = {
                 "status": "rejected",
@@ -301,7 +318,7 @@ class Worker:
         with self.database.session.begin() as db:
             s, job = self.locked(db, claim)
             old_plans = s.all("plan")
-            p = generate_plan(a, report, max((p["version"] for p in old_plans), default=0) + 1)
+            p = generate_plan(a, report, max((p["version"] for p in old_plans), default=0) + 1, old_plans)
             for old in old_plans:
                 if old["status"] != "archived":
                     old["status"] = "archived"

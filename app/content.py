@@ -1,5 +1,8 @@
 import copy
 import json
+import math
+import re
+from collections import Counter
 from pathlib import Path
 
 from app.db import iso, new_id
@@ -30,61 +33,123 @@ def protocol(previous=None, variant=0):
     return tasks
 
 
-def generate_plan(assessment, report, version):
+def variant_timing(variant, verification):
+    """Planning guidance, never a completion gate. Reading time includes all requested passes."""
+    repetitions = variant["repetitions"]
+    words = len(re.findall(r"\b[\w’'-]+\b", variant["text"])) * repetitions
+    low = max(5, math.ceil(words * 60 / 180))
+    high = max(low, math.ceil(words * 60 / 90))
+    if verification == "self_confirmation":
+        return {
+            "expected_recording_seconds": None,
+            "estimated_practice_seconds": variant["action_duration_seconds"],
+            "max_recording_seconds": None,
+            "includes_listening": False,
+        }
+    # Two seconds per thought boundary; a normal breath between repeated passes.
+    pause_allowance = variant["text"].count("/") * 2 + (repetitions - 1) * 3
+    low += pause_allowance
+    high += pause_allowance
+    reading = math.ceil(words * 60 / 140) + pause_allowance
+    return {
+        "expected_recording_seconds": {"min": low, "max": high},
+        "estimated_practice_seconds": reading * 2 + 25,  # read + listen + preparation/reflection
+        "max_recording_seconds": min(180, max(60, math.ceil((high + 20) / 5) * 5)),
+        "includes_listening": True,
+    }
+
+
+def generate_plan(assessment, report, version, previous_plans=()):
     priorities = [p["tag"] for p in report["priorities"]]
     target_ids = []
-    for p in report["priorities"]:
-        for eid in p["exercise_ids"]:
-            if eid not in target_ids and eid not in ("E01", "E12"):
+    for priority in report["priorities"]:
+        for eid in priority["exercise_ids"]:
+            if eid in EXERCISES and eid not in target_ids and eid not in ("E01", "E12"):
                 target_ids.append(eid)
-    # Keep rotation varied using catalog tags, regardless of the model's chosen subset.
-    for e in EXERCISES.values():
-        if set(e["tags"]) & set(priorities) and e["id"] not in target_ids and e["id"] not in ("E01", "E12"):
-            target_ids.append(e["id"])
+    for ex in EXERCISES.values():
+        if (
+            set(ex["tags"]) & set(priorities)
+            and ex["id"] not in target_ids
+            and ex["id"] not in ("E01", "E12")
+        ):
+            target_ids.append(ex["id"])
     if not target_ids:
-        target_ids = [e["id"] for e in EXERCISES.values() if set(e["tags"]) & set(priorities)]
+        target_ids = ["E03", "E08", "E09", "E10"]
+    usage = Counter(
+        item["task"].get("variant_id")
+        for plan in previous_plans
+        for lesson in plan["lessons"]
+        for item in lesson["items"]
+    )
+
+    def make_item(eid, day, position):
+        ex = EXERCISES[eid]
+        difficulty = "beginner" if day <= 7 else "intermediate"
+        pool = [v for v in ex["difficulty_variants"] if v["difficulty"] == difficulty]
+        variant = min(pool, key=lambda v: usage[v["id"]])
+        usage[variant["id"]] += 1
+        verification = ex["verification"]["type"]
+        timing = variant_timing(variant, verification)
+        return {
+            "id": new_id(),
+            "exercise_id": eid,
+            "exercise_version": ex["version"],
+            "position": position,
+            "difficulty": difficulty,
+            "variant_label": variant["label"],
+            "title": ex["title"],
+            "reason": "Warm up gently."
+            if eid == "E01"
+            else "Bring the skills together in a new story."
+            if eid == "E12"
+            else "Practice your assessment priorities."
+            if eid in target_ids
+            else "Build a balanced session with a complementary skill.",
+            "status": "pending",
+            "latest_attempt_id": None,
+            "completed_at": None,
+            "estimated_duration_seconds": timing["estimated_practice_seconds"],
+            "task": {
+                "schema_version": 2,
+                "variant_id": variant["id"],
+                "instruction": variant["instruction"],
+                "text": variant["text"],
+                "steps": [step.strip() + "." for step in variant["text"].rstrip(".").split(". ")]
+                if eid == "E01"
+                else [],
+                "repetitions": variant["repetitions"],
+                "timing": timing,
+                "reflection_prompt": variant["reflection_prompt"],
+                "example": copy.deepcopy(ex["example"]),
+                "verification": {
+                    "type": verification,
+                    "min_elapsed_seconds": None,
+                    "required_metrics": list(ex["verification"]["required_metrics"]),
+                    "max_recording_seconds": timing["max_recording_seconds"],
+                    "target_wpm": {"min": 120, "max": 150} if eid == "E06" else None,
+                    "quality_rules_version": "audio-quality-v1",
+                    "quality_rules": copy.deepcopy(CATALOG["quality_rules"]),
+                },
+            },
+        }
+
     lessons = []
     for day in range(1, 15):
         chosen = [target_ids[(day - 1) % len(target_ids)]]
         if len(target_ids) > 1:
             chosen.append(target_ids[day % len(target_ids)])
-        sequence = list(dict.fromkeys(["E01", *chosen, "E12"]))
-        for general in ("E11", "E02", "E03"):
-            if sum(EXERCISES[e]["duration_seconds"] for e in sequence) >= 300:
+        sequence = list(dict.fromkeys(["E01", *chosen]))
+        items = [make_item(eid, day, n) for n, eid in enumerate(sequence, 1)]
+        # Add complementary practice using actual chosen-variant estimates, keeping narration last.
+        narration = make_item("E12", day, 0)
+        for eid in ("E11", "E02", "E03", "E08", "E09", "E04", "E07"):
+            if sum(i["estimated_duration_seconds"] for i in [*items, narration]) >= 300:
                 break
-            if general not in sequence:
-                sequence.append(general)
-        items = []
-        for position, eid in enumerate(sequence, 1):
-            ex = EXERCISES[eid]
-            variant = ex["difficulty_variants"][0 if day <= 7 else 1]
-            verification = ex["verification"]["type"]
-            items.append(
-                {
-                    "id": new_id(),
-                    "exercise_id": eid,
-                    "exercise_version": ex["version"],
-                    "position": position,
-                    "difficulty": variant["id"],
-                    "title": ex["title"],
-                    "reason": "Warm up gently." if eid == "E01" else "Practice your assessment priorities.",
-                    "status": "pending",
-                    "latest_attempt_id": None,
-                    "completed_at": None,
-                    "estimated_duration_seconds": ex["duration_seconds"],
-                    "task": {
-                        "instruction": ex["instruction"],
-                        "text": variant["text"],
-                        "example": ex["example"],
-                        "verification": {
-                            "type": verification,
-                            "min_elapsed_seconds": ex["verification"]["min_elapsed_seconds"],
-                            "max_recording_seconds": 90 if verification == "recording" else None,
-                            "target_wpm": {"min": 120, "max": 150} if eid == "E06" else None,
-                        },
-                    },
-                }
-            )
+            if eid not in sequence:
+                sequence.append(eid)
+                items.append(make_item(eid, day, len(items) + 1))
+        narration["position"] = len(items) + 1
+        items.append(narration)
         lessons.append(
             {
                 "id": new_id(),
@@ -98,6 +163,7 @@ def generate_plan(assessment, report, version):
     return {
         "id": new_id(),
         "version": version,
+        "catalog_version": CATALOG["catalog_version"],
         "assessment_id": assessment["id"],
         "status": "active",
         "created_at": iso(),

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { request } from './api'
-import type { Assessment, Exercise, Job, Me, Plan, Progress, Today } from './types'
+import type { Assessment, Attempt, Exercise, Job, Me, Plan, Progress, Today } from './types'
 
 export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => request<Me>('/me') })
 export const useToday = () => useQuery({ queryKey: ['today'], queryFn: () => request<Today>('/today') })
@@ -24,3 +24,6 @@ export const useJob = (id: string | null | undefined) =>
     enabled: !!id,
     refetchInterval: (q) => jobPollInterval(q.state.data),
   })
+
+export const useAttempt = (id: string | null | undefined) =>
+  useQuery({ queryKey: ['attempt', id], queryFn: () => request<Attempt>('/exercise-attempts/' + id), enabled: !!id })

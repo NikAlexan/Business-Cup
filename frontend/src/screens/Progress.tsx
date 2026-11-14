@@ -67,7 +67,7 @@ export default function Progress() {
           <div className="rs-metric"><span className="rs-label">Sessions</span><span className="rs-metric__v">{s.current_plan_completed_lessons}<small>/ {s.current_plan_total_lessons}</small></span><span className="rs-metric__n">{s.completed_lessons_all_time} all time</span></div>
           <div className="rs-metric"><span className="rs-label">Streak</span><span className="rs-metric__v">{s.current_streak_days}<small>days</small></span><span className="rs-metric__n">Longest {s.longest_streak_days}</span></div>
           <div className="rs-metric"><span className="rs-label">Notes</span><span className="rs-metric__v">{s.notes_total}</span><span className="rs-metric__n">For finished practice</span></div>
-          <div className="rs-metric"><span className="rs-label">Practice</span><span className="rs-metric__v">{Math.floor(s.practice_seconds_total / 60)}<small>min</small></span><span className="rs-metric__n">{s.last_practice_on ? 'Last ' + formatDate(s.last_practice_on, d.timezone) : 'No sessions yet'}</span></div>
+          <div className="rs-metric"><span className="rs-label">Recorded practice</span><span className="rs-metric__v">{Math.floor(s.practice_seconds_total / 60)}<small>min</small></span><span className="rs-metric__n">{s.last_practice_on ? 'Last ' + formatDate(s.last_practice_on, d.timezone) : 'No sessions yet'}</span></div>
         </div>
         <div className="rs-cols">
           <div className="rs-stack" style={{ gap: 16 }}>

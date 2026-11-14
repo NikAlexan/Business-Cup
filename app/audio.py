@@ -106,7 +106,8 @@ def speech_segments(signal, model_path):
     return segments
 
 
-def quality_check(signal, settings, purpose):
+def quality_check(signal, settings, purpose, rules=None):
+    rules = QUALITY_RULES if rules is None else rules
     duration = len(signal) / SAMPLE_RATE
     segments = speech_segments(signal, settings.vad_model_path)
     speech_seconds = sum(b - a for a, b in segments) / SAMPLE_RATE
@@ -119,13 +120,9 @@ def quality_check(signal, settings, purpose):
         speech_rms = float(np.sqrt(np.mean(signal[mask] ** 2)))
         noise_rms = float(np.sqrt(np.mean(signal[~mask] ** 2)))
         snr = 20 * math.log10(max(speech_rms, 1e-8) / max(noise_rms, 1e-8))
-        noise_level = "low" if snr >= 15 else "moderate" if snr >= 3 else "high"
+        noise_level = "low" if snr >= 15 else "moderate" if snr >= rules["min_speech_noise_db"] else "high"
     issues = []
-    minimum = (
-        QUALITY_RULES["min_speech_seconds"]
-        if purpose == "assessment"
-        else QUALITY_RULES["exercise_min_speech_seconds"]
-    )
+    minimum = rules["min_speech_seconds"] if purpose == "assessment" else rules["exercise_min_speech_seconds"]
     if speech_seconds < minimum:
         issues.append(
             {
@@ -133,7 +130,7 @@ def quality_check(signal, settings, purpose):
                 "message": f"Please record at least {minimum} seconds of audible speech.",
             }
         )
-    if clipping > QUALITY_RULES["max_clipping_ratio"]:
+    if clipping > rules["max_clipping_ratio"]:
         issues.append(
             {"code": "clipping", "message": "Move farther from the microphone or lower its input volume."}
         )

@@ -42,6 +42,7 @@ export type PlanItem = {
   id: string
   exercise_id: string
   position: number
+  variant_label?: string
   difficulty?: string
   title: string
   reason: string
@@ -51,6 +52,10 @@ export type PlanItem = {
   notes_available: number
   task: {
     instruction: string
+    repetitions?: number
+    steps?: string[]
+    reflection_prompt?: string
+    timing?: { expected_recording_seconds: { min: number; max: number } | null; includes_listening: boolean }
     text: string
     example: { type: string; text: string; audio_url: string | null }
     verification: {
@@ -160,7 +165,7 @@ export type Attempt = {
   status: 'passed' | 'needs_retry'
   reward: Reward
   practice_seconds: number
-  feedback: { summary: string; issues: Issue[]; coaching?: Issue[] }
+  feedback: { summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
 }
 export type Completion = {
   lesson_id: string
