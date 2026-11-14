@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Settings and your data — Resonance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="screens.css">
+<style>body{margin:0} a{color:#2b2b2b} a:hover{color:#0b7a6d}</style>
+</head>
+<body>
+<div class="rs rs-page" style="background: #ffffff; font-family: Rubik, system-ui, sans-serif; color: #2b2b2b; padding-bottom: 0">
+
+<header class="rs-nav" style="padding: 0 max(20px, calc((100% - 1200px) / 2 + 40px))"><div style="display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 50%; background: #1b2440; display: flex; align-items: center; justify-content: center; gap: 2px"><i style="width:3px;height:8px;border-radius:2px;background:#ffc23d"></i><i style="width:3px;height:15px;border-radius:2px;background:#14b3a0"></i><i style="width:3px;height:10px;border-radius:2px;background:#ffc23d"></i></span><span style="font: 600 21px Fredoka, sans-serif">Resonance</span></div><nav class="rs-nav__links" aria-label="Main"><a class="rs-nav__link" href="Home.html"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg>Today</a><a class="rs-nav__link" href="Progress.html"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Progress</a><a class="rs-nav__link rs-nav__link--on" href="Settings.html" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke-linecap="round"/></svg>Settings</a></nav><div style="display: flex; gap: 8px; flex-wrap: wrap"><span class="rs-chip"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="9" width="3" height="6" rx="1.5" fill="#e09b00"/><rect x="7" y="5" width="3" height="14" rx="1.5" fill="#e09b00"/><rect x="12" y="2" width="3" height="20" rx="1.5" fill="#e09b00"/><rect x="17" y="7" width="3" height="10" rx="1.5" fill="#e09b00"/></svg> 4<span class="d-only">&nbsp;days</span></span><span class="rs-chip"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" fill="none" stroke="#14b3a0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="3" fill="#14b3a0"/><circle cx="17.5" cy="16" r="3" fill="#14b3a0"/></svg> 64</span><span class="rs-chip d-only"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f8fff" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> 38 min</span></div></header>
+<div class="rs-wrap rs-narrow" style="padding-top: 28px; padding-bottom: 40px; display: flex; flex-direction: column; gap: 24px">
+<h1 class="rs-h rs-h1">Settings</h1>
+<div class="rs-card rs-stack" style="gap: 16px; padding: 24px">
+<h2 class="rs-h" style="font-size: 20px">Practice</h2>
+<div class="rs-stack" style="gap: 6px"><label for="goal" style="font: 500 15px Rubik">Goal</label><select id="goal" style="height: 48px; border-radius: 14px; border: 2px solid #e5e5e5; padding: 0 14px; font: 400 16px Rubik; background: #ffffff; color: #2b2b2b"><option>Clearer speech</option><option>More expressive voice</option><option>Voice-over delivery</option></select></div>
+<div class="rs-stack" style="gap: 6px"><label for="tz" style="font: 500 15px Rubik">Time zone</label><select id="tz" style="height: 48px; border-radius: 14px; border: 2px solid #e5e5e5; padding: 0 14px; font: 400 16px Rubik; background: #ffffff; color: #2b2b2b"><option>America/New_York (detected)</option></select><span class="rs-label">Streaks and the check-in date follow this zone.</span></div>
+</div>
+<div class="rs-card rs-stack" style="gap: 14px; padding: 24px">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap"><h2 class="rs-h" style="font-size: 20px">Subscription</h2><span class="rs-badge" style="background: #dff7f3; color: #0b7a6d">Active · test mode</span></div>
+<dl style="margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 20px">
+<dt class="rs-label" style="align-self: center">Plan</dt><dd style="margin: 0">Monthly · [PRICE]</dd>
+<dt class="rs-label" style="align-self: center">Renews on</dt><dd style="margin: 0">[DATE]</dd>
+</dl>
+<div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center"><a class="rs-btn rs-btn--secondary rs-btn--wide" href="#">Manage subscription</a><a class="rs-link" href="Terms.html" style="font-size: 15px">Subscription terms</a></div>
+<span class="rs-label">Change plan, update the card or cancel on Stripe's page. Access lasts to the end of the paid period.</span>
+</div>
+<div class="rs-card rs-stack" style="gap: 12px; padding: 24px">
+<h2 class="rs-h" style="font-size: 20px">Your data</h2>
+<p style="margin: 0">There's no account. Your profile, plan and recordings are tied to this browser. Clearing cookies or switching devices starts you fresh.</p>
+<div class="rs-stack" style="gap: 12px; border: 2px solid #ffc4bf; border-radius: 18px; padding: 16px; background: #ffffff">
+<span style="font-weight: 500">Delete all 14 recordings, your profile and plan?</span>
+<span style="font-size: 15px; color: #69707c">This can't be undone. Your streak and notes go too. Cancel the subscription first, or it keeps renewing.</span>
+<div style="display: flex; gap: 10px; flex-wrap: wrap"><button class="rs-btn rs-btn--wide" style="background: #d6332f; color: #ffffff; box-shadow: 0 3px 0 #a3201d"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg> Delete my data</button><button class="rs-btn rs-btn--secondary rs-btn--wide">Keep my data</button></div>
+</div>
+</div>
+</div>
+<nav class="rs-tabs" aria-label="Main" style="grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid #e5e5e5; margin-top: 24px"><a class="rs-tab" href="Home.html"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg><span>Today</span></a><a class="rs-tab" href="Progress.html"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Progress</span></a><a class="rs-tab rs-tab--on" href="Settings.html"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke-linecap="round"/></svg><span>Settings</span></a></nav>
+</div>
+</body>
+</html>
