@@ -56,7 +56,7 @@ export function MetricTile({ spec, all, comparison }: { spec: MetricSpec; all: R
       <span className="rs-metric__n">
         {c
           ? c.available && c.delta !== null
-            ? `${c.delta >= 0 ? '+' : '−'}${Math.abs(Math.round(c.delta * scale * 10) / 10)} vs baseline`
+            ? `Was ${Math.round((c.before as number) * scale)} ${spec.unit} · ${c.delta >= 0 ? '+' : '−'}${Math.abs(Math.round(c.delta * scale * 10) / 10)}`
             : 'Not comparable to baseline'
           : spec.note?.(all)}
       </span>
