@@ -4,7 +4,7 @@ import { ApiError, post, useMutationWithKey } from '../api/api'
 import type { Assessment } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
-import { LevelMeter, levelLabel } from '../components/LevelMeter'
+import { LevelMeter, STATUS_TEXT, useLevelStatus } from '../components/LevelMeter'
 import { MicBlocked } from '../components/MicBlocked'
 import { ErrorBanner } from '../components/ui'
 import { getMic, meter, micErrorKind, type MicErrorKind } from '../lib/recorder'
@@ -26,6 +26,7 @@ export default function MicCheck() {
   const [distance, setDistance] = useState(20)
   const [env, setEnv] = useState<string>('quiet_room')
   const stopRef = useRef<() => void>(() => {})
+  const status = useLevelStatus(level)
 
   const open = useCallback(async () => {
     setError(null)
@@ -85,9 +86,9 @@ export default function MicCheck() {
             <p style={{ margin: '8px 0 28px', color: 'var(--muted)' }}>Say a few words in your normal voice.</p>
             <div className="rs-cols" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
               <div className="rs-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '32px 20px' }}>
-                <LevelMeter level={level} label={'Input level: ' + levelLabel(level)} />
-                <span className="rs-badge" style={levelLabel(level) === 'Good level' ? { background: 'var(--success-tint)', color: 'var(--success)' } : { background: 'var(--warning-tint)', color: 'var(--warning)' }} aria-live="polite">
-                  {device ? levelLabel(level) : 'Waiting for the mic…'}
+                <LevelMeter level={level} label={'Input level: ' + STATUS_TEXT[status]} />
+                <span className="rs-badge" style={status === 'good' ? { background: 'var(--success-tint)', color: 'var(--success)' } : status === 'loud' ? { background: 'var(--warning-tint)', color: 'var(--warning)' } : { background: 'var(--surface)', color: 'var(--muted)' }} aria-live="polite">
+                  {device ? STATUS_TEXT[status] : 'Waiting for the mic…'}
                 </span>
               </div>
               <form className="rs-stack" style={{ gap: 16 }} aria-label="Recording setup" onSubmit={(e) => (e.preventDefault(), go())}>

@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const api = process.env.API_URL ?? 'http://localhost:8000'
+const api = process.env.API_URL ?? 'http://localhost:8080' // compose frontend proxies the API
 
 export default defineConfig({
   plugins: [
@@ -28,7 +28,7 @@ export default defineConfig({
       workbox: {
         // App shell only: API responses and audio are private and must stay fresh.
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
-        navigateFallbackDenylist: [/^\/api\//, /^\/health\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/health\//, /^\/docs/, /^\/openapi\.json/],
       },
     }),
   ],

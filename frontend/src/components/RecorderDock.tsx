@@ -1,4 +1,4 @@
-import { LevelMeter, levelLabel } from './LevelMeter'
+import { LevelMeter, STATUS_TEXT, useLevelStatus } from './LevelMeter'
 import { MicBlocked } from './MicBlocked'
 import type { useRecorder } from '../lib/recorder'
 
@@ -18,6 +18,7 @@ const StopIcon = () => (
 
 // Record → stop (or auto-stop at the limit) → listen → send or record again.
 export function RecorderDock({ r, max, sending, onSend, sendLabel = 'Use this take' }: { r: ReturnType<typeof useRecorder>; max: number; sending: boolean; onSend: () => void; sendLabel?: string }) {
+  const status = useLevelStatus(r.level)
   if (r.error) return <MicBlocked kind={r.error} onRetry={r.start} />
   if (r.state === 'recorded' && r.url)
     return (
@@ -45,13 +46,13 @@ export function RecorderDock({ r, max, sending, onSend, sendLabel = 'Use this ta
           {clock(r.seconds)} <span style={{ color: 'var(--muted)', fontSize: 18 }}>/ {clock(max)}</span>
         </span>
         <span className="rs-label" style={on ? { color: 'var(--success)' } : undefined} aria-live="polite">
-          {on ? 'Recording · ' + levelLabel(r.level).toLowerCase() : 'Press to record'}
+          {on ? (status === 'waiting' ? 'Recording · start reading' : 'Recording · ' + STATUS_TEXT[status].toLowerCase()) : 'Press to record'}
         </span>
       </div>
       <button className="rs-rec" type="button" aria-label={on ? 'Stop recording' : 'Start recording'} onClick={on ? r.stop : r.start} style={{ marginBottom: 5, cursor: 'pointer' }}>
         {on ? <StopIcon /> : <MicIcon />}
       </button>
-      <LevelMeter level={r.level} label={'Input level: ' + levelLabel(r.level)} />
+      <LevelMeter level={r.level} label={'Input level: ' + STATUS_TEXT[status]} />
     </div>
   )
 }

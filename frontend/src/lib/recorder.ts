@@ -49,11 +49,19 @@ export function meter(stream: MediaStream, onLevel: (v: number) => void): () => 
   ctx.createMediaStreamSource(stream).connect(analyser)
   const buf = new Float32Array(analyser.fftSize)
   let raf = 0
-  const tick = () => {
+  let smooth = 0
+  let last = 0
+  const tick = (now = 0) => {
     analyser.getFloatTimeDomainData(buf)
     let sum = 0
     for (const v of buf) sum += v * v
-    onLevel(Math.min(1, Math.sqrt(sum / buf.length) * 4))
+    const rms = Math.min(1, Math.sqrt(sum / buf.length) * 4)
+    // Fast attack, slow release: bars follow the voice without flicker between syllables.
+    smooth = rms > smooth ? rms : smooth * 0.9 + rms * 0.1
+    if (now - last > 66) {
+      last = now
+      onLevel(smooth)
+    }
     raf = requestAnimationFrame(tick)
   }
   tick()
