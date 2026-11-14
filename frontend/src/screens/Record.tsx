@@ -7,6 +7,8 @@ import type { AssessmentTask, Recording } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
 import { RecorderDock } from '../components/RecorderDock'
+import { ScriptText } from '../components/ScriptText'
+import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { limitFor, uploadRecording, useRecorder } from '../lib/recorder'
 
@@ -33,8 +35,15 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
     }
   }, [job.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
   const busy = upload.isPending || !!jobId
+  const follow = useSpeechFollow(task.text, r.state === 'recording')
   return (
     <>
+      <div className="rs-card" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 28 }}>
+        <ScriptText text={task.text} read={r.state === 'recording' ? follow.read : 0} />
+        <span className="rs-label">
+          Read it at your own pace — there's no time limit to chase.{follow.supported ? ' Words you read turn green.' : ''}
+        </span>
+      </div>
       {upload.error && <ErrorBanner error={upload.error} onRetry={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime })} />}
       <RecorderDock
         r={r}
@@ -112,10 +121,6 @@ export default function Record() {
                 </div>
               </div>
             )}
-            <div className="rs-card" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 28 }}>
-              <p className="rs-script rs-script--big">{current.text}</p>
-              <span className="rs-label">Read it at your own pace — there's no time limit to chase. We measure how you read on your own.</span>
-            </div>
             <TaskRecorder
               key={current.id + (current.recording_id ?? '')}
               task={current}
