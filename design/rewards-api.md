@@ -1,6 +1,6 @@
-# Награды: ноты и минуты практики (предложение к API)
+# Награды: ноты и минуты практики (реализовано, `rules_version: 1`)
 
-Дизайн показывает три счётчика: серия дней (есть в API), **ноты** и **минуты практики** (нет). Ноты — награда за выполненную практику, никогда за измерения голоса.
+Дизайн показывает три счётчика: серия дней (есть в API), **ноты** и **минуты практики** (есть с `rules_version: 1`). Ноты — награда за выполненную практику, никогда за измерения голоса.
 
 ## Правила начисления
 
@@ -11,16 +11,16 @@
 | Запись упражнения прошла проверку качества (`passed`) | +1 |
 | Повтор уже засчитанного `plan_item` | 0 |
 
-Минуты практики — сумма `elapsed_seconds` засчитанных попыток.
+Минуты практики — сумма по засчитанным попыткам: `elapsed_seconds` (timer), длительность записи (recording), номинальная длительность упражнения из каталога (self_confirmation).
 
 ## Поля
 
 | Где | Поле |
 | --- | --- |
-| Ответ `POST /exercise-attempts` | `reward: {notes: int, reason: "exercise_completed" \| "quality_bonus"}` |
+| Ответ `POST /exercise-attempts` | `reward: {notes: int, parts: [{notes, reason: "exercise_completed" \| "quality_bonus"}]}`, `practice_seconds: int` |
 | Ответ `PUT /progress/{lesson_id}` | `session_reward: {notes: int, practice_seconds: int}` — для экрана `Done` |
-| `GET /me` → `progress` | `notes_total`, `practice_seconds_total` |
-| `GET /progress` → `summary` | `notes_total`, `practice_seconds_total` |
+| `GET /me` → `progress` | `notes_total`, `practice_seconds_total`, `rules_version` |
+| `GET /progress` → `summary` | `notes_total`, `practice_seconds_total`, `rules_version` |
 | `plan.lessons[].items[]` в `GET /plan` и `GET /today` | `notes_available` — для подписи «+3 notes» |
 
 ## Требования

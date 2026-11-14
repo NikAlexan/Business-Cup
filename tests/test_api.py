@@ -400,3 +400,56 @@ def test_demo_override_requires_enabled_mode_and_is_auditable(client, app, setti
     assert response.status_code == 201
     assert response.json()["demo_override_used"] is True
     assert client.get("/api/v1/me").json()["demo_mode"] is True
+
+
+def test_rewards_follow_completed_practice(client, worker, speech_file):
+    guest(client)
+    complete_assessment(client, worker, speech_file)
+    lesson = client.get("/api/v1/today").json()["lesson"]
+    expected = {
+        i["id"]: (2 if i["exercise_id"] == "E01" else 3) + (i["task"]["verification"]["type"] == "recording")
+        for i in lesson["items"]
+    }
+    assert {i["id"]: i["notes_available"] for i in lesson["items"]} == expected
+    assert client.get("/api/v1/plan").json()["lessons"][0]["items"][0]["notes_available"] == 2
+
+    warmup = lesson["items"][0]
+    short = post(client, "/exercise-attempts", {"plan_item_id": warmup["id"], "elapsed_seconds": 1}).json()
+    assert short["reward"] == {"notes": 0, "parts": []} and short["practice_seconds"] == 0
+
+    results = {}
+    for item in lesson["items"]:
+        key = str(uuid4())
+        if item["task"]["verification"]["type"] == "timer":
+            payload = {"plan_item_id": item["id"], "elapsed_seconds": 60}
+        else:
+            r = upload(client, speech_file, {"purpose": "exercise", "plan_item_id": item["id"]})
+            worker.run_once()
+            payload = {"plan_item_id": item["id"], "recording_id": r.json()["recording"]["id"]}
+        first = post(client, "/exercise-attempts", payload, key=key)
+        assert first.status_code == 201, first.text
+        assert post(client, "/exercise-attempts", payload, key=key).json() == first.json()
+        results[item["id"]] = (item, first.json())
+    assert results[warmup["id"]][1]["reward"] == {
+        "notes": 2,
+        "parts": [{"notes": 2, "reason": "exercise_completed"}],
+    }
+    recorded = [a for i, a in results.values() if i["task"]["verification"]["type"] == "recording"]
+    assert recorded and recorded[0]["reward"]["parts"] == [
+        {"notes": 3, "reason": "exercise_completed"},
+        {"notes": 1, "reason": "quality_bonus"},
+    ]
+
+    done = client.put("/api/v1/progress/" + lesson["id"], json={"status": "completed"}).json()
+    assert done["session_reward"]["notes"] == sum(expected.values())
+    assert done["session_reward"]["practice_seconds"] > 60
+    again = client.put("/api/v1/progress/" + lesson["id"], json={"status": "completed"}).json()
+    assert again["session_reward"] == done["session_reward"]
+    me = client.get("/api/v1/me").json()["progress"]
+    assert me["notes_total"] == sum(expected.values())
+    assert me["practice_seconds_total"] == done["session_reward"]["practice_seconds"]
+    assert client.get("/api/v1/progress").json()["summary"]["notes_total"] == me["notes_total"]
+
+    assert client.delete("/api/v1/guest-data").status_code == 204
+    guest(client)
+    assert client.get("/api/v1/me").json()["progress"]["notes_total"] == 0
