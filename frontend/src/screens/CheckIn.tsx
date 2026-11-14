@@ -34,7 +34,7 @@ export default function CheckIn() {
                 </div>
                 {r.demo_override_available && (
                   <div className="rs-card rs-stack" style={{ gap: 10, padding: 20, border: '2px dashed var(--warning)', background: 'var(--warning-tint)' }}>
-                    <span className="rs-badge" style={{ background: '#fff', color: 'var(--warning)', alignSelf: 'flex-start' }}>DEMO_MODE</span>
+                    <span className="rs-badge" style={{ background: 'var(--ground)', color: 'var(--warning)', alignSelf: 'flex-start' }}>DEMO_MODE</span>
                     <p style={{ margin: 0, fontSize: 15 }}>
                       Demo mode lets you run the check-in before day 14. The result is marked Demo.
                     </p>

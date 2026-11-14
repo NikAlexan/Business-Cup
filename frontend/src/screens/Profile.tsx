@@ -33,8 +33,8 @@ export default function Profile() {
         <div className="rs-stack" style={{ gap: 6 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <h1 className="rs-h rs-h1">{re ? 'Your check-in' : 'Your voice profile'}</h1>
-            {d.demo_override_used && (
-              <span className="rs-badge" style={{ background: 'var(--warning-tint)', color: 'var(--warning)' }} title="Made before day 14 using DEMO_MODE">
+            {(d.demo_override_used || d.analysis_metadata?.demo?.prepared_data) && (
+              <span className="rs-badge" style={{ background: 'var(--warning-tint)', color: 'var(--warning)' }} title={d.analysis_metadata?.demo?.prepared_data ? 'Prepared demo data, not a real recording' : 'Made before day 14 using DEMO_MODE'}>
                 Demo
               </span>
             )}

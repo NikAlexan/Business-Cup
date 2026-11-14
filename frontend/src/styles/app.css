@@ -22,3 +22,30 @@ button.rs-btn { font-family: var(--font-display); }
 .rs-word--read { color: var(--success); text-decoration: underline 3px var(--primary); text-underline-offset: 6px; transition: color 150ms ease-out; }
 .rs-word--pace { box-shadow: inset 0 -6px 0 var(--sky-tint); border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { .rs-word--read { transition: none; } }
+
+/* Press: tactile buttons sink into their 3px ledge. */
+.rs-btn, .rs-opt, .rs-rec { transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1); }
+.rs-btn:not(:disabled):active, .rs-opt:active { transform: translateY(3px); box-shadow: 0 0 0 transparent; }
+.rs-rec:not(:disabled):active { transform: translateY(5px); box-shadow: 0 0 0 transparent; }
+
+/* Done: the plan grows bar by bar, today's bar lands last and lights up, then rewards arrive. */
+@keyframes rs-grow { from { transform: scaleY(0.08); } }
+@keyframes rs-light { from { background: rgba(255, 255, 255, .16); } }
+@keyframes rs-arrive { from { opacity: 0; transform: translateY(8px); } }
+.rs-bars > i { transform-origin: bottom; animation: rs-grow 520ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i) * 35ms); }
+.rs-bars > i.rs-today { animation: rs-grow 620ms cubic-bezier(0.16, 1, 0.3, 1) 560ms both, rs-light 300ms ease-out 1080ms both; }
+.rs-arrive > * { animation: rs-arrive 360ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(1200ms + var(--n, 0) * 90ms); }
+.rs-arrive > :nth-child(2) { --n: 1; }
+.rs-arrive > :nth-child(3) { --n: 2; }
+@media (prefers-reduced-motion: reduce) {
+  .rs-btn, .rs-opt, .rs-rec { transition: none; }
+  .rs-bars > i { animation: none; }
+  .rs-bars > i.rs-today { animation: rs-light 400ms ease-out 200ms both; }
+  .rs-arrive > * { animation: rs-arrive-fade 300ms ease-out 400ms both; }
+}
+@keyframes rs-arrive-fade { from { opacity: 0; } }
+
+/* Route change: header and tabs stay put, only the new screen's content settles in. */
+@keyframes rs-enter { from { opacity: 0; transform: translateY(10px); } }
+.rs-page > main { animation: rs-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .rs-page > main { animation: rs-arrive-fade 160ms ease-out both; } }
