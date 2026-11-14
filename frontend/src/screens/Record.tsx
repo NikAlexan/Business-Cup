@@ -38,7 +38,7 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
       {upload.error && <ErrorBanner error={upload.error} onRetry={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime })} />}
       <RecorderDock
         r={r}
-        max={max}
+       
         sending={busy}
         onSend={() => r.blob && r.mime && upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJobId(d.job_id) })}
       />
@@ -114,7 +114,7 @@ export default function Record() {
             )}
             <div className="rs-card" style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 28 }}>
               <p className="rs-script rs-script--big">{current.text}</p>
-              <span className="rs-label">Aim for about {current.target_duration_seconds} seconds. Baseline texts carry no marks: we measure how you read on your own.</span>
+              <span className="rs-label">Read it at your own pace — there's no time limit to chase. We measure how you read on your own.</span>
             </div>
             <TaskRecorder
               key={current.id + (current.recording_id ?? '')}

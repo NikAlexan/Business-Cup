@@ -94,7 +94,7 @@ function RecordCheck({ item, accepted, onRecorded, busy }: { item: PlanItem; acc
       </div>
       {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
       {j.data?.status === 'failed' && <ErrorBanner text={j.data.error?.message ?? 'The recording check failed.'} />}
-      <RecorderDock r={r} max={max} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" />
+      <RecorderDock r={r} sending={busy || upload.isPending || !!job} onSend={send} sendLabel="Check my take" />
     </>
   )
 }
