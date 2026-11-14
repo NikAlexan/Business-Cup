@@ -5,6 +5,7 @@ import { request } from '../api/api'
 import { useMe } from '../api/hooks'
 import { AppShell } from '../components/AppShell'
 import { ErrorBanner, Skeleton } from '../components/ui'
+import { useInstallPrompt } from '../lib/install'
 
 const GOALS = [
   ['clear_speech', 'Clearer speech'],
@@ -19,6 +20,7 @@ export default function Settings() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [confirm, setConfirm] = useState(false)
+  const app = useInstallPrompt()
   const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
   const save = useMutation({
     mutationFn: (body: object) => request('/preferences', { method: 'PATCH', body }),
@@ -59,6 +61,17 @@ export default function Settings() {
             </div>
             {save.error && <ErrorBanner error={save.error} />}
             {save.isSuccess && <span className="rs-label" role="status" style={{ color: 'var(--success)' }}>Saved</span>}
+          </div>
+        )}
+        {!app.isStandalone && (app.canInstall || app.isIos) && (
+          <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
+            <h2 className="rs-h" style={{ fontSize: 20 }}>Install the app</h2>
+            <p style={{ margin: 0 }}>Open your daily session from the home screen, like any other app.</p>
+            {app.canInstall ? (
+              <button className="rs-btn" type="button" onClick={app.install} style={{ alignSelf: 'flex-start' }}>Install app</button>
+            ) : (
+              <span className="rs-label">In Safari, tap Share → Add to Home Screen.</span>
+            )}
           </div>
         )}
         <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>

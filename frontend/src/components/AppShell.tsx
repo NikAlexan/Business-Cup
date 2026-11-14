@@ -4,6 +4,7 @@ import { ApiError } from '../api/api'
 import { useMe } from '../api/hooks'
 import { ChartIcon, GearIcon, HomeIcon, Logo } from './Icons'
 import { RewardChips } from './RewardChips'
+import { UpdateBanner } from './UpdateBanner'
 
 const NAV = [
   { to: '/today', label: 'Today', icon: <HomeIcon /> },
@@ -50,6 +51,7 @@ export function AppShell({ children, chips = true }: { children: ReactNode; chip
       <main className="rs-wrap" style={{ paddingTop: 28, paddingBottom: 40 }}>
         {children}
       </main>
+      <UpdateBanner />
       <nav className="rs-tabs" aria-label="Main">
         {NAV.map((n) => (
           <NavLink key={n.to} to={n.to} className={({ isActive }) => 'rs-tab' + (isActive ? ' rs-tab--on' : '')}>

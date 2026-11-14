@@ -18,3 +18,4 @@ button.rs-btn { font-family: var(--font-display); }
 .rs-spin { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--sky); border-right-color: transparent; animation: rs-rot 0.9s linear infinite; flex: none; }
 @keyframes rs-rot { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rs-spin { animation-duration: 3s; } }
+.rs-update { position: fixed; left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 20; max-width: 520px; margin: 0 auto; box-shadow: 0 4px 0 var(--line); }
