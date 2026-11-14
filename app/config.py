@@ -8,10 +8,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     database_url: str = "sqlite:///./voice.db"
-    app_secret: SecretStr = SecretStr("local-development-only-change-me-32chars")
+    app_secret: SecretStr  # required: APP_SECRET from .env or the environment
     openai_api_key: SecretStr = SecretStr("")
     audio_model: str = "gpt-audio-1.5"
-    transcribe_model: str = "gpt-4o-mini-transcribe"
+    transcribe_model: str = "whisper-1"
     normalize_model: str = "gpt-4o-mini"
     openai_base_url: str = "https://api.openai.com/v1"
     audio_data: Path = Path("audio_data")

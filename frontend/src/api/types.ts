@@ -133,7 +133,15 @@ export type Assessment = {
   } | null
   measurements: Record<string, Measurement> | null
   comparison: Comparison | null
+  interpretation?: Record<string, MetricInterpretation> | null
   recordings?: Recording[]
+}
+export type MetricInterpretation = {
+  band: 'below' | 'within' | 'above' | null
+  target: { min: number; max: number; unit?: string } | null
+  label: string
+  note: string
+  focus: boolean
 }
 export type Job = {
   id: string
