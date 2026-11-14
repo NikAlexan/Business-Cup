@@ -1,0 +1,29 @@
+[
+  {
+    "kind": "control_text",
+    "order": 1,
+    "text": "Today I will speak at a comfortable pace, making each word clear. A steady voice helps listeners follow the message from beginning to end.",
+    "prompt_version": "control-v1",
+    "instruction": "Read naturally and clearly.",
+    "target_duration_seconds": 35,
+    "max_duration_seconds": 60
+  },
+  {
+    "kind": "novel_text",
+    "order": 2,
+    "text": "Before the town awoke, a small delivery van crossed the bridge. The driver paused near the station, checked the address, and carried a parcel to the front door.",
+    "prompt_version": "novel-v1-03",
+    "instruction": "Read this unfamiliar passage at your normal pace.",
+    "target_duration_seconds": 40,
+    "max_duration_seconds": 60
+  },
+  {
+    "kind": "intonation",
+    "order": 3,
+    "text": "You finished the recording. You finished the recording? First, we listen; then, we practice; finally, we try again.",
+    "prompt_version": "intonation-v1",
+    "instruction": "Read the statement, question, and list with the indicated intonation.",
+    "target_duration_seconds": 25,
+    "max_duration_seconds": 60
+  }
+]

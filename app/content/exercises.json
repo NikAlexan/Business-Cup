@@ -1,0 +1,418 @@
+{
+  "catalog_version": "catalog-v1",
+  "items": [
+    {
+      "id": "E01",
+      "version": 1,
+      "title": "Articulation warm-up",
+      "goal": "Move your lips, tongue, and jaw gently. Keep all movements comfortable.",
+      "instruction": "Move your lips, tongue, and jaw gently. Keep all movements comfortable.",
+      "example": {
+        "type": "text",
+        "text": "Smile gently, round your lips, then relax your jaw.",
+        "audio_url": null
+      },
+      "duration_seconds": 60,
+      "tags": [
+        "articulation"
+      ],
+      "verification": {
+        "type": "timer",
+        "min_elapsed_seconds": 45,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Smile gently, round your lips, then relax your jaw."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Smile gently, round your lips, then relax your jaw. Repeat once with a deliberate change of emphasis."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E02",
+      "version": 1,
+      "title": "Comfortable vowels",
+      "goal": "Speak each vowel clearly at a comfortable volume.",
+      "instruction": "Speak each vowel clearly at a comfortable volume.",
+      "example": {
+        "type": "text",
+        "text": "Ah, ee, oh, oo.",
+        "audio_url": null
+      },
+      "duration_seconds": 60,
+      "tags": [
+        "clarity"
+      ],
+      "verification": {
+        "type": "self_confirmation",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Ah, ee, oh, oo."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Ah, ee, oh, oo. Repeat once with a deliberate change of emphasis."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E03",
+      "version": 1,
+      "title": "Clear word endings",
+      "goal": "Read each phrase, keeping the first and last sounds distinct.",
+      "instruction": "Read each phrase, keeping the first and last sounds distinct.",
+      "example": {
+        "type": "text",
+        "text": "Bright light. Fresh bread. Take your time.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "clarity"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Bright light. Fresh bread. Take your time. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Bright light. Fresh bread. Take your time. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E04",
+      "version": 1,
+      "title": "Consonant combinations",
+      "goal": "Read the consonant groups slowly before trying the full phrases.",
+      "instruction": "Read the consonant groups slowly before trying the full phrases.",
+      "example": {
+        "type": "text",
+        "text": "Blue glass. Crisp spring. Gentle breeze.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "clarity"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Blue glass. Crisp spring. Gentle breeze. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Blue glass. Crisp spring. Gentle breeze. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E05",
+      "version": 1,
+      "title": "Tongue twister",
+      "goal": "Read accurately first, then gradually increase your pace.",
+      "instruction": "Read accurately first, then gradually increase your pace.",
+      "example": {
+        "type": "text",
+        "text": "Red leather, yellow leather.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "clarity",
+        "pace"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Red leather, yellow leather. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Red leather, yellow leather. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E06",
+      "version": 1,
+      "title": "Steady reading pace",
+      "goal": "Read at a comfortable pace within the target range.",
+      "instruction": "Read at a comfortable pace within the target range.",
+      "example": {
+        "type": "text",
+        "text": "A calm voice carries a clear message. Take a moment to let each idea settle.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "pace"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": [
+          "speaking_rate_wpm"
+        ]
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "A calm voice carries a clear message. Take a moment to let each idea settle. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "A calm voice carries a clear message. Take a moment to let each idea settle. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E07",
+      "version": 1,
+      "title": "Explore different tempos",
+      "goal": "Read the passage slowly, then at a conversational pace.",
+      "instruction": "Read the passage slowly, then at a conversational pace.",
+      "example": {
+        "type": "text",
+        "text": "The morning train arrived beside the old market.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "pace"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "The morning train arrived beside the old market. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "The morning train arrived beside the old market. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E08",
+      "version": 1,
+      "title": "Meaningful pauses",
+      "goal": "Read the passage, pausing briefly at each slash.",
+      "instruction": "Read the passage, pausing briefly at each slash.",
+      "example": {
+        "type": "text",
+        "text": "Take your time / let each phrase land / then continue.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "pauses",
+        "pace"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Take your time / let each phrase land / then continue. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Take your time / let each phrase land / then continue. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E09",
+      "version": 1,
+      "title": "Statement, question, list",
+      "goal": "Read the sentence as a statement, a question, and a list.",
+      "instruction": "Read the sentence as a statement, a question, and a list.",
+      "example": {
+        "type": "text",
+        "text": "You are ready. You are ready? Ready, steady, go.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "intonation"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "You are ready. You are ready? Ready, steady, go. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "You are ready. You are ready? Ready, steady, go. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E10",
+      "version": 1,
+      "title": "Change the emphasis",
+      "goal": "Read the sentence three times, stressing a different word each time.",
+      "instruction": "Read the sentence three times, stressing a different word each time.",
+      "example": {
+        "type": "text",
+        "text": "I can tell the story.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "expressiveness",
+        "intonation"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "I can tell the story. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "I can tell the story. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E11",
+      "version": 1,
+      "title": "Comfortable breath groups",
+      "goal": "Read each short phrase with a comfortable breath in between.",
+      "instruction": "Read each short phrase with a comfortable breath in between.",
+      "example": {
+        "type": "text",
+        "text": "A quiet morning. A comfortable breath. A clear beginning.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "breath"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "A quiet morning. A comfortable breath. A clear beginning. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "A quiet morning. A comfortable breath. A clear beginning. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    },
+    {
+      "id": "E12",
+      "version": 1,
+      "title": "New narrator read",
+      "goal": "Read the new passage as if speaking to one interested listener.",
+      "instruction": "Read the new passage as if speaking to one interested listener.",
+      "example": {
+        "type": "text",
+        "text": "Every voice has a story. Today, we begin with a clear and thoughtful message.",
+        "audio_url": null
+      },
+      "duration_seconds": 120,
+      "tags": [
+        "delivery"
+      ],
+      "verification": {
+        "type": "recording",
+        "min_elapsed_seconds": null,
+        "required_metrics": []
+      },
+      "difficulty_variants": [
+        {
+          "id": "beginner",
+          "label": "Beginner",
+          "text": "Every voice has a story. Today, we begin with a clear and thoughtful message. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice."
+        },
+        {
+          "id": "intermediate",
+          "label": "Intermediate",
+          "text": "Every voice has a story. Today, we begin with a clear and thoughtful message. Take a comfortable breath, then read the passage again with clear phrase endings and a natural voice. Change your emphasis to highlight the main idea, without forcing your voice."
+        }
+      ],
+      "content_locale": "en-US"
+    }
+  ]
+}
