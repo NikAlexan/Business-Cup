@@ -43,7 +43,44 @@ def test_interpretation_ignores_incomparable_baseline():
 
     m = {"intonation_range_semitones": {"available": True, "value": 9}}
     old = {"measurements": m, "analysis_metadata": {"measurement_version": "voice-metrics-v1"}}
-    new = {"measurements": m, "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION}}
-    assert comparable_measurements(None) is None
-    assert comparable_measurements(old) is None
-    assert comparable_measurements(new) is m
+    new = {
+        "measurements": m,
+        "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION},
+        "protocol_version": "assessment-v2",
+        "recording_conditions": {"device_label": "same mic"},
+    }
+    assert comparable_measurements(None, new) is None
+    assert comparable_measurements(old, new) is None
+    assert comparable_measurements(new, new) is m
+
+
+def test_same_measurement_version_is_not_enough_when_setup_or_protocol_changed():
+    from app.worker import MEASUREMENT_VERSION, comparable_measurements
+
+    baseline = {
+        "measurements": {"intonation_range_semitones": {"available": True, "value": 9}},
+        "recording_conditions": {"device_label": "old mic"},
+        "protocol_version": "assessment-v2",
+        "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION},
+    }
+    new_setup = {**baseline, "recording_conditions": {"device_label": "new mic"}}
+    new_protocol = {**baseline, "protocol_version": "assessment-v3"}
+    assert comparable_measurements(baseline, new_setup) is None
+    assert comparable_measurements(baseline, new_protocol) is None
+    assert comparable_measurements(baseline, dict(baseline)) == baseline["measurements"]
+
+
+def test_invalid_word_timestamps_are_unavailable_without_partial_metrics():
+    invalid = [
+        [{"start": 0}, {"start": 1, "end": 2}],
+        [{"start": 0, "end": 0}, {"start": 0, "end": 0}],
+        [{"start": 0, "end": 1}, {"start": 0.5, "end": 2}],
+        [{"start": 0, "end": 1}, {"start": 1, "end": float("inf")}],
+        [{"start": -1, "end": 0}, {"start": 0, "end": 1}],
+        [{"start": 0, "end": 1}, {"start": True, "end": 2}],
+        ["not an object", {"start": 1, "end": 2}],
+    ]
+    for words in invalid:
+        result = timing_metrics(np.zeros(16000), [], 2, words)
+        assert all(not m["available"] and m["value"] is None for m in result.values())
+        assert result["speaking_rate_wpm"]["unavailable_reason"] == "transcription_invalid_timestamps"

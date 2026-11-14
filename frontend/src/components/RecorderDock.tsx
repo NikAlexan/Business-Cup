@@ -15,7 +15,7 @@ const StopIcon = () => (
   </svg>
 )
 
-// No clock on purpose: people read at their own pace. The server limit is only a silent safety stop.
+// People finish at their own pace; automatic safety stops are explained after the take.
 // Record → stop → listen → send or record again.
 export function RecorderDock({
   r,
@@ -37,7 +37,7 @@ export function RecorderDock({
   if (r.state === 'recorded' && r.url)
     return (
       <div className="rs-dock" style={{ flexDirection: 'column', gap: 14 }}>
-        <span className="rs-label">Your take — listen back if you like</span>
+        <span className="rs-label" role="status">{r.limitReached ? 'Recording reached its length limit. Listen for a complete ending before sending.' : 'Your take — listen back if you like'}</span>
         <audio
           controls
           src={r.url}
@@ -69,16 +69,18 @@ export function RecorderDock({
       </div>
     )
   const on = r.state === 'recording'
+  const requesting = r.state === 'requesting'
   return (
     <div className="rs-dock">
       <div className="rs-stack" style={{ alignItems: 'center', gap: 4 }}>
         <span className="rs-label" style={on ? { color: 'var(--success)' } : undefined} aria-live="polite">
-          {on ? (status === 'waiting' ? 'Recording · read at your own pace' : 'Recording · ' + STATUS_TEXT[status].toLowerCase() + ' · press stop when done') : 'Press to record'}
+          {on ? (status === 'waiting' ? 'Recording · read at your own pace' : 'Recording · ' + STATUS_TEXT[status].toLowerCase() + ' · press stop when done') : requesting ? 'Waiting for microphone permission…' : 'Press to record'}
         </span>
       </div>
-      <button className="rs-rec" type="button" aria-label={on ? 'Stop recording' : 'Start recording'} onClick={on ? r.stop : r.start} style={{ marginBottom: 5, cursor: 'pointer' }}>
+      <button className="rs-rec" type="button" disabled={requesting || sending} aria-label={on ? 'Stop recording' : requesting ? 'Waiting for microphone permission' : 'Start recording'} onClick={on ? r.stop : r.start} style={{ marginBottom: 5, cursor: 'pointer' }}>
         {on ? <StopIcon /> : <MicIcon />}
       </button>
+      {requesting && <button className="rs-btn rs-btn--secondary" type="button" onClick={r.reset}>Cancel microphone request</button>}
       <LevelMeter level={r.level.level} label={'Input level: ' + STATUS_TEXT[status]} />
     </div>
   )

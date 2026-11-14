@@ -128,3 +128,17 @@ Smoke создаёт синтезированную тестовую речь ч
 Фронтенд записи микрофона, проверка UI в Safari/Chrome, восстановление сессии на другом устройстве, диагностика речевых дефектов, Stripe и CMS в эту реализацию бэкенда не входят. Внутренний `AccessPolicy.check_access(subject_id, capability)` оставлен для будущей оплаты; `NoBillingAccessPolicy` разрешает возможности MVP.
 
 Официальные источники интеграции: [Audio in Chat Completions](https://developers.openai.com/api/docs/guides/audio-chat-completions), [Transcriptions API](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create), [Silero VAD](https://github.com/snakers4/silero-vad/tree/v5.1.2), [pYIN](https://librosa.org/doc/main/generated/librosa.pyin.html).
+
+
+## Frontend and browser checks
+
+```bash
+cd frontend
+npm ci
+npm test
+npm run build
+npx playwright install --with-deps chromium
+npm run test:browser
+```
+
+Browser checks require the root `.venv`, Python dependencies, FFmpeg and the pinned models from `scripts-download-vad.py`. They start a server bound to `127.0.0.1:4173` with a temporary SQLite database and audio directory, explicit empty paid-provider credentials and prepared demo history. Chromium uses a generated speech WAV as its microphone. The API, queue, FFmpeg/VAD, recorder and private playback run normally; the complete paid voice-profile analysis is outside these checks. Test data is deleted when the server stops. Traces are kept in ignored `frontend/test-results/` on failures.

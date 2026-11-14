@@ -108,3 +108,23 @@ def test_provider_failures_do_not_expose_secrets(status, retryable):
         assert "do-not-leak" not in str(caught.value)
     finally:
         p.close()
+
+
+@pytest.mark.parametrize(
+    "timestamps",
+    [
+        [{"start": 0}, {"start": 1, "end": 2}],
+        [None, "invalid"],
+        {"unexpected": "object"},
+    ],
+)
+def test_transcription_with_malformed_timestamps_stays_unavailable(timestamps):
+    from app.audio import timing_metrics
+
+    p = provider(lambda _: httpx.Response(200, json={"text": "Read each word clearly.", "words": timestamps}))
+    try:
+        transcript = p.transcribe(np.zeros(16000), "Read each word clearly.")
+        measured = timing_metrics(np.zeros(16000), [], transcript["word_count"], transcript["words"])
+        assert all(not value["available"] and value["value"] is None for value in measured.values())
+    finally:
+        p.close()

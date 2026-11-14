@@ -1,5 +1,5 @@
 {
-  "catalog_version": "catalog-v3",
+  "catalog_version": "catalog-v4",
   "items": [
     {
       "id": "E01",
@@ -228,7 +228,7 @@
     },
     {
       "id": "E02",
-      "version": 3,
+      "version": 4,
       "title": "Comfortable vowels",
       "goal": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar.",
       "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
@@ -248,204 +248,204 @@
       },
       "difficulty_variants": [
         {
-          "id": "e02-v3-01",
+          "id": "e02-v4-01",
           "label": "Front vowel contrast",
           "difficulty": "beginner",
           "text": "seat, sit; beat, bit; leave, live. We leave a seat beside the window. This little ticket fits in my pocket.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Could you hear the difference between seat and sit when they appeared in a sentence?"
         },
         {
-          "id": "e02-v3-02",
+          "id": "e02-v4-02",
           "label": "Open vowel contrast",
           "difficulty": "beginner",
           "text": "pen, pan; bed, bad; said, sad. The red pen fell beside the black bag. Dan left the map on the bed.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did pen and pan stay distinct without exaggerating your jaw movement?"
         },
         {
-          "id": "e02-v3-03",
+          "id": "e02-v4-03",
           "label": "Rounded vowels",
           "difficulty": "beginner",
           "text": "pool, pull; fool, full; Luke, look. The pool looks cool in the morning. A full blue basket stood beside the door.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Were pool and pull easy to distinguish at your normal speaking volume?"
         },
         {
-          "id": "e02-v3-04",
+          "id": "e02-v4-04",
           "label": "Moving vowels",
           "difficulty": "beginner",
           "text": "day, die; late, light; main, mine. The daylight moved across the white wall. I made time to find the right lane.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did each changing vowel glide smoothly, without turning into two separate syllables?"
         },
         {
-          "id": "e02-v3-05",
+          "id": "e02-v4-05",
           "label": "Back vowel contrast",
           "difficulty": "beginner",
           "text": "coat, caught; boat, bought; low, law. We bought a coat for the boat trip. A low boat moved beyond the old stone wall.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Which vowels were distinct in your own accent? Similar vowels are not automatically an error."
         },
         {
-          "id": "e02-v3-06",
+          "id": "e02-v4-06",
           "label": "Clear long vowels",
           "difficulty": "beginner",
           "text": "green, blue, calm, warm. A green leaf floated across the blue pool. The warm room became calm when the visitors left.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Were the longer vowels clear without being pushed or held for extra time?"
         },
         {
-          "id": "e02-v3-07",
+          "id": "e02-v4-07",
           "label": "Vowels in names",
           "difficulty": "beginner",
           "text": "Mia, Maya, Mo, Mae. Mia made a note for Maya. Mo and Mae waited by the main entrance until noon.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Could you distinguish the names Mia, Maya, Mo and Mae in the connected sentences?"
         },
         {
-          "id": "e02-v3-08",
+          "id": "e02-v4-08",
           "label": "Vowels through phrases",
           "difficulty": "beginner",
           "text": "a clear view; an open road; a quiet room. We chose the quiet room with a clear view of the open road.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did the vowels remain clear as you moved from the short phrases into the longer sentence?"
         },
         {
-          "id": "e02-v3-09",
+          "id": "e02-v4-09",
           "label": "Diphthong glide",
           "difficulty": "beginner",
           "text": "time, town, toy; fine, found, foil. I found a small toy near the town clock. The final choice was mine.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Could you hear the vowel moving naturally in time, town and toy?"
         },
         {
-          "id": "e02-v3-10",
+          "id": "e02-v4-10",
           "label": "Comfortable vowel onset",
           "difficulty": "beginner",
           "text": "easy, open, always, only. Only Anna knew the answer. An open invitation arrived early on an otherwise ordinary afternoon.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did each word begin easily, without a hard attack or a forced breathy start?"
         },
         {
-          "id": "e02-v3-11",
+          "id": "e02-v4-11",
           "label": "Unstressed vowels",
           "difficulty": "intermediate",
-          "text": "about, support, today, away. Today we talked about a plan to support the team. Keep the quieter syllables comfortable and audible.",
-          "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
+          "text": "about, support, today, away. Today we talked about a plan to support the team.",
+          "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round. Keep the quieter syllables comfortable and audible.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Were the unstressed syllables still audible without giving every syllable equal weight?"
         },
         {
-          "id": "e02-v3-12",
+          "id": "e02-v4-12",
           "label": "Vowels across boundaries",
           "difficulty": "intermediate",
           "text": "we agree; go over; say it. We agree to go over the details. Please say it again when the room is quieter.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did the connected vowel sounds flow across word boundaries without losing the words?"
         },
         {
-          "id": "e02-v3-13",
+          "id": "e02-v4-13",
           "label": "Vowel length in context",
           "difficulty": "intermediate",
           "text": "cap, cab; back, bag; rice, rise. A cab waited near the bag. The price of rice began to rise again.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did the endings affect the vowel length naturally, without making every vowel equally long?"
         },
         {
-          "id": "e02-v3-14",
+          "id": "e02-v4-14",
           "label": "Three vowel positions",
           "difficulty": "intermediate",
           "text": "meet, met, mat; feel, fell, fat. We met on the mat beside the window. I felt the cool air as the light fell.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Could you distinguish meet, met and mat in the longer phrases?"
         },
         {
-          "id": "e02-v3-15",
+          "id": "e02-v4-15",
           "label": "Rounded transitions",
           "difficulty": "intermediate",
           "text": "who, you, we; move, music, view. You knew the music would move us. We shared a view of the moonlit harbor.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did the rounded vowel transitions stay easy, especially between you, knew and music?"
         },
         {
-          "id": "e02-v3-16",
+          "id": "e02-v4-16",
           "label": "Quiet clarity",
           "difficulty": "intermediate",
           "text": "please, pause, choose, share. Please choose a seat and share your story. We paused when the room grew quiet, then continued normally.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Was your quieter delivery still easy to understand without becoming a whisper?"
         },
         {
-          "id": "e02-v3-17",
+          "id": "e02-v4-17",
           "label": "Contrast in context",
           "difficulty": "intermediate",
           "text": "sale, sell; fail, fell; pain, pen. The shop will sell the pen in the sale. The pale light fell across the page.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did the vowel in sale remain distinct from sell when you connected the words?"
         },
         {
-          "id": "e02-v3-18",
+          "id": "e02-v4-18",
           "label": "Vowels in narration",
           "difficulty": "intermediate",
           "text": "A pale moon rose above the bay. Below the hill, the sleepy village glowed. One open window framed a small yellow light.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Were the vowels clear while the passage still sounded like a story?"
         },
         {
-          "id": "e02-v3-19",
+          "id": "e02-v4-19",
           "label": "Open to rounded",
           "difficulty": "intermediate",
           "text": "ah, oh, oo; calm, coat, cool. The calm host took a coat from the cool room. The old boat moved slowly toward shore.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Did the open-to-rounded vowel sequence stay smooth with a comfortable jaw?"
         },
         {
-          "id": "e02-v3-20",
+          "id": "e02-v4-20",
           "label": "Connected vowel flow",
           "difficulty": "intermediate",
           "text": "We are away for an hour. They enjoy an open evening. I owe you a story about an unusually quiet island.",
           "instruction": "Read the words and sentences three times, with a normal breath between rounds. Listen to the vowel differences without forcing a shape or changing your accent. Finish after the third round.",
           "repetitions": 3,
           "action_duration_seconds": 35,
-          "reflection_prompt": "Which vowel pair stayed distinct in connected speech? Your accent may make some pairs similar."
+          "reflection_prompt": "Could you keep the words distinct while allowing the neighboring vowels to connect?"
         }
       ],
       "content_locale": "en-US",

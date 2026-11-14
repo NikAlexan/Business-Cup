@@ -66,3 +66,29 @@ Sol 6.1, max reasoning, reviewed `e9fe30e` read-only. Overall readiness: 5.5/10;
 
 
 Iteration 2 checks: 90 tests passed in the full backend run; the subsequently added historical-time regression also passed in the targeted 49-test content/completion run. Frontend: 23 tests, TypeScript and Vite/PWA production build passed. Ruff lint/format and diff whitespace checks passed. No live browser result is claimed for this iteration.
+
+
+## Iteration 2 independent review
+
+Sol 6.1 Max reviewed `f2e04a6`: overall 6.6/10. Content had real improvements, independently sampled across all types and all narration variants. Reviewer executed 222 plans / 3108 lessons and found estimates 300–369 seconds. Remaining objections: malformed transcription timestamps can still break optional metrics; the result loses the audio player; curriculum overuses a fixed complementary skill and resets difficulty; a vowel prompt still contains an instruction and some reflections do not match the variant. This is a static/code review score, not a new score for later changes.
+
+## Iteration 3: recording lifecycle and real user flows
+
+- Integrated upstream dark theme and demo data into the improvement branch, preserving honest time labels.
+- Added cancellable permission requests, a requesting state, protection against parallel starts, and cleanup on unmount/constructor/meter/recorder/socket errors. A canceled permission grant cannot start a new recorder after navigation.
+- Auto-stop leaves encoder/timer headroom and explains that a technical limit ended the take. This does not impose a pedagogical timer.
+- Completed exercise feedback now includes private audio playback, restored after reload.
+- Added keyboard arrow/Home/End navigation with a single tab stop for onboarding goal selection.
+- Interpretation and comparison now share one condition/protocol/measurement comparability gate.
+- Invalid/missing/zero-duration/nonfinite/overlapping word timestamps become unavailable metrics. They do not invalidate accepted daily audio.
+- Edited vowel-specific reflection questions and moved the remaining spoken instruction into instruction metadata; content version advanced to catalog-v4/E02 version4.
+- Added frontend CI and browser CI.
+- Verified 99 backend tests in the full run; 48 audio/content checks after the final comparison/content edits. Frontend: 38 tests and production build. Three Chromium E2E scenarios passed with the real FastAPI API, a real worker/VAD, temporary SQLite/audio and synthetic microphone audio: keyboard onboarding; 390px recording → feedback → private playback → reload with unchanged rewards/time; permission cancellation followed by eventual live-track release. The full paid initial assessment is not exercised by these browser tests.
+
+## Next iteration priorities
+
+1. Give explicitly recommended skills enough sessions; rotate complementary skills and maintain prior practice level instead of unconditional beginner resets.
+2. Allow optional uncredited practice repeats and retain their feedback/history without duplicating completion, streak or notes.
+3. Extend daily feedback beyond the basic quality check with useful, clearly sourced observations and reflection.
+4. Expand real browser journeys to full sessions, retries/network loss, settings/history and multiple viewport/theme states.
+5. Request another Max review after these product changes and browser evidence are available. Do not claim 9.5 without independent evidence.

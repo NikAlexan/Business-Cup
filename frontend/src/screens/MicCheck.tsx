@@ -25,26 +25,48 @@ export default function MicCheck() {
   const [device, setDevice] = useState('')
   const [distance, setDistance] = useState(20)
   const [env, setEnv] = useState<string>('quiet_room')
+  const requestRef = useRef<AbortController | null>(null)
   const stopRef = useRef<() => void>(() => {})
 
   const open = useCallback(async () => {
+    if (requestRef.current) return
+    const controller = new AbortController()
+    requestRef.current = controller
     setError(null)
+    setDevice('')
     stopRef.current()
     try {
-      const stream = await getMic()
-      setDevice(stream.getAudioTracks()[0]?.label || 'Default microphone')
-      const stopMeter = meter(stream, setLevel)
-      stopRef.current = () => {
-        stopMeter()
-        stream.getTracks().forEach((t) => t.stop())
+      const stream = await getMic(10_000, controller.signal)
+      if (controller.signal.aborted) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
       }
+      let stopMeter = () => {}
+      let disposed = false
+      stopRef.current = () => {
+        if (disposed) return
+        disposed = true
+        stopMeter()
+        stream.getTracks().forEach((track) => track.stop())
+      }
+      stopMeter = meter(stream, setLevel)
+      setDevice(stream.getAudioTracks()[0]?.label || 'Default microphone')
+
     } catch (e) {
+      if (controller.signal.aborted) return
+      stopRef.current()
       setError(micErrorKind(e, window.isSecureContext))
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null
     }
   }, [])
   useEffect(() => {
     void open()
-    return () => stopRef.current()
+    return () => {
+      requestRef.current?.abort()
+      requestRef.current = null
+      stopRef.current()
+    }
   }, [open])
 
   const create = useMutationWithKey((body: object, key) => post<Assessment>('/assessments', body, key))

@@ -1,6 +1,6 @@
 # Exercise catalog and plan snapshots
 
-Catalog `catalog-v3`, task schema 2. There are 12 exercise types and 20 original variants per type (240 total). The ten beginner and ten intermediate variants have separate identities, labels, texts, repetitions and listening/reflection prompts. The categories are original speaking practice based on vocal variety and comfortable voice use, not validated medical treatments.
+Catalog `catalog-v4`, task schema 2. There are 12 exercise types and 20 original variants per type (240 total). The ten beginner and ten intermediate variants have separate identities, labels, texts, repetitions and listening/reflection prompts. The categories are original speaking practice based on vocal variety and comfortable voice use, not validated medical treatments.
 
 ## Content and practice
 
@@ -33,7 +33,7 @@ Plan generation considers variant usage across prior plans, chooses the least-us
 
 Audio issues such as silence or clipping require another take. Pace outside the drill's band is coaching, not a failed attempt. Missing credentials, rate limits or other expected provider failures during optional exercise transcription preserve accepted audio and return unavailable measurements with a reason. The full baseline/check-in assessment still requires its analysis to succeed.
 
-The exercise screen restores saved attempt feedback through `latest_attempt_id`, shows available measured pace, and preserves the checked take for resending an attempt after a transport error. A full qualitative AI review and uncredited optional repeat after completion remain further work; quality checks do not claim to score diction or expression.
+The exercise screen restores saved attempt feedback through `latest_attempt_id`, shows available measured pace, and preserves the checked take for resending an attempt after a transport error. Completed takes can be played beside their saved feedback, including after reload. A full qualitative AI review and uncredited optional repeat after completion remain further work; quality checks do not claim to score diction or expression.
 
 ## Validation
 

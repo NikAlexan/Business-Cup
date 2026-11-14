@@ -57,7 +57,7 @@ def test_legacy_timer_does_not_require_waiting(client, app):
     assert response.json()["practice_seconds"] == 5
 
 
-@pytest.mark.parametrize("failure_at", ["construction", "transcription"])
+@pytest.mark.parametrize("failure_at", ["construction", "transcription", "missing_timestamp", "zero_span"])
 def test_optional_transcription_failure_preserves_accepted_take(
     client, app, settings, speech_file, failure_at, monkeypatch
 ):
@@ -74,6 +74,10 @@ def test_optional_transcription_failure_preserves_accepted_take(
             super().__init__(settings)
 
         def transcribe(self, signal, text):
+            if failure_at == "missing_timestamp":
+                return {"word_count": 2, "words": [{"start": 0}, {"start": 1, "end": 2}]}
+            if failure_at == "zero_span":
+                return {"word_count": 2, "words": [{"start": 0, "end": 0}, {"start": 0, "end": 0}]}
             raise ProviderFailure("analysis_provider_rate_limited", True)
 
     gid = guest(client).json()["guest_id"]
@@ -93,7 +97,11 @@ def test_optional_transcription_failure_preserves_accepted_take(
     assert job["result"]["quality"]["status"] == "accepted"
     pace = job["result"]["measurements"]["speaking_rate_wpm"]
     assert pace["available"] is False and pace["value"] is None
-    assert pace["unavailable_reason"] == "transcription_provider_unavailable"
+    assert pace["unavailable_reason"] == (
+        "transcription_invalid_timestamps"
+        if failure_at in ("missing_timestamp", "zero_span")
+        else "transcription_provider_unavailable"
+    )
     attempt = post(
         client,
         "/exercise-attempts",

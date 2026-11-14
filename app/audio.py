@@ -193,12 +193,33 @@ def timing_metrics(signal, segments, word_count=None, words=None):
     return combine_timing((word_count, words))
 
 
+def valid_word_timestamps(words):
+    if not isinstance(words, list) or len(words) < 2:
+        return False
+    previous_end = 0
+    for word in words:
+        if not isinstance(word, dict):
+            return False
+        start, end = word.get("start"), word.get("end")
+        if any(
+            isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)
+            for v in (start, end)
+        ):
+            return False
+        if start < previous_end or end <= start:
+            return False
+        previous_end = end
+    return True
+
+
 def combine_timing(*parts):
     """Timing pooled over (word_count, words) parts; unavailable if any part lacks words, never partial."""
     total_words = span = pause_time = pause_count = 0
     for word_count, words in parts:
         if not word_count or not words or len(words) < 2:
             return {k: metric(None, u, "transcription_unavailable") for k, u in TIMING_UNITS.items()}
+        if not valid_word_timestamps(words):
+            return {k: metric(None, u, "transcription_invalid_timestamps") for k, u in TIMING_UNITS.items()}
         pauses = [b["start"] - a["end"] for a, b in zip(words, words[1:])]
         pauses = [g for g in pauses if g >= 0.3]
         total_words += word_count

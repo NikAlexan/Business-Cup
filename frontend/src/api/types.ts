@@ -96,7 +96,7 @@ export type Today = {
 export type Issue = { code: string; message: string }
 export type Recording = {
   id: string
-  status: 'queued' | 'processing' | 'completed' | 'failed'
+  status: 'queued' | 'processing' | 'completed' | 'needs_rerecord' | 'failed'
   duration_seconds: number | null
   quality: { status: string; issues: Issue[] } | null
   audio_url: string
@@ -161,6 +161,7 @@ export type Job = {
 }
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
+  recording_id?: string | null
   id: string
   plan_item_id: string
   status: 'passed' | 'needs_retry'

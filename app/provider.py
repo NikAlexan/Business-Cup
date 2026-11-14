@@ -94,7 +94,10 @@ class OpenAIAudioProvider:
             "text": text,
             "verified": verified,
             "word_count": len(actual) if verified else None,
-            "words": [{"start": w["start"], "end": w["end"]} for w in data.get("words") or []]
+            "words": [
+                {"start": w.get("start"), "end": w.get("end")} if isinstance(w, dict) else {}
+                for w in (data.get("words") if isinstance(data.get("words"), list) else [])
+            ]
             if verified
             else [],
             "verification_method": "prompt_alignment_v1",

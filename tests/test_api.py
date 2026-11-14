@@ -544,8 +544,9 @@ def test_interpretation_uses_assessment_goal(client, worker, speech_file):
 
 
 def test_demo_seed(settings):
-    from app.main import create_app
     from fastapi.testclient import TestClient
+
+    from app.main import create_app
     from tests.conftest import guest
 
     settings.demo_mode = True

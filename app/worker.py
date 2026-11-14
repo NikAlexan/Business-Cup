@@ -32,20 +32,24 @@ class WorkCancelled(Exception):
     pass
 
 
-def comparable_measurements(previous):
-    """Baseline measurements for interpretation, only if measured the same way."""
-    if previous and previous.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION:
-        return previous["measurements"]
-    return None
+def assessments_comparable(before, after):
+    return bool(
+        before
+        and before.get("protocol_version")
+        and before.get("recording_conditions") is not None
+        and before.get("recording_conditions") == after.get("recording_conditions")
+        and before.get("protocol_version") == after.get("protocol_version")
+        and before.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION
+    )
+
+
+def comparable_measurements(previous, current):
+    """Interpretation and comparison share the same conditions/version gate."""
+    return previous["measurements"] if assessments_comparable(previous, current) else None
 
 
 def compare(before, after, measurements):
-    conditions_match = before["recording_conditions"] == after["recording_conditions"]
-    compatible = (
-        conditions_match
-        and before["protocol_version"] == after["protocol_version"]
-        and before.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION
-    )
+    compatible = assessments_comparable(before, after)
     metrics = {}
     for name, value in measurements.items():
         if name in ("f0_timeline", "f0_range_hz"):
@@ -303,7 +307,7 @@ class Worker:
                 else None
             )
             comparison = compare(previous, a, measurements) if previous else None
-            interpretation = interpret(a["goal"], measurements, comparable_measurements(previous))
+            interpretation = interpret(a["goal"], measurements, comparable_measurements(previous, a))
             self.stage(claim, "ai_analysis")
             report = provider.report(signals, a, measurements, comparison, interpretation)
             transcript = {"verified": all(t["verified"] for t in transcripts)}

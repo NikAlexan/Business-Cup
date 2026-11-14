@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, post, useMutationWithKey } from '../api/api'
-import { useAttempt, useJob, useMe, usePlan, useToday } from '../api/hooks'
+import { useAttempt, useJob, useMe, usePlan, useRecording, useToday } from '../api/hooks'
 import type { Attempt, Lesson, PlanItem } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
@@ -141,6 +141,7 @@ export default function Exercise() {
   const [localResult, setResult] = useState<Attempt | null>(null)
   const savedAttempt = useAttempt(found?.item.latest_attempt_id)
   const result = localResult ?? savedAttempt.data ?? null
+  const savedRecording = useRecording(result?.recording_id)
   const attempt = useMutationWithKey((b: Body, key) => post<Attempt>('/exercise-attempts', b, key))
 
   useEffect(() => setResult(null), [planItemId])
@@ -213,6 +214,8 @@ export default function Exercise() {
                 {typeof result?.feedback.metrics?.speaking_rate_wpm?.value === 'number' && <p style={{ margin: 0 }}>Measured pace: {Math.round(result.feedback.metrics.speaking_rate_wpm.value)} words/min</p>}
                 {savedAttempt.isPending && item.latest_attempt_id && !localResult && <p>Loading your saved feedback…</p>}
                 {savedAttempt.error && !localResult && <ErrorBanner error={savedAttempt.error} onRetry={() => savedAttempt.refetch()} />}
+                {savedRecording.data?.audio_url && <audio controls preload="metadata" aria-label="Your completed take" src={savedRecording.data.audio_url} style={{ width: '100%' }} />}
+                {savedRecording.error && <ErrorBanner error={savedRecording.error} onRetry={() => savedRecording.refetch()} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
