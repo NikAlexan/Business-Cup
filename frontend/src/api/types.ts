@@ -97,6 +97,7 @@ export type Recording = {
   audio_url: string
   created_at: string
   purpose: string
+  plan_item_id: string | null
 }
 export type AssessmentTask = {
   id: string
@@ -176,6 +177,7 @@ export type Progress = {
   activity: { date: string; completed_lessons: number }[]
   measurement_history: { assessment_id: string; completed_at: string; measurements: Record<string, Measurement> }[]
   recordings: Recording[]
+  next_recordings_cursor: string | null
   reassessment: Reassessment
 }
 export type Exercise = {
