@@ -1,0 +1,16 @@
+# Local development: docker compose -f compose.yaml -f compose.dev.yaml up -d
+# Backend code is mounted from the host, so Python edits need no image rebuild.
+# Rebuild only after changing requirements.lock or the Dockerfile.
+services:
+  web:
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"]
+    volumes:
+      - audio_data:/data/audio
+      - ./app:/app/app
+      - ./migrations:/app/migrations
+  worker:
+    # ponytail: no autoreload for the worker; after editing app/worker.py run `docker compose restart worker`
+    volumes:
+      - audio_data:/data/audio
+      - ./app:/app/app
+      - ./migrations:/app/migrations

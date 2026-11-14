@@ -14,6 +14,10 @@ const screens = {
   Progress: lazy(() => import('./screens/Progress')),
   CheckIn: lazy(() => import('./screens/CheckIn')),
   Settings: lazy(() => import('./screens/Settings')),
+  Paywall: lazy(() => import('./screens/Billing').then((m) => ({ default: m.Paywall }))),
+  PaySuccess: lazy(() => import('./screens/Billing').then((m) => ({ default: m.PaySuccess }))),
+  PayCanceled: lazy(() => import('./screens/Billing').then((m) => ({ default: m.PayCanceled }))),
+  Terms: lazy(() => import('./screens/Billing').then((m) => ({ default: m.Terms }))),
 }
 
 export default function App() {
@@ -32,6 +36,10 @@ export default function App() {
         <Route path="/progress" element={<S.Progress />} />
         <Route path="/check-in" element={<S.CheckIn />} />
         <Route path="/settings" element={<S.Settings />} />
+        <Route path="/paywall" element={<S.Paywall />} />
+        <Route path="/pay/success" element={<S.PaySuccess />} />
+        <Route path="/pay/canceled" element={<S.PayCanceled />} />
+        <Route path="/terms" element={<S.Terms />} />
         <Route path="*" element={<S.Main />} />
       </Routes>
     </Suspense>

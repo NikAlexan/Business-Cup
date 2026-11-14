@@ -1,5 +1,6 @@
 """One-click mock data for the current guest (DEMO_MODE only). Replaces the guest's resources."""
 
+import random
 from datetime import timedelta
 
 from sqlalchemy import delete
@@ -7,6 +8,7 @@ from sqlalchemy import delete
 from app.audio import metric
 from app.content import generate_plan, interpret, protocol
 from app.db import Idempotency, Job, Resource, iso, new_id, utcnow
+from app.service import notes_for
 from app.worker import MEASUREMENT_VERSION
 
 CONDITIONS = {"device_label": "Demo microphone", "distance_cm": 20, "environment": "quiet_room", "notes": None}
@@ -46,6 +48,36 @@ REPORT = {
 }
 
 
+def practice(rng, item, at, retry=False):
+    """An attempt shaped like Service.attempt() produces, with human variation in time spent."""
+    kind = item["task"]["verification"]["type"]
+    planned = item["estimated_duration_seconds"]
+    seconds = {
+        "timer": round(planned * rng.uniform(0.7, 1.4)),
+        "recording": rng.randint(35, 110),  # length of the accepted take
+        "self_confirmation": planned,
+    }[kind]
+    parts = [{"notes": notes_for(item) - (kind == "recording"), "reason": "exercise_completed"}]
+    if kind == "recording":
+        parts.append({"notes": 1, "reason": "quality_bonus"})
+    return {
+        "id": new_id(), "plan_item_id": item["id"], "exercise_id": item["exercise_id"],
+        "status": "needs_retry" if retry else "passed", "verification_type": kind,
+        "elapsed_seconds": seconds if kind == "timer" else None, "recording_id": None,
+        "created_at": iso(at), "completed_at": None if retry else iso(at),
+        "plan_item_status": "pending" if retry else "completed",
+        "practice_seconds": 0 if retry else seconds,
+        "reward": {"notes": 0, "parts": []} if retry else {"notes": sum(x["notes"] for x in parts), "parts": parts},
+        "feedback": {
+            "summary": "Please try this exercise again." if retry else "Practice completed.",
+            "metrics": None,
+            "issues": [{"code": "pace_outside_target", "message": "Try reading within the target pace range."}]
+            if retry else [],
+        },
+        **({"self_confirmed": True} if kind == "self_confirmation" else {}),
+    }
+
+
 def seed(s):
     g = s.auth()
     for model in (Resource, Job, Idempotency):
@@ -72,17 +104,14 @@ def seed(s):
         p = generate_plan(a, REPORT, 2 if previous else 1)
         p["created_at"] = at
         if previous:
+            rng = random.Random(s.guest.id)  # stable per guest, different between guests
             for day, lesson in enumerate(p["lessons"][:6]):
-                done = now - timedelta(days=6 - day)
+                # Real people practice at different times of day and take uneven time per exercise.
+                done = now - timedelta(days=6 - day, hours=rng.randint(0, 5), minutes=rng.randint(0, 59))
                 for item in lesson["items"]:
-                    attempt = {
-                        "id": new_id(), "plan_item_id": item["id"], "exercise_id": item["exercise_id"],
-                        "status": "passed", "verification_type": "self_confirmation", "self_confirmed": True,
-                        "elapsed_seconds": None, "recording_id": None, "created_at": iso(done), "completed_at": iso(done),
-                        "plan_item_status": "completed", "practice_seconds": item["estimated_duration_seconds"],
-                        "reward": {"notes": 3, "parts": [{"notes": 3, "reason": "exercise_completed"}]},
-                        "feedback": {"summary": "Practice completed.", "metrics": None, "issues": []},
-                    }
+                    attempt = practice(rng, item, done)
+                    if attempt["verification_type"] == "recording" and rng.random() < 0.25:
+                        s.put("attempt", practice(rng, item, done, retry=True))  # a take that missed the target
                     s.put("attempt", attempt)
                     item.update(status="completed", completed_at=iso(done), latest_attempt_id=attempt["id"])
                 lesson.update(status="completed", completed_at=iso(done), timezone=tz,

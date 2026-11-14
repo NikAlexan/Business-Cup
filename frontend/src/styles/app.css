@@ -4,7 +4,7 @@ a { color: var(--ink); }
 a:hover { color: var(--primary-edge); }
 .rs-logo { width: 30px; height: 30px; border-radius: 50%; background: var(--stage); display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
 .rs-logo i { width: 3px; border-radius: 2px; }
-.rs-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; font: 600 21px var(--font-display); color: var(--ink); }
+.rs-brand { display: flex; min-height: 44px; align-items: center; gap: 8px; text-decoration: none; font: 600 21px var(--font-display); color: var(--ink); }
 .rs-banner--danger { background: var(--danger-tint); align-items: center; justify-content: space-between; }
 .rs-banner--warn { background: var(--warning-tint); }
 .rs-banner--info { background: var(--sky-tint); align-items: center; }
@@ -15,6 +15,9 @@ a:hover { color: var(--primary-edge); }
 button.rs-btn { font-family: var(--font-display); }
 .rs-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .rs-tabs { position: sticky; bottom: 0; z-index: 5; }
+/* Short pages: stretch to the viewport so the tab bar sits at the bottom, not under the content. */
+.rs-page:has(> .rs-tabs) { min-height: 100dvh; display: flex; flex-direction: column; }
+.rs-page:has(> .rs-tabs) > main { flex: 1 0 auto; width: 100%; }
 .rs-spin { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--sky); border-right-color: transparent; animation: rs-rot 0.9s linear infinite; flex: none; }
 @keyframes rs-rot { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rs-spin { animation-duration: 3s; } }
@@ -49,3 +52,16 @@ button.rs-btn { font-family: var(--font-display); }
 @keyframes rs-enter { from { opacity: 0; transform: translateY(10px); } }
 .rs-page > main { animation: rs-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 @media (prefers-reduced-motion: reduce) { .rs-page > main { animation: rs-arrive-fade 160ms ease-out both; } }
+
+/* impeccable adapt: touch targets for inline text links, paywall reflow */
+@media (pointer: coarse) { .rs-link { display: inline-block; padding-block: 13px; margin-block: -13px; } }
+.rs-paywall { grid-template-columns: minmax(0, 1fr) minmax(0, 440px); }
+@container page (max-width: 960px) {
+  .rs-paywall { grid-template-columns: minmax(0, 1fr) !important; max-width: 560px; margin: 0 auto; }
+}
+/* Phone: 15 bars are ~16px wide, numbers don't fit. Keep the number only on today's bar; colour carries done/ahead. */
+@container page (max-width: 760px) {
+  .rs-eq { gap: 4px; height: 112px !important; }
+  .rs-eq > i { border-radius: 6px; }
+  .rs-eq > i:not(.t):not(.c) { font-size: 0; padding: 0; }
+}
