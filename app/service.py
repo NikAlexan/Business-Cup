@@ -3,6 +3,7 @@ import hashlib
 import json
 import shutil
 from datetime import date, datetime, timedelta
+from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 from itsdangerous import BadSignature, URLSafeTimedSerializer
@@ -530,6 +531,41 @@ class Service:
                         return p, lesson, item
         fail(404, "not_found", "Plan item not found.")
 
+    def recording_check_state(self, record):
+        job_id = record.get("check_job_id")
+        if not job_id:  # Legacy uploads did not persist the job pointer.
+            job_id = next(
+                (
+                    j.id
+                    for j in self.db.scalars(select(Job).where(Job.guest_id == self.guest.id))
+                    if j.data.get("recording_id") == record["id"] and j.data["type"] == "recording_check"
+                ),
+                None,
+            )
+        return (
+            {
+                "recording_id": record["id"],
+                "job_id": job_id,
+                "practice_only": bool(record.get("practice_only")),
+                "based_on_attempt_id": (record.get("practice_focus") or {}).get("attempt_id"),
+                "practice_focus": record.get("practice_focus"),
+                "status": record["status"],
+            }
+            if job_id
+            else None
+        )
+
+    def assessment_state(self, assessment_id):
+        assessment = self.get(assessment_id, "assessment")
+        records = {r["id"]: r for r in self.all("recording") if r.get("assessment_id") == assessment["id"]}
+        for task in assessment["tasks"]:
+            task["pending_take"] = None
+            record = records.get(task.get("pending_recording_id") or task.get("last_upload_id"))
+            if record and record["status"] in ("queued", "processing", "failed"):
+                if record["status"] != "failed" or task.get("quality_status") != "accepted":
+                    task["pending_take"] = self.recording_check_state(record)
+        return assessment
+
     def item_state(self, item_id):
         plan, lesson, item = self.find_item(item_id)
         attempted = {a.get("recording_id") for a in self.all("attempt") if a["plan_item_id"] == item["id"]}
@@ -545,25 +581,7 @@ class Service:
         pending = None
         if records:
             record = max(records, key=lambda r: (r["created_at"], r["id"]))
-            job_id = record.get("check_job_id")
-            if not job_id:  # Legacy uploads did not persist the job pointer.
-                job_id = next(
-                    (
-                        j.id
-                        for j in self.db.scalars(select(Job).where(Job.guest_id == self.guest.id))
-                        if j.data.get("recording_id") == record["id"] and j.data["type"] == "recording_check"
-                    ),
-                    None,
-                )
-            if job_id:
-                pending = {
-                    "recording_id": record["id"],
-                    "job_id": job_id,
-                    "practice_only": bool(record.get("practice_only")),
-                    "based_on_attempt_id": (record.get("practice_focus") or {}).get("attempt_id"),
-                    "practice_focus": record.get("practice_focus"),
-                    "status": record["status"],
-                }
+            pending = self.recording_check_state(record)
         return {
             "plan_id": plan["id"],
             "plan_status": plan["status"],
@@ -594,8 +612,48 @@ class Service:
             fail(404, "not_found", "The source take does not belong to this exercise.")
         return {"attempt_id": source["id"], "note": source.get("reflection", {}).get("note", "")}
 
-    def upload(self, upload, fields, mime_type):
+    def cancel_upload(self, upload_key, item_id):
+        self.auth("daily_training")
+        self.find_item(item_id, practice_only=True)
+        cancel_id = str(uuid5(UUID(self.guest.id), "cancel-upload:" + upload_key))
+        existing = self.db.get(Resource, cancel_id)
+        if existing:
+            if existing.data["plan_item_id"] != str(item_id):
+                fail(409, "upload_cancellation_conflict", "This upload key belongs to another exercise.")
+            return existing.data["result"]
+        prior = self.db.get(Idempotency, digest(self.guest.id + "POST/api/v1/recordings" + upload_key))
+        recording_id = None
+        if prior:
+            recording_id = prior.data.get("recording", {}).get("id")
+            record = self.get(recording_id, "recording")
+            if record.get("plan_item_id") != str(item_id) or not record.get("practice_only"):
+                fail(404, "not_found", "Extra-practice upload not found for this exercise.")
+            self.dismiss_recording(recording_id)
+        elif (
+            sum(
+                self.local_date(c["created_at"]) == self.local_date() for c in self.all("upload_cancellation")
+            )
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily upload cancellation limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        result = {"upload_key": upload_key, "status": "canceled", "recording_id": recording_id}
+        self.put(
+            "upload_cancellation",
+            {"id": cancel_id, "plan_item_id": str(item_id), "created_at": iso(), "result": result},
+        )
+        return result
+
+    def upload(self, upload, fields, mime_type, upload_key=None):
         self.auth("daily_training" if fields["purpose"] == "exercise" else "assessment")
+        if upload_key and self.db.get(
+            Resource, str(uuid5(UUID(self.guest.id), "cancel-upload:" + upload_key))
+        ):
+            fail(409, "upload_canceled", "This upload was canceled. Record a new take to practice again.")
         purpose = fields["purpose"]
         a = task = item = None
         if purpose == "assessment":

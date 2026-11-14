@@ -56,6 +56,10 @@ class Empty(Input):
     pass
 
 
+class CancelUploadInput(Input):
+    plan_item_id: UUID
+
+
 class AttemptInput(Input):
     plan_item_id: UUID
     practice_only: bool = False

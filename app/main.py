@@ -24,6 +24,7 @@ from app.errors import ApiError, fail
 from app.schemas import (
     AssessmentInput,
     AttemptInput,
+    CancelUploadInput,
     CompleteInput,
     Empty,
     GuestInput,
@@ -297,7 +298,7 @@ def create_app(settings=None):
 
     @app.get("/api/v1/assessments/{assessment_id}")
     def assessment(assessment_id: UUID, s: S):
-        return s.get(assessment_id, "assessment")
+        return s.assessment_state(assessment_id)
 
     @app.post("/api/v1/assessments/{assessment_id}/submit")
     def submit(assessment_id: UUID, payload: Empty, request: Request, s: S):
@@ -360,8 +361,12 @@ def create_app(settings=None):
             s,
             request,
             {**fields, "sha256": fingerprint.hexdigest(), "mime_type": mime_type},
-            lambda: s.upload(file, fields, mime_type),
+            lambda: s.upload(file, fields, mime_type, upload_key=key(request)),
         )
+
+    @app.put("/api/v1/recording-uploads/{upload_key}/cancellation")
+    def cancel_upload(upload_key: UUID, payload: CancelUploadInput, s: S):
+        return s.cancel_upload(str(upload_key), payload.plan_item_id)
 
     @app.get("/api/v1/jobs/{job_id}")
     def job(job_id: UUID, s: S):

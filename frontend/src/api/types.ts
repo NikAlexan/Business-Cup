@@ -107,6 +107,7 @@ export type Recording = {
   plan_item_id: string | null
 }
 export type AssessmentTask = {
+  pending_take?: PendingTake | null
   id: string
   kind: string
   order: number
@@ -125,6 +126,7 @@ export type Comparison = {
   metrics: Record<string, { available: boolean; before: unknown; after: unknown; delta: number | null; unit: string }>
 }
 export type Assessment = {
+  recording_conditions?: { device_label: string | null; distance_cm: number | null; environment: string; notes?: string | null }
   id: string
   kind: 'initial' | 'reassessment'
   status: string

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, post, request, useMutationWithKey } from '../api/api'
-import { useAttempt, useAttemptHistory, useJob, useMe, usePlanItem, useRecording } from '../api/hooks'
+import { useAttempt, useAttemptHistory, useMe, usePlanItem, useRecording } from '../api/hooks'
 import type { Attempt, PendingTake, PlanItem } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { DemoNotice } from '../components/DemoNotice'
@@ -15,7 +15,8 @@ import { SpeechReview } from '../components/SpeechReview'
 import { ScriptText } from '../components/ScriptText'
 import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
-import { uploadRecording, useRecorder } from '../lib/recorder'
+import { useRecorder } from '../lib/recorder'
+import { useRecordingCheck } from '../lib/recordingCheck'
 
 import { formatEstimate } from '../lib/format'
 
@@ -75,32 +76,11 @@ function SelfCheck({ onFinish, busy }: { onFinish: () => void; busy: boolean }) 
   )
 }
 
-function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void }) {
-  const qc = useQueryClient()
+function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn, onUploadStarted }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void; onUploadStarted?: (key: string) => void }) {
   const max = Math.min(item.task.verification.max_recording_seconds ?? 90, serverLimit)
   const r = useRecorder({ maxSeconds: max, accepted })
-  const [job, setJob] = useState<{ id: string; rec: string } | null>(() => pendingTake ? { id: pendingTake.job_id, rec: pendingTake.recording_id } : null)
-  const j = useJob(job?.id)
-  const [checkedRecording, setCheckedRecording] = useState<string | null>(null)
-  useEffect(() => setCheckedRecording(null), [r.blob])
-  const [checkError, setCheckError] = useState<string | null>(null)
-  const [failedJob, setFailedJob] = useState<{ id: string; rec: string; retryable: boolean } | null>(null)
-  const retryCheck = useMutationWithKey((id: string, key) => post<{ job_id: string }>('/jobs/' + id + '/retry', {}, key))
-  useEffect(() => { setFailedJob(null); setCheckError(null); retryCheck.reset() }, [r.blob]) // eslint-disable-line react-hooks/exhaustive-deps
-  const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) => uploadRecording({ purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(basedOn ? { based_on_attempt_id: basedOn } : {}) }, v.blob, v.mime, key))
-  useEffect(() => {
-    const s = j.data?.status
-    if (s === 'failed' && job) {
-      setFailedJob({ ...job, retryable: !!j.data?.retryable })
-      setCheckError(j.data?.error?.message ?? 'The recording check failed. Retry the check or record a new take.')
-      setJob(null)
-    }
-    if (job && (s === 'completed' || s === 'needs_rerecord')) {
-      setCheckedRecording(s === 'completed' ? job.rec : null)
-      onRecorded(job.rec)
-      setJob(null)
-    }
-  }, [j.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+  const check = useRecordingCheck({ pendingTake, blob: r.blob, mime: r.mime, onChecked: onRecorded, onUploaded, onUploadStarted,
+    fields: { purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(basedOn ? { based_on_attempt_id: basedOn } : {}) } })
   const recording = r.state === 'recording'
   const spokenText = Array.from({ length: item.task.repetitions ?? 1 }, () => item.task.text).join('\n\n')
   const follow = useSpeechFollow(spokenText, recording)
@@ -108,19 +88,6 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pend
   useEffect(() => setPlayT(null), [r.state])
   const wpm = item.task.verification.target_wpm
   const pacer = wpm && recording ? (r.seconds * (wpm.min + wpm.max)) / 2 / 60 : undefined
-  const send = () => {
-    if (failedJob?.retryable) {
-      retryCheck.mutate(failedJob.id, { onSuccess: () => {
-        qc.setQueryData(['job', failedJob.id], { status: 'queued', poll_after_ms: 2000 })
-        setJob({ id: failedJob.id, rec: failedJob.rec }); setFailedJob(null); setCheckError(null)
-        void qc.invalidateQueries({ queryKey: ['job', failedJob.id] })
-      } })
-      return
-    }
-    setCheckError(null)
-    if (checkedRecording) { onRecorded(checkedRecording); return }
-    if (r.blob && r.mime) upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => { setJob({ id: d.job_id, rec: d.recording.id }); onUploaded({ job_id: d.job_id, recording_id: d.recording.id, practice_only: practiceOnly, status: 'queued' }) } })
-  }
   return (
     <>
       <div className="rs-card rs-stack" style={{ padding: 28, gap: 12 }}>
@@ -131,15 +98,15 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pend
           </span>
         )}
       </div>
-      {j.error && <ErrorBanner error={j.error} onRetry={() => j.refetch()} />}
-      {job && !r.blob && <p role="status">Checking your saved take. You can return here after leaving this page.</p>}
-      {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
-      {retryCheck.error && <ErrorBanner error={retryCheck.error} onRetry={send} />}
-      {checkError && <ErrorBanner text={checkError} onRetry={!retryCheck.isPending && (failedJob?.retryable || r.blob) ? send : undefined} />}
-      {checkedRecording && !r.blob ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
-        <audio controls aria-label="Your checked take" src={'/api/v1/recordings/' + checkedRecording + '/audio'} />
-        <button className="rs-btn" type="button" disabled={busy} onClick={send}>{busy ? 'Saving…' : 'Save checked take'}</button>
-      </div> : !job || r.blob ? <RecorderDock r={r} sending={busy || upload.isPending || retryCheck.isPending || !!job} onSend={send} sendLabel="Check my take" onPlayTime={setPlayT} /> : null}
+      {check.job.error && <ErrorBanner error={check.job.error} onRetry={() => check.job.refetch()} />}
+      {check.checking && !r.blob && <p role="status">Checking your saved take. You can return here after leaving this page.</p>}
+      {check.upload.error && <ErrorBanner error={check.upload.error} onRetry={check.send} />}
+      {check.retry.error && <ErrorBanner error={check.retry.error} onRetry={check.send} />}
+      {check.checkError && <ErrorBanner text={check.checkError} onRetry={check.canRetryCheck ? check.send : undefined} />}
+      {check.checkedRecording && !r.blob ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
+        <audio controls aria-label="Your checked take" src={'/api/v1/recordings/' + check.checkedRecording + '/audio'} />
+        <button className="rs-btn" type="button" disabled={busy} onClick={check.send}>{busy ? 'Saving…' : 'Save checked take'}</button>
+      </div> : !check.checking || r.blob ? <RecorderDock r={r} sending={busy || check.busy} onSend={check.send} sendLabel="Check my take" onPlayTime={setPlayT} /> : null}
     </>
   )
 }
@@ -155,6 +122,7 @@ export default function Exercise() {
   const [localResult, setResult] = useState<Attempt | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const canceling = useRef(false)
+  const uploadKey = useRef<string | null>(null)
   const [repeatSource, setRepeatSource] = useState<string | null>(null)
   const [repeatFor, setRepeatFor] = useState<string | null>(null)
   const [localPending, setLocalPending] = useState<{ itemId: string; take: PendingTake } | null>(null)
@@ -173,9 +141,10 @@ export default function Exercise() {
   const result = latestLocal ?? selected ?? savedAttempt.data ?? null
   const savedRecording = useRecording(result?.recording_id)
   const dismiss = useMutation({ mutationFn: (id: string) => request('/recordings/' + id + '/dismiss', { method: 'PUT', body: {} }) })
+  const cancelUpload = useMutation({ mutationFn: (key: string) => request('/recording-uploads/' + key + '/cancellation', { method: 'PUT', body: { plan_item_id: planItemId } }) })
   const attempt = useMutationWithKey((b: Body, key) => post<Attempt>('/exercise-attempts', b, key))
 
-  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null); setLocalPending(null); setIgnored(new Set()); setRepeatSource(null); canceling.current = false }, [planItemId])
+  useEffect(() => { setResult(null); setRepeatFor(null); setSelectedId(null); setLocalPending(null); setIgnored(new Set()); setRepeatSource(null); canceling.current = false; uploadKey.current = null }, [planItemId])
 
   if (itemState.isPending) return <Frame><Skeleton height={360} /></Frame>
   if (itemState.error) return <Frame><ErrorBanner error={itemState.error} onRetry={() => itemState.refetch()} /><Link className="rs-link" to="/today">Back to today</Link></Frame>
@@ -191,6 +160,7 @@ export default function Exercise() {
       { plan_item_id: item.id, ...(practicingAgain ? { practice_only: true, ...(basedOn ? { based_on_attempt_id: basedOn } : {}) } : {}), ...b },
       {
         onSuccess: (a) => {
+          uploadKey.current = null
           setResult(a)
           setSelectedId(a.id)
           setIgnored((old) => new Set([...old, ...(pendingTake ? [pendingTake.recording_id] : []), ...(a.recording_id ? [a.recording_id] : [])]))
@@ -216,8 +186,9 @@ export default function Exercise() {
     )
   const cancelRepeat = () => {
     canceling.current = true
-    const finish = () => { setRepeatFor(null); setResult(null); attempt.reset(); setLocalPending(null); if (pendingTake) setIgnored((old) => new Set([...old, pendingTake.recording_id])); void itemState.refetch() }
-    if (pendingTake) dismiss.mutate(pendingTake.recording_id, { onSuccess: finish, onError: () => { canceling.current = false } })
+    const finish = () => { uploadKey.current = null; setRepeatFor(null); setResult(null); attempt.reset(); setLocalPending(null); if (pendingTake) setIgnored((old) => new Set([...old, pendingTake.recording_id])); void itemState.refetch() }
+    if (uploadKey.current) cancelUpload.mutate(uploadKey.current, { onSuccess: finish })
+    else if (pendingTake) dismiss.mutate(pendingTake.recording_id, { onSuccess: finish })
     else finish()
   }
   const showOutcome = completed && !practicingAgain
@@ -292,7 +263,7 @@ export default function Exercise() {
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
                   </div>
                 ))}
-                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { canceling.current = false; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
+                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { canceling.current = false; uploadKey.current = null; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
                   Practice again — no extra notes
                 </button>
                 <button className="rs-btn rs-btn--wide" type="button" onClick={goNext} style={{ alignSelf: 'flex-start' }}>
@@ -301,8 +272,9 @@ export default function Exercise() {
               </div>
             ) : (
               <>
-                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.{(pendingTake?.practice_focus?.note || result?.reflection?.note) && <span> Your saved focus: {pendingTake?.practice_focus?.note || result?.reflection?.note}</span>}</span><button className="rs-link" type="button" disabled={attempt.isPending || dismiss.isPending} onClick={cancelRepeat}>Cancel extra practice</button></div>}
+                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.{(pendingTake?.practice_focus?.note || result?.reflection?.note) && <span> Your saved focus: {pendingTake?.practice_focus?.note || result?.reflection?.note}</span>}</span><button className="rs-link" type="button" disabled={attempt.isPending || dismiss.isPending || cancelUpload.isPending} onClick={cancelRepeat}>Cancel extra practice</button></div>}
                 {dismiss.error && <ErrorBanner error={dismiss.error} onRetry={cancelRepeat} />}
+                {cancelUpload.error && <ErrorBanner error={cancelUpload.error} onRetry={cancelRepeat} />}
                 {result?.status === 'needs_retry' && (
                   <div className="rs-banner rs-banner--warn" role="status">
                     <div className="rs-stack" style={{ gap: 2 }}>
@@ -318,7 +290,7 @@ export default function Exercise() {
                 {v.type === 'self_confirmation' && <SelfCheck key={item.id} busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
                 {v.type === 'recording' && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
                 {v.type === 'recording' && me.isPending && <Skeleton height={160} />}
-                {v.type === 'recording' && me.data && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} pendingTake={pendingTake} onUploaded={(take) => { canceling.current = false; setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
+                {v.type === 'recording' && me.data && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
               </>
             )}
             {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>
@@ -326,7 +298,7 @@ export default function Exercise() {
               {history.isPending && <p>Loading your takes…</p>}
               {history.error && <ErrorBanner error={history.error} onRetry={() => history.refetch()} />}
               <ol className="rs-stack" style={{ paddingLeft: 22, gap: 10 }}>
-                {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending} onClick={() => { setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
+                {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending || practicingAgain} onClick={() => { setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
                   {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US', { timeZone: me.data?.preferences?.timezone ?? 'UTC' }) : ''}
                 </button></li>)}
               </ol>

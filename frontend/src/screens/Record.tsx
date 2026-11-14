@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { post, request, useMutationWithKey } from '../api/api'
-import { useAssessment, useJob, useMe } from '../api/hooks'
+import { useAssessment, useMe } from '../api/hooks'
 import type { AssessmentTask, Recording } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
@@ -10,7 +10,8 @@ import { RecorderDock } from '../components/RecorderDock'
 import { ScriptText } from '../components/ScriptText'
 import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
-import { limitFor, uploadRecording, useRecorder } from '../lib/recorder'
+import { limitFor, useRecorder } from '../lib/recorder'
+import { useRecordingCheck } from '../lib/recordingCheck'
 
 const KIND_TITLE: Record<string, string> = {
   control_text: 'Read this passage',
@@ -21,30 +22,8 @@ const KIND_TITLE: Record<string, string> = {
 function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: AssessmentTask; assessmentId: string; accepted: string[]; onChecked: () => void }) {
   const max = Math.min(task.max_duration_seconds, limitFor('assessment'))
   const r = useRecorder({ maxSeconds: max, accepted })
-  const [jobId, setJobId] = useState<string | null>(null)
-  const job = useJob(jobId)
-  const [checkError, setCheckError] = useState<string | null>(null)
-  const upload = useMutationWithKey((v: { blob: Blob; mime: string }, key) =>
-    uploadRecording({ purpose: 'assessment', assessment_id: assessmentId, task_id: task.id }, v.blob, v.mime, key),
-  )
-  useEffect(() => {
-    const s = job.data?.status
-    if (s === 'failed') {
-      setCheckError(job.data?.error?.message ?? 'The recording check failed. Your take is still here; try sending it again.')
-      setJobId(null)
-      onChecked()
-    }
-    if (s === 'completed' || s === 'needs_rerecord') {
-      setJobId(null)
-      r.reset()
-      onChecked()
-    }
-  }, [job.data?.status]) // eslint-disable-line react-hooks/exhaustive-deps
-  const send = () => {
-    setCheckError(null)
-    if (r.blob && r.mime) upload.mutate({ blob: r.blob, mime: r.mime }, { onSuccess: (d) => setJobId(d.job_id) })
-  }
-  const busy = upload.isPending || !!jobId
+  const check = useRecordingCheck({ pendingTake: task.pending_take, fields: { purpose: 'assessment', assessment_id: assessmentId, task_id: task.id },
+    blob: r.blob, mime: r.mime, onChecked: () => { r.reset(); onChecked() } })
   const follow = useSpeechFollow(task.text, r.state === 'recording')
   const [playT, setPlayT] = useState<number | null>(null)
   useEffect(() => setPlayT(null), [r.state])
@@ -56,14 +35,17 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
           Read it at your own pace — there's no time limit to chase.{follow.supported ? ' Words you read turn green.' : ''}
         </span>
       </div>
-      {upload.error && <ErrorBanner error={upload.error} onRetry={send} />}
-      {checkError && <ErrorBanner text={checkError} onRetry={send} />}
-      <RecorderDock
+      {check.job.error && <ErrorBanner error={check.job.error} onRetry={() => check.job.refetch()} />}
+      {check.checking && !r.blob && <p role="status">Checking your saved take. You can return here after leaving this page.</p>}
+      {check.upload.error && <ErrorBanner error={check.upload.error} onRetry={check.send} />}
+      {check.retry.error && <ErrorBanner error={check.retry.error} onRetry={check.send} />}
+      {check.checkError && <ErrorBanner text={check.checkError} onRetry={check.canRetryCheck ? check.send : undefined} />}
+      {(!check.checking || r.blob) && <RecorderDock
         r={r}
-        sending={busy}
+        sending={check.busy}
         onPlayTime={setPlayT}
-        onSend={send}
-      />
+        onSend={check.send}
+      />}
     </>
   )
 }
@@ -77,7 +59,7 @@ export default function Record() {
   const a = useAssessment(id)
   useRedirectOn401(a.error ?? me.error)
   const tasks = [...(a.data?.tasks ?? [])].sort((x, y) => x.order - y.order)
-  const current = tasks.find((t) => t.quality_status !== 'accepted')
+  const current = tasks.find((t) => t.pending_take || t.quality_status !== 'accepted')
   const index = current ? tasks.indexOf(current) : tasks.length
   const rejected = current?.quality_status === 'rejected' ? current : undefined
   const rec = useQuery({
@@ -102,7 +84,7 @@ export default function Record() {
   const progress = Math.round((index / Math.max(1, tasks.length)) * 100)
   return (
     <div className="rs rs-page">
-      <FlowHeader back="/mic-check">
+      <FlowHeader back={a.data.kind === 'reassessment' ? '/mic-check?kind=reassessment' + (a.data.demo_override_used ? '&demo=1' : '') : '/mic-check'}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div className="rs-bar" role="progressbar" aria-valuenow={progress} aria-label={`Task ${Math.min(index + 1, tasks.length)} of ${tasks.length}`}>
@@ -123,6 +105,11 @@ export default function Record() {
                 Task {index + 1} of {tasks.length} · {current.instruction}
               </p>
             </div>
+            {a.data.recording_conditions && <aside className="rs-card rs-stack" aria-label="Saved recording setup" style={{ padding: 16, gap: 4 }}>
+              <strong>Saved recording setup</strong>
+              <span>{a.data.recording_conditions.device_label || 'Microphone not recorded'} · {a.data.recording_conditions.distance_cm ? a.data.recording_conditions.distance_cm + ' cm' : 'Distance not recorded'} · {a.data.recording_conditions.environment.replace(/_/g, ' ')}</span>
+              {a.data.recording_conditions.notes && <span>{a.data.recording_conditions.notes}</span>}
+            </aside>}
             {rejected && (
               <div className="rs-banner rs-banner--warn" role="status">
                 <div className="rs-stack" style={{ gap: 2 }}>

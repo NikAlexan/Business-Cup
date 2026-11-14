@@ -148,3 +148,6 @@ The daily practice loop restores accepted uploads after reload, keeps completed 
 
 
 When provider credentials are configured, each saved accepted exercise recording can start separate background speech coaching. The attempt's `speech_review` survives reload, offers one audio-grounded listening note and one next action, and cannot revoke completion. Configure `EXERCISE_REVIEWS_ENABLED`, `MAX_EXERCISE_REVIEWS_PER_DAY` and `MAX_TOTAL_EXERCISE_REVIEWS_PER_DAY` to control automatic work; these are job-count budgets, not currency caps. Provider calls use actual audio through the existing [Chat Completions audio integration](https://developers.openai.com/api/docs/guides/audio-chat-completions). Automated tests mock paid calls and do not establish real-world coaching accuracy.
+
+
+Baseline/check-in and daily exercises share accepted-upload recovery and saved-check retries. Before a check-in, the mic screen displays and prefills the prior setup; each recording screen also shows the assessment's saved conditions. Canceling extra practice during an in-flight upload uses its original operation UUID: the server either dismisses the accepted take or rejects a later upload. Cancellation is confirmed only when its request succeeds; a cancellation transport error keeps late check results from auto-saving an attempt while the user retries.

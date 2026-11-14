@@ -45,7 +45,7 @@ const savedAttempt = {
     coaching: [{ code: 'pace_outside_target', message: 'For future practice, explore a gentler pace.' }],
     metrics: { speaking_rate_wpm: { available: true, value: 165, unit: 'words/min', unavailable_reason: null } } },
 }
-function setup(item: PlanItem, intercept?: (path: string, init?: RequestInit) => Response | undefined) {
+function setup(item: PlanItem, intercept?: (path: string, init?: RequestInit) => Response | Promise<Response> | undefined) {
   const lesson = { id: 'lesson', items: [item] }
   const transport = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input)
@@ -427,6 +427,101 @@ test('a speech-coaching failure keeps saved audio, reflection and completion ava
   expect(screen.getByLabelText('Your completed take')).toBeTruthy()
   expect(screen.getByRole('textbox', { name: 'What did you hear, and what will you try next?' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Practice again — no extra notes' })).toBeTruthy()
+})
+
+test.each([false, true])('canceling a delayed accepted upload cannot resurrect a repeat, including cancellation failure: %s', async (failCancel) => {
+  vi.spyOn(recorder, 'useRecorder').mockReturnValue({
+    state: 'recorded', level: { level: 0, status: 'waiting' }, seconds: 25, mime: 'audio/webm', blob: new Blob(['take']), url: 'blob:take', error: null, limitReached: false,
+    start: vi.fn(), stop: vi.fn(), reset: vi.fn(),
+  })
+  let resolveUpload!: (response: Response) => void
+  let uploads = 0, cancellations = 0, saves = 0, polls = 0
+  let key = '', canceled = false
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/recordings') {
+      uploads++; key = (init?.headers as Record<string, string>)['Idempotency-Key']
+      return new Promise<Response>((resolve) => { resolveUpload = resolve })
+    }
+    if (path === '/api/v1/recording-uploads/' + key + '/cancellation') {
+      cancellations++
+      expect(JSON.parse(String(init?.body))).toEqual({ plan_item_id: 'item' })
+      if (failCancel && cancellations === 1) return Response.json({ error: { message: 'Cancellation is offline' } }, { status: 503 })
+      canceled = true; return Response.json({ status: 'canceled', recording_id: 'late-recording' })
+    }
+    if (path === '/api/v1/jobs/late-job') { polls++; return Response.json({ status: 'completed' }) }
+    if (path === '/api/v1/exercise-attempts') { saves++; throw Error('Canceled upload cannot become an attempt') }
+  })
+  const view = open('/exercise/item')
+  fireEvent.click(await screen.findByRole('button', { name: 'Practice again — no extra notes' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Check my take' }))
+  await waitFor(() => expect(uploads).toBe(1))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel extra practice' }))
+  if (failCancel) {
+    await screen.findByText('Cancellation is offline')
+    resolveUpload(Response.json({ recording: { id: 'late-recording' }, job_id: 'late-job' }, { status: 202 }))
+    await waitFor(() => expect(polls).toBe(1))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Record again' }) as HTMLButtonElement).disabled).toBe(true))
+    expect(saves).toBe(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+  }
+  await screen.findByRole('heading', { name: 'Practice complete' })
+  if (!failCancel) resolveUpload(Response.json({ recording: { id: 'late-recording' }, job_id: 'late-job' }, { status: 202 }))
+  view.unmount()
+  open('/exercise/item')
+  await screen.findByRole('heading', { name: 'Practice complete' })
+  expect(canceled).toBe(true)
+  expect(saves).toBe(0)
+  expect(uploads).toBe(1)
+  expect(cancellations).toBe(failCancel ? 2 : 1)
+})
+
+test.each(['polling', 'failed'])('baseline resumes a saved quality check without a Blob or reupload: %s', async (mode) => {
+  const reset = vi.fn()
+  vi.spyOn(recorder, 'useRecorder').mockReturnValue({ state: 'idle', level: { level: 0, status: 'waiting' }, seconds: 0, mime: null, blob: null, url: null, error: null, limitReached: false, start: vi.fn(), stop: vi.fn(), reset })
+  let resume = false, accepted = false, uploads = 0, retries = 0
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const path = String(input)
+    if (path === '/api/v1/me') return Response.json({ limits: { accepted_audio_types: ['audio/webm'] } })
+    if (path === '/api/v1/assessments/assessment') return Response.json({ id: 'assessment', status: 'draft', tasks: [{ id: 'task', kind: 'control_text', order: 1, instruction: 'Read naturally.', text: 'A passage.', max_duration_seconds: 60, recording_id: accepted ? 'recording' : null, quality_status: accepted ? 'accepted' : null,
+      pending_take: accepted ? null : { recording_id: 'recording', job_id: 'saved-quality', status: mode === 'failed' ? 'failed' : 'queued', practice_only: false } }] })
+    if (path === '/api/v1/jobs/saved-quality/retry') { retries++; resume = true; return Response.json({ job_id: 'saved-quality' }, { status: 202 }) }
+    if (path === '/api/v1/jobs/saved-quality') {
+      if (resume) { accepted = true; return Response.json({ status: 'completed' }) }
+      return mode === 'polling' ? Response.json({ error: { message: 'Polling offline' } }, { status: 503 }) : Response.json({ status: 'failed', retryable: true, error: { message: 'Check needs retry' } })
+    }
+    if (path === '/api/v1/recordings') { uploads++; throw Error('Must reuse saved recording') }
+    throw Error('Unexpected request: ' + path)
+  }))
+  open('/record?assessment_id=assessment')
+  await screen.findByText(mode === 'polling' ? 'Polling offline' : 'Check needs retry')
+  if (mode === 'polling') resume = true
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+  await screen.findByRole('heading', { name: 'All 1 tasks recorded' })
+  expect(uploads).toBe(0)
+  expect(retries).toBe(mode === 'failed' ? 1 : 0)
+})
+
+test('check-in restores the actual previous setup before recording', async () => {
+  const stop = vi.fn()
+  vi.spyOn(recorder, 'getMic').mockResolvedValue({ getTracks: () => [{ stop }], getAudioTracks: () => [{ label: 'USB microphone' }] } as unknown as MediaStream)
+  vi.spyOn(recorder, 'meter').mockReturnValue(vi.fn())
+  let submitted: Record<string, unknown> | undefined
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(input)
+    if (path === '/api/v1/me') return Response.json({ latest_assessment_id: 'previous' })
+    if (path === '/api/v1/assessments/previous') return Response.json({ id: 'previous', recording_conditions: { device_label: 'USB microphone', distance_cm: 50, environment: 'some_noise', notes: 'Mic on the stand.' } })
+    if (path === '/api/v1/assessments') { submitted = JSON.parse(String(init?.body)); return Response.json({ id: 'new' }, { status: 201 }) }
+    if (path === '/api/v1/assessments/new') return Response.json({ id: 'new', status: 'draft', tasks: [] })
+    throw Error('Unexpected request: ' + path)
+  }))
+  open('/setup?kind=reassessment')
+  await screen.findByRole('heading', { name: 'Previous recording setup' })
+  await waitFor(() => expect((screen.getByLabelText('Distance to the mic') as HTMLSelectElement).value).toBe('50'))
+  expect((screen.getByRole('radio', { name: 'Some noise' }) as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByRole('textbox', { name: 'Setup notes (optional)' }) as HTMLTextAreaElement).value).toBe('Mic on the stand.')
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Start the 3 tasks' }) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'Start the 3 tasks' }))
+  await waitFor(() => expect(submitted?.recording_conditions).toEqual({ device_label: 'USB microphone', distance_cm: 50, environment: 'some_noise', notes: 'Mic on the stand.' }))
 })
 
 test('a completed day still exposes its exercises for review and marks prepared history', async () => {

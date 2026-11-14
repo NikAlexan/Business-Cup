@@ -168,3 +168,73 @@ test('a completed session keeps its exercises reachable for feedback and extra p
   await page.getByRole('button', { name: 'Cancel extra practice' }).click()
   expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
 })
+
+test('baseline resumes an accepted upload after reload and finishes all three recording checks', async ({ page }) => {
+  test.setTimeout(75_000)
+  expect((await page.request.post('/api/v1/guest-session', { headers: { 'Idempotency-Key': randomUUID() }, data: { goal: 'clear_speech', timezone: 'UTC', locale: 'en-US', consent: { audio_processing: true, policy_version: '2026-11-14' } } })).ok()).toBe(true)
+  const created = await page.request.post('/api/v1/assessments', { headers: { 'Idempotency-Key': randomUUID() }, data: { kind: 'initial', recording_conditions: { device_label: 'Browser test microphone', distance_cm: 50, environment: 'quiet_room' } } })
+  expect(created.status()).toBe(201)
+  const assessment = await created.json()
+  let uploads = 0
+  page.on('request', (request) => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/recordings') uploads++ })
+  await page.goto('/record?assessment_id=' + assessment.id)
+  await page.route('**/api/v1/jobs/**', (route) => route.abort('internetdisconnected'))
+  for (let index = 0; index < 3; index++) {
+    await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+    await page.waitForTimeout(9000)
+    await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+    const accepted = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/recordings' && response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Use this take', exact: true }).click()
+    expect((await accepted).status()).toBe(202)
+    if (index === 0) {
+      await page.reload()
+      await page.unroute('**/api/v1/jobs/**')
+    }
+    if (index < 2) await expect(page.getByRole('heading', { name: index === 0 ? 'Read this unfamiliar passage' : 'Read with expression', exact: true })).toBeVisible()
+  }
+  await expect(page.getByRole('heading', { name: 'All 3 tasks recorded' })).toBeVisible()
+  expect(uploads).toBe(3)
+  const saved = await (await page.request.get('/api/v1/assessments/' + assessment.id)).json()
+  expect(saved.tasks.every((task: { quality_status: string; pending_take: unknown }) => task.quality_status === 'accepted' && task.pending_take === null)).toBe(true)
+  // Stop before the separate paid full-profile analysis.
+})
+
+test('cancel during a delayed upload acknowledgment leaves no recoverable extra take', async ({ page }) => {
+  test.setTimeout(65_000)
+  const lesson = await seed(page)
+  const item = lesson.items.find((value) => value.task.verification.type === 'recording')!
+  await page.goto('/exercise/' + item.id)
+  const record = async () => {
+    await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+    await page.waitForTimeout(4000)
+    await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+    await page.getByRole('button', { name: 'Check my take', exact: true }).click()
+  }
+  await record()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  const before = await (await page.request.get('/api/v1/me')).json()
+  let release!: () => void
+  let uploaded: { recording: { id: string } } | undefined
+  await page.route('**/api/v1/recordings', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    const response = await route.fetch()
+    expect(response.status()).toBe(202)
+    uploaded = await response.json()
+    await new Promise<void>((resolve) => { release = resolve })
+    await route.fulfill({ response })
+  })
+  await page.getByRole('button', { name: 'Practice again — no extra notes' }).click()
+  await record()
+  await expect.poll(() => uploaded?.recording.id).toBeTruthy()
+  await page.getByRole('button', { name: 'Cancel extra practice' }).click()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  expect((await (await page.request.get('/api/v1/plan-items/' + item.id)).json()).pending_take).toBeNull()
+  release()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  const takes = await (await page.request.get('/api/v1/exercise-attempts?plan_item_id=' + item.id)).json()
+  expect(takes.items.some((take: { recording_id: string }) => take.recording_id === uploaded!.recording.id)).toBe(false)
+  expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
+})

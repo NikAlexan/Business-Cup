@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { request } from './api'
 import type { Assessment, Attempt, Exercise, Job, Me, Plan, PlanItemState, Progress, Recording, Today } from './types'
 
-export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => request<Me>('/me') })
+export const useMe = (enabled = true) => useQuery({ queryKey: ['me'], queryFn: () => request<Me>('/me'), enabled })
 export const useToday = () => useQuery({ queryKey: ['today'], queryFn: () => request<Today>('/today') })
 export const usePlan = () => useQuery({ queryKey: ['plan'], queryFn: () => request<Plan>('/plan') })
 export const useProgress = () => useQuery({ queryKey: ['progress'], queryFn: () => request<Progress>('/progress') })
