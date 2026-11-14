@@ -1,4 +1,4 @@
-import { LevelMeter, STATUS_TEXT, useLevelStatus } from './LevelMeter'
+import { LevelMeter, STATUS_TEXT } from './LevelMeter'
 import { MicBlocked } from './MicBlocked'
 import type { useRecorder } from '../lib/recorder'
 
@@ -18,7 +18,7 @@ const StopIcon = () => (
 
 // Record → stop (or auto-stop at the limit) → listen → send or record again.
 export function RecorderDock({ r, max, sending, onSend, sendLabel = 'Use this take' }: { r: ReturnType<typeof useRecorder>; max: number; sending: boolean; onSend: () => void; sendLabel?: string }) {
-  const status = useLevelStatus(r.level)
+  const status = r.level.status
   if (r.error) return <MicBlocked kind={r.error} onRetry={r.start} />
   if (r.state === 'recorded' && r.url)
     return (
@@ -52,7 +52,7 @@ export function RecorderDock({ r, max, sending, onSend, sendLabel = 'Use this ta
       <button className="rs-rec" type="button" aria-label={on ? 'Stop recording' : 'Start recording'} onClick={on ? r.stop : r.start} style={{ marginBottom: 5, cursor: 'pointer' }}>
         {on ? <StopIcon /> : <MicIcon />}
       </button>
-      <LevelMeter level={r.level} label={'Input level: ' + STATUS_TEXT[status]} />
+      <LevelMeter level={r.level.level} label={'Input level: ' + STATUS_TEXT[status]} />
     </div>
   )
 }

@@ -21,3 +21,15 @@ test('poll and limits', () => {
   expect(limitFor('exercise')).toBe(90)
   expect(limitFor('assessment')).toBe(60)
 })
+
+test('level judge ignores the opening click and pauses between words', async () => {
+  const { createLevelJudge } = await import('./recorder')
+  const j = createLevelJudge()
+  expect(j(0.5, 1, 0)).toBe('waiting') // click on open
+  expect(j(0.01, 0.02, 800)).toBe('waiting') // quiet room
+  expect(j(0.12, 0.3, 1000)).toBe('good') // speech
+  expect(j(0.01, 0.02, 2500)).toBe('good') // pause between words
+  expect(j(0.01, 0.02, 3200)).toBe('waiting') // silence for > 2 s
+  for (const t of [3300, 3400, 3500]) j(0.4, 1, t)
+  expect(j(0.4, 1, 3600)).toBe('loud') // sustained clipping
+})

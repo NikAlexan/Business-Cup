@@ -4,10 +4,10 @@ import { ApiError, post, useMutationWithKey } from '../api/api'
 import type { Assessment } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { FlowHeader } from '../components/FlowHeader'
-import { LevelMeter, STATUS_TEXT, useLevelStatus } from '../components/LevelMeter'
+import { LevelMeter, STATUS_TEXT } from '../components/LevelMeter'
 import { MicBlocked } from '../components/MicBlocked'
 import { ErrorBanner } from '../components/ui'
-import { getMic, meter, micErrorKind, type MicErrorKind } from '../lib/recorder'
+import { getMic, meter, micErrorKind, type Level, type MicErrorKind } from '../lib/recorder'
 
 const ENVS = [
   ['quiet_room', 'Quiet room'],
@@ -21,12 +21,11 @@ export default function MicCheck() {
   const [params] = useSearchParams()
   const reassessment = params.get('kind') === 'reassessment'
   const [error, setError] = useState<MicErrorKind | null>(null)
-  const [level, setLevel] = useState(0)
+  const [{ level, status }, setLevel] = useState<Level>({ level: 0, status: 'waiting' })
   const [device, setDevice] = useState('')
   const [distance, setDistance] = useState(20)
   const [env, setEnv] = useState<string>('quiet_room')
   const stopRef = useRef<() => void>(() => {})
-  const status = useLevelStatus(level)
 
   const open = useCallback(async () => {
     setError(null)

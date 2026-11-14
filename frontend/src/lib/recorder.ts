@@ -41,26 +41,54 @@ export async function getMic(timeoutMs = 10_000): Promise<MediaStream> {
   }
 }
 
-// Level 0..1 from an AnalyserNode (RMS), polled by rAF. Returns a stop function.
-export function meter(stream: MediaStream, onLevel: (v: number) => void): () => void {
+export type LevelStatus = 'waiting' | 'good' | 'loud'
+export type Level = { level: number; status: LevelStatus }
+
+// Classifies mic input over time, not per frame: pauses between words are normal,
+// the noise floor differs per room/mic, and opening the mic often clicks.
+export function createLevelJudge() {
+  let floor = 0.02
+  let voiceAt = -Infinity
+  let clips: number[] = []
+  let start = -1
+  return (rms: number, peak: number, now: number): LevelStatus => {
+    if (start < 0) start = now
+    if (now - start < 700) return 'waiting'
+    floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * 0.999 + rms * 0.001
+    if (rms > Math.max(0.012, floor * 2.5)) voiceAt = now
+    if (peak >= 0.99) clips.push(now)
+    clips = clips.filter((t) => now - t < 1500)
+    if (clips.length >= 3) return 'loud'
+    return now - voiceAt < 2000 ? 'good' : 'waiting'
+  }
+}
+
+// AnalyserNode RMS for the bars plus a judged status, ~15 updates/s. Returns a stop function.
+export function meter(stream: MediaStream, onLevel: (v: Level) => void): () => void {
   const ctx = new AudioContext()
   const analyser = ctx.createAnalyser()
   analyser.fftSize = 1024
   ctx.createMediaStreamSource(stream).connect(analyser)
   const buf = new Float32Array(analyser.fftSize)
+  const judge = createLevelJudge()
   let raf = 0
   let smooth = 0
   let last = 0
   const tick = (now = 0) => {
     analyser.getFloatTimeDomainData(buf)
     let sum = 0
-    for (const v of buf) sum += v * v
-    const rms = Math.min(1, Math.sqrt(sum / buf.length) * 4)
-    // Fast attack, slow release: bars follow the voice without flicker between syllables.
-    smooth = rms > smooth ? rms : smooth * 0.9 + rms * 0.1
+    let peak = 0
+    for (const v of buf) {
+      sum += v * v
+      peak = Math.max(peak, Math.abs(v))
+    }
+    const rms = Math.sqrt(sum / buf.length)
+    const status = judge(rms, peak, now)
+    const display = Math.min(1, rms * 5)
+    smooth = display > smooth ? display : smooth * 0.9 + display * 0.1 // fast attack, slow release
     if (now - last > 66) {
       last = now
-      onLevel(smooth)
+      onLevel({ level: smooth, status })
     }
     raf = requestAnimationFrame(tick)
   }
@@ -75,7 +103,7 @@ type State = 'idle' | 'recording' | 'recorded'
 
 export function useRecorder({ maxSeconds, accepted }: { maxSeconds: number; accepted: string[] }) {
   const [state, setState] = useState<State>('idle')
-  const [level, setLevel] = useState(0)
+  const [level, setLevel] = useState<Level>({ level: 0, status: 'waiting' })
   const [seconds, setSeconds] = useState(0)
   const [blob, setBlob] = useState<Blob | null>(null)
   const [url, setUrl] = useState<string | null>(null)
@@ -120,7 +148,7 @@ export function useRecorder({ maxSeconds, accepted }: { maxSeconds: number; acce
         setBlob(b)
         setMime(actual)
         setUrl(URL.createObjectURL(b))
-        setLevel(0)
+        setLevel({ level: 0, status: 'waiting' })
         setState('recorded')
       }
       rec.current = r
