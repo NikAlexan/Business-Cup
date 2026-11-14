@@ -14,7 +14,7 @@ export function RewardChips({ streak, notes, seconds, style, className }: { stre
         <NoteIcon /> {notes}
       </span>
       {seconds !== undefined && (
-        <span className="rs-chip" title="Practice time">
+        <span className="rs-chip d-only" title="Practice time">
           <ClockIcon /> {formatMinutes(seconds)}
         </span>
       )}

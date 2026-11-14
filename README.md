@@ -20,6 +20,8 @@ docker compose up --build -d
 
 Compose запускает `frontend` (nginx: статика SPA и прокси `/api`, `/health`, `/docs` в `web`), `web`, `worker` и PostgreSQL. Наружу опубликован только `frontend` (`WEB_PORT`, по умолчанию 8080): фронт и API на одном origin, поэтому cookie сессии работает без CORS. Миграции Alembic применяются перед запуском web/worker; advisory lock сериализует миграторы. Общие volumes `audio_data` и `pg_data` сохраняются после обычного `docker compose down`. Команда `docker compose down -v` удаляет их.
 
+Для локальной разработки бэкенда: `docker compose -f compose.yaml -f compose.dev.yaml up -d`. Код `app/` монтируется в контейнеры, `web` перезапускается сам при изменениях, `worker` — через `docker compose restart worker`. Образ пересобирать только после изменения зависимостей или `Dockerfile`.
+
 По умолчанию порты приложения и базы привязаны к localhost. Для внешней демонстрации поставить HTTPS reverse proxy и настроить `ALLOWED_ORIGINS` и `COOKIE_SECURE=true`. `getUserMedia` на удалённом HTTP-адресе не предназначен для записи микрофона.
 
 В контейнере `DATABASE_URL` указывает на Compose-сервис `db`; значение в `.env` используется для локального Python-процесса. При изменении пароля изменить `POSTGRES_PASSWORD` и локальный `DATABASE_URL` согласованно. Не менять пароль уже инициализированного volume без изменения роли в PostgreSQL.

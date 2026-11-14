@@ -89,3 +89,7 @@ class VoiceReport(Input):
     limitations: list[str] = Field(min_length=1, max_length=8)
     priorities: list[Priority] = Field(min_length=1, max_length=2)
     recommended_exercise_ids: list[str] = Field(min_length=1, max_length=12)
+
+
+class CheckoutInput(Input):
+    interval: Literal["month", "year"]

@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 
-from app.access import NoBillingAccessPolicy
+from app.billing import has_access, view
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
 from app.errors import fail
@@ -37,7 +37,6 @@ class Service:
         self.db, self.settings = db, settings
         self.signer = URLSafeTimedSerializer(settings.app_secret.get_secret_value(), salt="voice-guest-v1")
         self.guest = None
-        self.policy = NoBillingAccessPolicy()
         if cookie:
             try:
                 gid = self.signer.loads(cookie, max_age=31536000)
@@ -53,7 +52,7 @@ class Service:
     def auth(self, capability=None):
         if not self.guest:
             fail(401, "session_required", "Create a guest session first.")
-        if capability and not self.policy.check_access(self.guest.subject_id, capability):
+        if capability and not has_access(self.settings, self.guest, capability):
             fail(403, "access_denied", "This capability is not available.")
         return self.guest
 
@@ -175,8 +174,13 @@ class Service:
             for plan in self.all("plan")
             for lesson in plan["lessons"]
         )
+        practiced = {}
+        for a in self.all("attempt"):
+            if a["status"] == "passed":
+                practiced[a["plan_item_id"]] = practiced.get(a["plan_item_id"], 0) + a.get("practice_seconds", 0)
         for lesson in p["lessons"]:
             annotate_notes(lesson)
+            lesson["practice_seconds"] = sum(practiced.get(i["id"], 0) for i in lesson["items"])
         for i, lesson in enumerate(p["lessons"]):
             if lesson["status"] == "completed":
                 continue
@@ -223,9 +227,9 @@ class Service:
             "current_plan_id": p["id"] if p else None,
             "reassessment": self.reassessment(),
             "capabilities": {
-                c: self.policy.check_access(self.guest.subject_id, c)
-                for c in ("assessment", "daily_training")
+                c: has_access(self.settings, self.guest, c) for c in ("assessment", "daily_training")
             },
+            "subscription": view(self.settings, self.guest),
             "progress": {
                 "completed_lessons": p["completed_lessons"] if p else 0,
                 "total_lessons": p["total_lessons"] if p else 0,
@@ -258,7 +262,8 @@ class Service:
         return status, data
 
     def create_assessment(self, payload):
-        self.auth("assessment")
+        # Baseline is free; the 14-day check-in is part of the subscription.
+        self.auth("daily_training" if payload["kind"] == "reassessment" else "assessment")
         active = next((a for a in self.assessments() if a["status"] in ACTIVE), None)
         if active:
             fail(

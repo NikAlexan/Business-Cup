@@ -26,8 +26,8 @@ export const ClockIcon = () => (
     <path d="M12 7v5l3 2" />
   </svg>
 )
-export const Check = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+export const Check = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="m5 12 5 5 9-10" />
   </svg>
 )

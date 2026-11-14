@@ -464,6 +464,8 @@ def test_rewards_follow_completed_practice(client, worker, speech_file):
     assert me["notes_total"] == sum(expected.values())
     assert me["practice_seconds_total"] == done["session_reward"]["practice_seconds"]
     assert client.get("/api/v1/progress").json()["summary"]["notes_total"] == me["notes_total"]
+    days = {x["id"]: x["practice_seconds"] for x in client.get("/api/v1/plan").json()["lessons"]}
+    assert days[lesson["id"]] == me["practice_seconds_total"] and sum(days.values()) == days[lesson["id"]]
 
     assert client.delete("/api/v1/guest-data").status_code == 204
     guest(client)
