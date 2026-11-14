@@ -18,8 +18,9 @@ const REASON = { exercise_completed: 'Exercise complete', quality_bonus: 'Clean 
 
 type Body = { plan_item_id: string; elapsed_seconds?: number; self_confirmed?: boolean; recording_id?: string }
 
-function TimerCheck({ min, onFinish, busy }: { min: number; onFinish: (s: number) => void; busy: boolean }) {
+function TimerCheck({ text, min, onFinish, busy }: { text: string; min: number; onFinish: (s: number) => void; busy: boolean }) {
   const [running, setRunning] = useState(false)
+  const follow = useSpeechFollow(text, running) // ponytail: pause/resume restarts the highlight
   const [elapsed, setElapsed] = useState(0)
   const started = useRef(0)
   useEffect(() => {
@@ -29,6 +30,10 @@ function TimerCheck({ min, onFinish, busy }: { min: number; onFinish: (s: number
     return () => clearInterval(t)
   }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
+    <>
+    <div className="rs-card" style={{ padding: 28 }}>
+      <ScriptText text={text} read={follow.read} />
+    </div>
     <div className="rs-dock">
       <div className="rs-stack" style={{ alignItems: 'center', gap: 4 }}>
         <span style={{ font: '600 28px var(--font-display)' }}>
@@ -45,6 +50,7 @@ function TimerCheck({ min, onFinish, busy }: { min: number; onFinish: (s: number
         </button>
       </div>
     </div>
+    </>
   )
 }
 
@@ -176,7 +182,7 @@ export default function Exercise() {
             )}
           </div>
           <div className="rs-stack" style={{ gap: 16 }}>
-            {(v.type !== 'recording' || passed) && (
+            {(v.type === 'self_confirmation' || passed) && (
               <div className="rs-card" style={{ padding: 28 }}>
                 <ScriptText text={item.task.text} />
               </div>
@@ -206,7 +212,7 @@ export default function Exercise() {
                   </div>
                 )}
                 {attempt.error && !(attempt.error instanceof ApiError && attempt.error.code === 'plan_item_already_completed') && <ErrorBanner error={attempt.error} />}
-                {v.type === 'timer' && <TimerCheck key={result?.id} min={v.min_elapsed_seconds ?? 30} busy={attempt.isPending} onFinish={(s) => submit({ elapsed_seconds: s })} />}
+                {v.type === 'timer' && <TimerCheck key={result?.id} text={item.task.text} min={v.min_elapsed_seconds ?? 30} busy={attempt.isPending} onFinish={(s) => submit({ elapsed_seconds: s })} />}
                 {v.type === 'self_confirmation' && <SelfCheck busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
                 {v.type === 'recording' && me.data && <RecordCheck item={item} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending} onRecorded={(id) => submit({ recording_id: id })} />}
               </>
