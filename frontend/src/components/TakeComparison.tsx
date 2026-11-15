@@ -1,3 +1,4 @@
+import { AudioPlayer } from './AudioPlayer'
 import { useAttempt } from '../api/hooks'
 import type { Attempt } from '../api/types'
 import { ErrorBanner } from './ui'
@@ -19,12 +20,12 @@ export function TakeComparison({ take }: { take: Attempt }) {
       ? [{ ...row, first: row.format(first.value), latest: row.format(latest.value) }] : []
   }) : []
   return <section className="rs-stack" aria-label="Compare with your previous take" style={{ gap: 10 }}>
-    <h3 className="rs-h" style={{ fontSize: 20 }}>Compare with your previous take</h3>
+    <h3 className="rs-h rs-h3">Compare with your previous take</h3>
     {previous.isPending && <p>Loading the previous take…</p>}
     {previous.error && <ErrorBanner error={previous.error} onRetry={() => previous.refetch()} />}
     {before?.recording_id && <>
       <span className="rs-label">Previous take · use the player above for this take</span>
-      <audio controls preload="metadata" aria-label="Previous take for comparison" src={'/api/v1/recordings/' + before.recording_id + '/audio'} style={{ width: '100%' }} />
+      <AudioPlayer preload="metadata" aria-label="Previous take for comparison" src={'/api/v1/recordings/' + before.recording_id + '/audio'} />
     </>}
     {currentIntent === 'keep' && <p className="rs-label">You chose to keep a useful feature for this take.</p>}
     {currentIntent === 'undecided' && <p className="rs-label">You chose to listen again before deciding on a change.</p>}

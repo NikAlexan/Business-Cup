@@ -1,3 +1,4 @@
+import { AudioPlayer } from '../components/AudioPlayer'
 import { useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAssessment, useExercises, useMe } from '../api/hooks'
@@ -40,8 +41,8 @@ export default function Profile() {
   const taskTitle = (kind: string) => ({ control_text: 'Control passage', novel_text: 'Unfamiliar passage', intonation: 'Expression task' }[kind] ?? kind.replace(/_/g, ' '))
   return (
     <AppShell>
-      <div className="rs-stack" style={{ gap: 24 }}>
-        <div className="rs-stack" style={{ gap: 6 }}>
+      <div className="rs-stack rs-gap-5">
+        <div className="rs-stack rs-gap-2">
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <h1 className="rs-h rs-h1">{re ? 'Your check-in' : 'Your voice profile'}</h1>
             {(d.demo_override_used || d.analysis_metadata?.demo?.prepared_data) && (
@@ -61,24 +62,27 @@ export default function Profile() {
         </div>
         {re && d.comparison && (
           <div className="rs-banner rs-banner--info">
-            <div className="rs-stack" style={{ gap: 6 }}><span>{d.comparison.summary}</span>{d.comparison.limitations?.map((note, index) => <span key={index}>{note}</span>)}</div>
+            <div className="rs-stack rs-gap-2"><span>{d.comparison.summary}</span>{d.comparison.limitations?.map((note, index) => <span key={index}>{note}</span>)}</div>
           </div>
         )}
         {re && d.comparison && <section className="rs-card rs-stack" aria-label="Before and after recordings" style={{ padding: 24, gap: 16 }}>
-          <h2 className="rs-h" style={{ fontSize: 22 }}>Listen before and after</h2>
+          <h2 className="rs-h rs-h2">Listen before and after</h2>
           {!d.comparison.audio_pairs?.length && <p>Matching recordings are not available for this check-in.</p>}
-          {d.comparison.audio_pairs?.map((pair) => <div key={pair.kind} className="rs-stack" style={{ gap: 8 }}>
+          {d.comparison.audio_pairs?.map((pair) => <div key={pair.kind} className="rs-stack rs-gap-2">
             <h3 className="rs-h" style={{ fontSize: 18 }}>{taskTitle(pair.kind)}</h3>
             {pair.kind === 'novel_text' && <p className="rs-label">These unfamiliar passages use different texts; compare the delivery rather than matching individual words.</p>}
-            <label className="rs-stack" style={{ gap: 6 }}>Before<audio controls preload="metadata" aria-label={'Before: ' + pair.kind} src={pair.before_audio_url} style={{ width: '100%' }} /></label>
-            <label className="rs-stack" style={{ gap: 6 }}>After<audio controls preload="metadata" aria-label={'After: ' + pair.kind} src={pair.after_audio_url} style={{ width: '100%' }} /></label>
+            {/* Mockup: before and after side by side, so the two takes read as one comparison. */}
+            <div className="rs-grid2">
+              <AudioPlayer title="Before" preload="metadata" aria-label={'Before: ' + pair.kind} src={pair.before_audio_url} />
+              <AudioPlayer title="After" preload="metadata" aria-label={'After: ' + pair.kind} src={pair.after_audio_url} />
+            </div>
           </div>)}
         </section>}
         {!d.comparison?.audio_pairs?.length && (d.tasks ?? []).some((task) => task.recording_id) && <section className="rs-card rs-stack" aria-label="Assessment recordings" style={{ padding: 24, gap: 16 }}>
-          <h2 className="rs-h" style={{ fontSize: 22 }}>Listen to your assessment recordings</h2>
+          <h2 className="rs-h rs-h2">Listen to your assessment recordings</h2>
           {(d.tasks ?? []).filter((task) => task.recording_id).map((task) => <div className="rs-stack" key={task.id} style={{ gap: 8 }}>
             <h3 className="rs-h" style={{ fontSize: 18 }}>{taskTitle(task.kind)}</h3>
-            <audio controls preload="none" aria-label={taskTitle(task.kind) + ' recording'} src={'/api/v1/recordings/' + task.recording_id + '/audio'} style={{ width: '100%' }} />
+            <AudioPlayer preload="none" aria-label={taskTitle(task.kind) + ' recording'} src={'/api/v1/recordings/' + task.recording_id + '/audio'} />
             <details><summary>Read the recorded script</summary><p>{task.text}</p></details>
           </div>)}
         </section>}
@@ -92,7 +96,7 @@ export default function Profile() {
         </details>}
         <div className="rs-cols">
           <div className="rs-card rs-stack" style={{ gap: 10, padding: 24 }}>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>What we noticed</h2>
+            <h2 className="rs-h rs-h3">What we noticed</h2>
             {d.report?.summary && <p style={{ margin: 0 }}>{d.report.summary}</p>}
             {d.report?.observations.map((o, i) => (
               <p key={i} style={{ margin: 0 }}>{o.text}</p>
@@ -101,26 +105,27 @@ export default function Profile() {
               AI listening observations can be mistaken. Check them against your recordings; they are not a diagnosis.
             </p>
           </div>
-          <div className="rs-stack" style={{ gap: 10 }}>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>
+          <div className="rs-stack rs-gap-3">
+            <h2 className="rs-h rs-h3">
               {(d.report?.priorities.length ?? 0) > 1 ? 'Two things to practice' : 'What to practice'}
             </h2>
-            {d.report?.priorities.slice(0, 2).map((p, i) => (
+            {d.report?.priorities.slice(0, 2).map((p, i, all) => { const dupTag = (t: string) => all.filter((x) => label(x.tag) === label(t)).length > 1; return (
               <div key={p.tag + i} className="rs-opt" style={{ boxShadow: 'none' }}>
                 <span className="rs-opt__icon" style={{ background: 'var(--sun)' }}>{i + 1}</span>
                 <span>
-                  <span className="rs-opt__title">{label(p.tag)}</span>
-                  <span className="rs-opt__meta">{[p.reason, ...p.exercise_ids.map(title).filter(Boolean)].join(' · ')}</span>
+                  {/* As in the mockup: category title. Two priorities can share a tag; then the exercise name tells them apart. */}
+                  <span className="rs-opt__title">{(dupTag(p.tag) && p.exercise_ids.map(title).filter(Boolean).join(' · ')) || label(p.tag)}</span>
+                  <span className="rs-opt__meta">{[p.reason, ...(dupTag(p.tag) ? [] : p.exercise_ids.map(title).filter(Boolean))].join(' · ')}</span>
                 </span>
               </div>
-            ))}
+            ) })}
             <Link className="rs-btn rs-btn--wide" to="/today" style={{ alignSelf: 'flex-start', marginTop: 8 }}>
               {me.data?.capabilities?.daily_training === false ? 'See my 14-session plan' : re ? 'See my new plan' : 'Start day 1'}
             </Link>
           </div>
         </div>
         {!!d.report?.limitations?.length && <section className="rs-card rs-stack" aria-label="Analysis limitations" style={{ padding: 24, gap: 10 }}>
-          <h2 className="rs-h" style={{ fontSize: 20 }}>Keep in mind</h2>
+          <h2 className="rs-h rs-h3">Keep in mind</h2>
           <ul style={{ margin: 0, paddingLeft: 22 }}>{d.report.limitations.map((note, index) => <li key={index}>{note}</li>)}</ul>
         </section>}
       </div>

@@ -1,5 +1,5 @@
-:root{--ground:#ffffff;--surface:#f7f7f7;--line:#e5e5e5;--ink:#2b2b2b;--muted:#69707c;--primary:#14b3a0;--primary-edge:#0b7a6d;--primary-ink:#0e1a19;--tonal:#e9f6f4;--tonal-edge:#c7e7e1;--sun:#ffc23d;--sun-edge:#e09b00;--sun-ink:#2b2b2b;--record:#f04a2a;--record-edge:#c23417;--sky:#1f8fff;--sky-tint:#e3f1ff;--baseline:#a3a8b0;--success:#0b7a6d;--success-tint:#dff7f3;--warning:#9a5b00;--warning-tint:#fff3d6;--danger:#d6332f;--danger-tint:#ffe4e2;--danger-edge:#a3201d;--stage:#1b2440;--stage-ink:#ffffff;--record-ink:#ffffff;--primary-tint:#dff7f3;--focus:#1f8fff;color-scheme:light;--font-display:"Fredoka",system-ui,sans-serif;--font-text:"Rubik",system-ui,sans-serif}
-@media (prefers-color-scheme:dark){:root{color-scheme:dark;--ground:#14181f;--surface:#1e242d;--line:#343c47;--ink:#f1f4f7;--muted:#9aa5b1;--primary:#2fd8c1;--primary-edge:#1fa592;--primary-ink:#0e1a19;--primary-tint:#163a36;--sun:#ffd25e;--sun-edge:#c79a1f;--sun-ink:#14181f;--record:#ff7a5c;--record-edge:#d4583d;--record-ink:#14181f;--sky:#5fb0ff;--sky-tint:#1a2c44;--baseline:#5d6673;--success:#2fd8c1;--success-tint:#163a36;--warning:#ffd25e;--warning-tint:#3a2f14;--danger:#ff8a80;--danger-tint:#45252a;--danger-edge:#c2564d;--focus:#5fb0ff;--stage:#0d1220;--stage-ink:#f1f4f7;--tonal:#203431;--tonal-edge:#162624}}
+:root{--ground:#ffffff;--surface:#f7f7f7;--line:#e5e5e5;--ink:#2b2b2b;--muted:#69707c;--primary:#14b3a0;--primary-edge:#0b7a6d;--primary-ink:#0e1a19;--tonal:#e9f6f4;--tonal-edge:#c7e7e1;--sun:#ffc23d;--sun-edge:#e09b00;--sun-ink:#2b2b2b;--record:#f04a2a;--record-edge:#c23417;--sky:#1f8fff;--sky-tint:#e3f1ff;--sky-ink:#0b62c4;--baseline:#a3a8b0;--success:#0b7a6d;--success-tint:#dff7f3;--warning:#9a5b00;--warning-tint:#fff3d6;--danger:#d6332f;--danger-tint:#ffe4e2;--danger-edge:#a3201d;--stage:#1b2440;--stage-ink:#ffffff;--record-ink:#ffffff;--primary-tint:#dff7f3;--focus:#1f8fff;color-scheme:light;--s-1:4px;--s-2:8px;--s-3:12px;--s-4:16px;--s-5:24px;--r-sm:10px;--r-md:18px;--r-lg:28px;--tap:48px;--font-display:"Fredoka",system-ui,sans-serif;--font-text:"Rubik",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--ground:#14181f;--surface:#1e242d;--line:#343c47;--ink:#f1f4f7;--muted:#9aa5b1;--primary:#2fd8c1;--primary-edge:#1fa592;--primary-ink:#0e1a19;--primary-tint:#163a36;--sun:#ffd25e;--sun-edge:#c79a1f;--sun-ink:#14181f;--record:#ff7a5c;--record-edge:#d4583d;--record-ink:#14181f;--sky:#5fb0ff;--sky-tint:#1a2c44;--sky-ink:#5fb0ff;--baseline:#5d6673;--success:#2fd8c1;--success-tint:#163a36;--warning:#ffd25e;--warning-tint:#3a2f14;--danger:#ff8a80;--danger-tint:#45252a;--danger-edge:#c2564d;--focus:#5fb0ff;--stage:#0d1220;--stage-ink:#f1f4f7;--tonal:#203431;--tonal-edge:#162624}}
 .rs{font:400 17px/1.55 var(--font-text);color:var(--ink);background:var(--ground)}
 .rs *{box-sizing:border-box}
 .rs-h{font-family:var(--font-display);font-weight:600;margin:0;line-height:1.15}
@@ -37,7 +37,7 @@
 .rs-eq>i.t{background:var(--primary);color:var(--primary-ink);box-shadow:0 0 0 2px var(--ground),0 0 0 4px var(--primary-edge)}
 .rs-eq>i.c{background:transparent;border:2px dashed var(--sky);color:var(--sky)}
 .rs-top{display:flex;align-items:center;justify-content:space-between;height:56px}
-.rs-iconbtn{width:44px;height:44px;border-radius:50%;border:0;background:var(--surface);display:grid;place-items:center;color:var(--ink)}
+.rs-iconbtn{width:var(--tap);height:var(--tap);border-radius:50%;border:0;background:var(--surface);display:grid;place-items:center;color:var(--ink)}
 .rs-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:2px solid var(--line);background:var(--ground)}
 .rs-tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 14px;font:500 13px var(--font-text);color:var(--muted);text-decoration:none}
 .rs-tab--on{color:var(--success)}
@@ -60,6 +60,9 @@
 .m-only{display:none!important}
 .rs-hero-title{font-size:56px}
 .rs-h1{font-size:40px}
+.rs-h2{font-size:22px}
+.rs-h3{font-size:20px}
+.rs-gap-1{gap:var(--s-1)}.rs-gap-2{gap:var(--s-2)}.rs-gap-3{gap:var(--s-3)}.rs-gap-4{gap:var(--s-4)}.rs-gap-5{gap:var(--s-5)}
 .rs-dock{display:flex;align-items:center;justify-content:center;gap:32px;padding:24px;border-radius:28px;background:var(--surface)}
 .rs-script--big{font-size:28px}
 @container page (max-width: 760px){

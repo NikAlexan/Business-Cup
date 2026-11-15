@@ -88,7 +88,7 @@ export function TakeReflection({ attempt, onSaved, storyId, exerciseId }: { atte
   return <section className="rs-stack" aria-label="Your next practice decision" style={{ gap: 10 }}>
     {canCarry && <fieldset disabled={busy} style={{ margin: 0, padding: 0, border: 0 }}>
       <legend style={{ fontWeight: 500, marginBottom: 8 }}>After listening, what will you do?</legend>
-      <div className="rs-stack" style={{ gap: 8 }}>
+      <div className="rs-stack rs-gap-2">
         {INTENTS.map(([value, title]) => <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <input type="radio" name={'intent-' + attempt.id} value={value} checked={chosenIntent === value} onChange={() => setIntentDraft(value === savedIntent ? null : { value, base: intentDraft ? intentDraft.base : savedIntent })} />{title}
         </label>)}
@@ -110,12 +110,12 @@ export function TakeReflection({ attempt, onSaved, storyId, exerciseId }: { atte
     {save.error && <ErrorBanner error={save.error} onRetry={!conflict ? () => save.mutate() : undefined} />}
     {save.isSuccess && !dirty && <span className="rs-label" role="status">Reflection saved with this take.</span>}
     <button className="rs-btn rs-btn--secondary" type="button" disabled={busy || conflict || !dirty} onClick={() => save.mutate()} style={{ alignSelf: 'flex-start' }}>Save reflection</button>
-    {canCarry && chosenIntent === 'undecided' && <div className="rs-stack" style={{ gap: 6 }}>
+    {canCarry && chosenIntent === 'undecided' && <div className="rs-stack rs-gap-2">
       <p style={{ margin: 0 }}>You can listen again without choosing a change. This note stays with the take.</p>
       {active && <p className="rs-label">Your existing story focus stays in place until you replace or clear it. <Link className="rs-link" to="/today">Review current focus</Link></p>}
     </div>}
-    {canCarry && chosenIntent !== 'undecided' && <div className="rs-stack" style={{ gap: 10 }}>
-      <label className="rs-stack" style={{ gap: 6 }}>Focus for story practice
+    {canCarry && chosenIntent !== 'undecided' && <div className="rs-stack rs-gap-3">
+      <label className="rs-stack rs-gap-2">Focus for story practice
         <select value={chosenSkill} disabled={busy} onChange={(event) => setSkill(event.target.value)} style={{ font: 'inherit', padding: 10, background: 'var(--ground)', color: 'var(--ink)', border: '2px solid var(--line)', borderRadius: 12 }}>
           <option value="">Suggested for this exercise</option>
           {Object.entries(catalog.data?.skills ?? {}).map(([key, entry]) => <option key={key} value={key}>{entry.label}</option>)}

@@ -18,8 +18,8 @@ const COPY: Record<MicErrorKind, { title: string; badge: string; steps: string[]
 export function MicBlocked({ kind, onRetry }: { kind: MicErrorKind; onRetry: () => void }) {
   const c = COPY[kind]
   return (
-    <div className="rs-stack" style={{ gap: 20 }}>
-      <div className="rs-stack" style={{ gap: 8 }}>
+    <div className="rs-stack rs-gap-5">
+      <div className="rs-stack rs-gap-2">
         <h1 className="rs-h rs-h1">{c.title}</h1>
         <p style={{ margin: 0, color: 'var(--muted)' }}>We need it to hear your voice. Nothing is recorded until you press Record.</p>
       </div>
@@ -32,7 +32,7 @@ export function MicBlocked({ kind, onRetry }: { kind: MicErrorKind; onRetry: () 
         <ol className="rs-stack" style={{ gap: 14, margin: 0, padding: 0, listStyle: 'none' }}>
           {c.steps.map((s, i) => (
             <li key={s} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <span className="rs-opt__icon" style={{ width: 32, height: 32, background: 'var(--sky-tint)', color: 'var(--sky)', fontSize: 14 }}>
+              <span className="rs-opt__icon" style={{ width: 32, height: 32, background: 'var(--sky-tint)', color: 'var(--sky-ink)', fontSize: 14 }}>
                 {i + 1}
               </span>
               <span>{s}</span>

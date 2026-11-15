@@ -27,7 +27,7 @@ export function SpeechReview({ take, onHear }: { take: Attempt; onHear: (seconds
   const report = review?.report
   const decision = listeningDecision(nextListeningIntent(take, live.data) ?? report?.action_intent ?? undefined)
   return <section className="rs-stack" aria-label="Speech coaching" style={{ gap: 10 }}>
-    <h3 className="rs-h" style={{ fontSize: 20 }}>Speech coaching</h3>
+    <h3 className="rs-h rs-h3">Speech coaching</h3>
     {pending && <p role="status">Your take is saved. Speech coaching is being prepared; you can continue and return later.</p>}
     {live.error && <ErrorBanner error={live.error} onRetry={() => live.refetch()} />}
     {job.error && <ErrorBanner error={job.error} onRetry={() => job.refetch()} />}

@@ -48,22 +48,22 @@ export default function Settings() {
   const zones = pref && !ZONES.includes(pref.timezone) ? [pref.timezone, ...ZONES] : ZONES
 
   return (
-    <AppShell>
-      <div className="rs-narrow rs-stack" style={{ gap: 24, margin: '0 auto' }}>
+    <AppShell narrow>
+      <div className="rs-stack rs-gap-5">
         <h1 className="rs-h rs-h1">Settings</h1>
         {!pref ? (
           <Skeleton height={200} />
         ) : (
           <div className="rs-card rs-stack" style={{ gap: 16, padding: 24 }}>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>Practice</h2>
-            <div className="rs-stack" style={{ gap: 6 }}>
+            <h2 className="rs-h rs-h3">Practice</h2>
+            <div className="rs-stack rs-gap-2">
               <label htmlFor="goal" style={{ font: '500 15px var(--font-text)' }}>Goal</label>
               <select id="goal" style={select} value={pref.goal} disabled={save.isPending} onChange={(e) => save.mutate({ goal: e.target.value })}>
                 {GOALS.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
               </select>
               <span className="rs-label">Your current plan stays as it is; the goal shapes the next one.</span>
             </div>
-            <div className="rs-stack" style={{ gap: 6 }}>
+            <div className="rs-stack rs-gap-2">
               <label htmlFor="tz" style={{ font: '500 15px var(--font-text)' }}>Time zone</label>
               <select id="tz" style={select} value={pref.timezone} disabled={save.isPending} onChange={(e) => save.mutate({ timezone: e.target.value })}>
                 {zones.map((z) => <option key={z} value={z}>{z === detected ? z + ' (detected)' : z}</option>)}
@@ -76,7 +76,7 @@ export default function Settings() {
         )}
         {!app.isStandalone && (app.canInstall || app.isIos) && (
           <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>Install the app</h2>
+            <h2 className="rs-h rs-h3">Install the app</h2>
             <p style={{ margin: 0 }}>Open your daily session from the home screen, like any other app.</p>
             {app.canInstall ? (
               <button className="rs-btn" type="button" onClick={app.install} style={{ alignSelf: 'flex-start' }}>Install app</button>
@@ -86,8 +86,8 @@ export default function Settings() {
           </div>
         )}
         {me.data?.demo_mode && (
-          <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>Demo data</h2>
+          <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, border: '2px dashed var(--warning)', background: 'var(--warning-tint)' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><h2 className="rs-h rs-h3">Demo data</h2><span className="rs-badge" style={{ background: 'var(--ground)', color: 'var(--warning)' }}>Demo mode only</span></div>
             <p style={{ margin: 0 }}>Replace this profile's data with two assessments and six completed lessons.</p>
             <button className="rs-btn rs-btn--secondary" type="button" disabled={seed.isPending} onClick={() => seed.mutate()} style={{ alignSelf: 'flex-start' }}>
               Fill with demo data
@@ -99,7 +99,7 @@ export default function Settings() {
         {sub && (
           <div className="rs-card rs-stack" style={{ gap: 14, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <h2 className="rs-h" style={{ fontSize: 20 }}>Subscription</h2>
+              <h2 className="rs-h rs-h3">Subscription</h2>
               <span className="rs-badge" style={paid ? { background: 'var(--success-tint)', color: 'var(--success)' } : undefined}>
                 {sub.status === 'trialing' ? 'Trial' : paid ? 'Active' : 'Not active'} · test mode
               </span>
@@ -128,7 +128,7 @@ export default function Settings() {
           </div>
         )}
         <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
-          <h2 className="rs-h" style={{ fontSize: 20 }}>Your data</h2>
+          <h2 className="rs-h rs-h3">Your data</h2>
           <p style={{ margin: 0 }}>There's no account. Your profile, plan and recordings are tied to this browser. Clearing cookies or switching devices starts you fresh.</p>
           {!confirm ? (
             <button className="rs-btn rs-btn--secondary" type="button" onClick={() => setConfirm(true)} style={{ alignSelf: 'flex-start' }}>

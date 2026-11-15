@@ -29,7 +29,7 @@ export function Chips() {
 
 const gutter = { padding: '0 max(20px, calc((100% - 1200px) / 2 + 40px))' }
 
-export function AppShell({ children, chips = true }: { children: ReactNode; chips?: boolean }) {
+export function AppShell({ children, chips = true, narrow = false }: { children: ReactNode; chips?: boolean; narrow?: boolean }) {
   const me = useMe()
   useRedirectOn401(me.error)
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? ' rs-nav__link--on' : '')
@@ -47,9 +47,9 @@ export function AppShell({ children, chips = true }: { children: ReactNode; chip
             </NavLink>
           ))}
         </nav>
-        {chips ? <Chips /> : <span />}
+        {chips ? <Chips /> : <span className="rs-nav__end" />}
       </header>
-      <main className="rs-wrap" style={{ paddingTop: 28, paddingBottom: 40 }}>
+      <main className={narrow ? 'rs-wrap rs-narrow' : 'rs-wrap'} style={{ paddingTop: 28, paddingBottom: 40 }}>
         <DemoNotice prepared={me.data?.data_provenance?.prepared_demo_history} enabled={me.data?.demo_mode} />
         {children}
       </main>
@@ -67,13 +67,14 @@ export function AppShell({ children, chips = true }: { children: ReactNode; chip
 }
 
 // Onboarding/flow screens: logo bar only, no tabs (as in the mockups).
-export function FlowShell({ children, narrow = true }: { children: ReactNode; narrow?: boolean }) {
+export function FlowShell({ children, narrow = true, end }: { children: ReactNode; narrow?: boolean; end?: ReactNode }) {
   return (
     <div className="rs rs-page">
       <header className="rs-nav" style={gutter}>
         <NavLink to="/" className="rs-brand">
           <Logo /> Resonance
         </NavLink>
+        {end}
       </header>
       <main className={narrow ? 'rs-wrap rs-narrow' : 'rs-wrap'} style={{ paddingTop: 28, paddingBottom: 40 }}>
         {children}

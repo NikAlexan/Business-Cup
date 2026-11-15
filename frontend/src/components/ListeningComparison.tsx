@@ -1,3 +1,4 @@
+import { AudioPlayer } from './AudioPlayer'
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useId, useRef, useState } from 'react'
 import { ApiError, post, request, useMutationWithKey } from '../api/api'
@@ -60,7 +61,7 @@ export function ListeningComparison({ takeId }: { takeId: string }) {
     <button className="rs-btn rs-btn--secondary" type="button" onClick={open}>Compare with A/B labels</button>
     <dialog ref={dialog} aria-labelledby={id + '-title'} aria-describedby={id + '-description'} onCancel={(event) => { event.preventDefault(); close() }} onClose={() => setOpened(false)} className="rs-card"
       style={{ width: 'min(620px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 32px)', boxSizing: 'border-box', overflowWrap: 'anywhere', border: '2px solid var(--line)', color: 'var(--ink)' }}>
-      <div className="rs-stack" style={{ gap: 16 }}>
+      <div className="rs-stack rs-gap-4">
         <button className="rs-btn rs-btn--quiet" type="button" onClick={close} style={{ alignSelf: 'flex-end' }}>Close comparison</button>
         <h2 id={id + '-title'} className="rs-h" style={{ fontSize: 24 }}>Listen to your two takes</h2>
         <p id={id + '-description'} style={{ margin: 0 }}>The previous/current labels stay hidden until you save your first answer. You may recognize your own takes; this is a personal listening check, not an independent test.</p>
@@ -73,7 +74,7 @@ export function ListeningComparison({ takeId }: { takeId: string }) {
           {comparison.text && <details><summary className="rs-link">Read the assigned text</summary><p>{comparison.text}</p><p className="rs-label">Your actual delivery may differ from the assigned text.</p></details>}
           {comparison.clips.map((clip) => <div className="rs-stack" key={clip.label} style={{ gap: 8 }}>
             <strong>Version {clip.label.toUpperCase()}{clip.role ? ' · ' + (clip.role === 'previous' ? 'Previous take' : 'Repeated take') : ''}</strong>
-            <audio ref={(element) => { if (element) players.current[clip.label] = element; else delete players.current[clip.label] }} controls preload="metadata" aria-label={'Comparison version ' + clip.label.toUpperCase()} src={clip.audio_url} style={{ width: '100%' }}
+            <AudioPlayer ref={(element) => { if (element) players.current[clip.label] = element; else delete players.current[clip.label] }} preload="metadata" aria-label={'Comparison version ' + clip.label.toUpperCase()} src={clip.audio_url}
               onError={() => setAudioErrors((errors) => errors.includes(clip.label) ? errors : [...errors, clip.label])}
               onCanPlay={() => setAudioErrors((errors) => errors.filter((label) => label !== clip.label))} />
             {audioErrors.includes(clip.label) && <ErrorBanner text={'Version ' + clip.label.toUpperCase() + ' could not load. Try loading this saved audio again.'} onRetry={() => players.current[clip.label]?.load()} />}
@@ -87,7 +88,7 @@ export function ListeningComparison({ takeId }: { takeId: string }) {
           </section> : <>
             <fieldset disabled={busy || !!load.error} style={{ border: 0, margin: 0, padding: 0 }}>
               <legend style={{ fontWeight: 500, marginBottom: 8 }}>After listening to both, what do you hear?</legend>
-              <div className="rs-stack" style={{ gap: 10 }}>{CHOICES.map(([value, label]) => <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="rs-stack rs-gap-3">{CHOICES.map(([value, label]) => <label key={value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input type="radio" name={id + '-choice'} checked={choice === value} onChange={() => setChoice(value)} />{label}
               </label>)}</div>
             </fieldset>
