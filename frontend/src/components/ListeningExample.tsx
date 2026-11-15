@@ -17,13 +17,18 @@ export function PlannedBoundary({ plan, feedback, onHear }: { plan: ListeningPla
 
 export function ListeningExample({ itemId, example, boundaries, plan, locked, onSaved, onBusy }: {
   itemId: string; example: ListeningExampleData; boundaries: ListeningBoundary[]; plan?: ListeningPlan | null
-  locked: boolean; onSaved: (plan: ListeningPlan) => void; onBusy: (busy: boolean) => void
+  locked: boolean; onSaved: (receipt: ListeningPlan) => Promise<ListeningPlan | null>; onBusy: (busy: boolean) => void
 }) {
   const [answer, setAnswer] = useState<'a' | 'b' | 'unsure' | null>(null)
   const [boundary, setBoundary] = useState<number | null>(null)
   const [audioError, setAudioError] = useState(false)
+  const [changedElsewhere, setChangedElsewhere] = useState(false)
   const players = useRef<(HTMLAudioElement | null)[]>([])
-  const save = useMutationWithKey((body: { example_id: string; answer: 'a' | 'b' | 'unsure'; boundary_index: number }, key) => post<ListeningPlan>('/plan-items/' + itemId + '/listening-plan', body, key))
+  const save = useMutationWithKey(async (body: { example_id: string; answer: 'a' | 'b' | 'unsure'; boundary_index: number }, key) => {
+    const receipt = await post<ListeningPlan>('/plan-items/' + itemId + '/listening-plan', body, key)
+    const current = await onSaved(receipt)
+    return { receipt, current }
+  })
   useEffect(() => { onBusy(save.isPending); return () => onBusy(false) }, [save.isPending, onBusy])
   useEffect(() => { if (locked) players.current.forEach((audio) => audio?.pause()) }, [locked])
   const editingAnswer = answer ?? plan?.answer ?? null
@@ -58,10 +63,11 @@ export function ListeningExample({ itemId, example, boundaries, plan, locked, on
           </label>)}</div>
         </fieldset>}
         <button className="rs-btn rs-btn--secondary" type="button" disabled={locked || save.isPending || !editingAnswer || editingBoundary === null || alreadySaved} onClick={() => {
-          if (editingAnswer && editingBoundary !== null) save.mutate({ example_id: example.id, answer: editingAnswer, boundary_index: editingBoundary }, { onSuccess: (saved) => { setAnswer(null); setBoundary(null); onSaved(saved) } })
+          if (editingAnswer && editingBoundary !== null) save.mutate({ example_id: example.id, answer: editingAnswer, boundary_index: editingBoundary }, { onSuccess: ({ receipt, current }) => { setAnswer(null); setBoundary(null); setChangedElsewhere(current?.id !== receipt.id) } })
         }}>Use this boundary for my take</button>
         {plan && !alreadySaved && !locked && <span className="rs-label">Save your new selection to replace the saved boundary shown below.</span>}
         {save.isPending && <span role="status">Saving your listening plan…</span>}
+        {changedElsewhere && <p role="status">A newer boundary was saved elsewhere. The latest saved boundary is shown below.</p>}
         {save.error && <ErrorBanner error={save.error} />}
         <a className="rs-link" href={example.notice_url} target="_blank" rel="noreferrer">Synthetic example credits</a>
       </div>

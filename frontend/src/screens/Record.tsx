@@ -23,7 +23,7 @@ function TaskRecorder({ task, assessmentId, accepted, onChecked }: { task: Asses
   const max = Math.min(task.max_duration_seconds, limitFor('assessment'))
   const r = useRecorder({ maxSeconds: max, accepted })
   const check = useRecordingCheck({ pendingTake: task.pending_take, fields: { purpose: 'assessment', assessment_id: assessmentId, task_id: task.id },
-    blob: r.blob, mime: r.mime, onChecked: () => { r.reset(); onChecked() } })
+    blob: r.blob, mime: r.mime, canRecover: r.state === 'idle', onChecked: () => { r.reset(); onChecked() } })
   const follow = useSpeechFollow(task.text, r.state === 'recording')
   const [playT, setPlayT] = useState<number | null>(null)
   useEffect(() => setPlayT(null), [r.state])

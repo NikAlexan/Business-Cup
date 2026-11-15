@@ -852,13 +852,16 @@ const plannedPause = { id: 'listening-a', plan_item_id: 'item', created_at: '202
 test('a listening comparison remains optional after audio failure and saves an owned boundary with retry identity', async () => {
   const item = { ...baseItem, exercise_id: 'E08', status: 'pending' as const, latest_attempt_id: null }
   const state = { item, lesson: { id: 'lesson', items: [item] }, plan_status: 'active', item_index: 0, pending_take: null, listening_example: pauseExample, listening_boundaries: pauseBoundaries, listening_plan: null }
+  let persisted: unknown = null
   const keys: string[] = []
   setup(item, (path, init) => {
-    if (path === '/api/v1/plan-items/item') return Response.json(state)
+    if (path === '/api/v1/plan-items/item') return Response.json({ ...state, listening_plan: persisted })
     if (path.endsWith('/listening-plan')) {
       keys.push(String((init?.headers as Record<string, string>)['Idempotency-Key']))
       expect(JSON.parse(String(init?.body))).toEqual({ example_id: pauseExample.id, answer: 'unsure', boundary_index: 0 })
-      return keys.length === 1 ? Response.json({ error: { message: 'Boundary save offline.' } }, { status: 503 }) : Response.json({ ...plannedPause, answer: 'unsure' }, { status: 201 })
+      if (keys.length === 1) return Response.json({ error: { message: 'Boundary save offline.' } }, { status: 503 })
+      persisted = { ...plannedPause, answer: 'unsure' }
+      return Response.json(persisted, { status: 201 })
     }
   })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
@@ -960,4 +963,115 @@ test('an unfinished archived task stays a preview while its completed neighbor r
   await screen.findByRole('button', { name: 'Start recording' })
   expect(screen.queryByRole('heading', { name: 'Saved task preview' })).toBeNull()
   expect(screen.queryByRole('heading', { name: 'Session not open yet' })).toBeNull()
+})
+
+test.each(['processing', 'completed'])('a newly discovered %s take restores its own boundary and saved job without reloading', async (status) => {
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+  const item = { ...baseItem, exercise_id: 'E08', status: 'pending' as const, latest_attempt_id: null }
+  const initial = { item, lesson: { id: 'lesson', items: [item] }, plan_status: 'active', item_index: 0, pending_take: null, listening_example: pauseExample, listening_boundaries: pauseBoundaries, listening_plan: plannedPause }
+  const remote = { recording_id: 'remote-recording', job_id: 'remote-job', status, practice_only: false, listening_plan: plannedPause }
+  let polls = 0
+  let saves = 0
+  setup(item, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json(initial)
+    if (path === '/api/v1/jobs/remote-job') { polls++; return Response.json({ status, poll_after_ms: 100000 }) }
+    if (path === '/api/v1/exercise-attempts') {
+      saves++
+      expect(JSON.parse(String(init?.body))).toEqual({ plan_item_id: 'item', recording_id: 'remote-recording' })
+      return Response.json({ ...savedAttempt, listening_plan: plannedPause }, { status: 201 })
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  await screen.findByRole('button', { name: 'Start recording' })
+  act(() => client.setQueryData(['plan-item', 'item'], { ...initial, pending_take: remote, listening_plan: { ...plannedPause, id: 'future-b', before: 'Future selection', after: 'for another take' } }))
+  await waitFor(() => expect(polls).toBeGreaterThan(0))
+  expect(screen.queryByText(/Future selection/)).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Start recording' })).toBeNull()
+  if (status === 'processing') {
+    await screen.findByText('Checking your saved take. You can return here after leaving this page.')
+    expect(saves).toBe(0)
+  } else {
+    await screen.findByRole('heading', { name: 'Practice complete' })
+    expect(saves).toBe(1)
+  }
+})
+
+test('a remote take waits for the local recording to be explicitly discarded and cannot replace its source or boundary', async () => {
+  const blob = new Blob(['local recording'])
+  vi.spyOn(recorder, 'useRecorder').mockImplementation(() => {
+    const [state, setState] = useState<'idle' | 'recording' | 'recorded'>('idle')
+    return { state, level: { level: 0, status: 'waiting' }, seconds: 5, error: null, limitReached: false,
+      mime: state === 'recorded' ? 'audio/webm' : null, blob: state === 'recorded' ? blob : null, url: state === 'recorded' ? 'blob:local' : null,
+      start: async () => { setState('recording') }, stop: () => setState('recorded'), reset: () => setState('idle') }
+  })
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+  const item = { ...baseItem, exercise_id: 'E08' }
+  const initial = { item, lesson: { id: 'lesson', items: [item] }, plan_status: 'active', item_index: 0, pending_take: null, listening_example: pauseExample, listening_boundaries: pauseBoundaries, listening_plan: plannedPause }
+  let submitted: { plan: FormDataEntryValue | null; source: FormDataEntryValue | null } | undefined
+  let polls = 0
+  setup(item, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json(initial)
+    if (path === '/api/v1/jobs/remote-job') { polls++; return Response.json({ status: 'processing', poll_after_ms: 100000 }) }
+    if (path === '/api/v1/recordings') {
+      const form = init?.body as FormData
+      submitted = { plan: form.get('listening_plan_id'), source: form.get('based_on_attempt_id') }
+      return Response.json({ error: { message: 'Local recording preserved.' } }, { status: 503 })
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  await screen.findByText('Recording received. Audio quality checked.')
+  fireEvent.click(await screen.findByRole('button', { name: 'Practice again — no extra notes' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
+  await screen.findByRole('button', { name: 'Stop recording' })
+  const later = { ...plannedPause, id: 'later-b', before: 'Remote boundary', after: 'for the remote take' }
+  act(() => client.setQueryData(['plan-item', 'item'], { ...initial, listening_plan: later, pending_take: { recording_id: 'remote-recording', job_id: 'remote-job', status: 'processing', practice_only: true, based_on_attempt_id: 'remote-source', listening_plan: later } }))
+  expect(polls).toBe(0)
+  expect(screen.queryByText(/Remote boundary/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Check my take' }))
+  await screen.findByText('Local recording preserved.')
+  expect(submitted).toEqual({ plan: plannedPause.id, source: 'attempt' })
+  expect(polls).toBe(0)
+  fireEvent.click(screen.getByRole('button', { name: 'Record again' }))
+  await screen.findByText('Checking your saved take. You can return here after leaving this page.')
+  expect(polls).toBeGreaterThan(0)
+  expect(screen.getByText(/Remote boundary/)).toBeTruthy()
+})
+
+test('an old save receipt is reconciled with a newer server boundary and remains consistent after reload', async () => {
+  const item = { ...baseItem, exercise_id: 'E08', status: 'pending' as const, latest_attempt_id: null }
+  const later = { ...plannedPause, id: 'later-b', answer: 'b' as const, boundary_index: 1, before: 'the second thought', after: 'the ending' }
+  let persisted: typeof plannedPause | typeof later | null = null
+  const state = () => ({ item, lesson: { id: 'lesson', items: [item] }, plan_status: 'active', item_index: 0, pending_take: null, listening_example: pauseExample, listening_boundaries: pauseBoundaries, listening_plan: persisted })
+  const keys: string[] = []
+  setup(item, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json(state())
+    if (path.endsWith('/listening-plan')) {
+      keys.push(String((init?.headers as Record<string, string>)['Idempotency-Key']))
+      if (keys.length === 1) { persisted = plannedPause; return Response.json({ error: { message: 'Response lost after commit.' } }, { status: 503 }) }
+      return Response.json(plannedPause, { status: 201 })
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  const view = open('/exercise/item', client)
+  fireEvent.click(await screen.findByText('Listen to a short pause comparison'))
+  fireEvent.click(screen.getByRole('radio', { name: 'Version A' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'The first thought / the second thought' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Use this boundary for my take' }))
+  await screen.findByText('Response lost after commit.')
+  persisted = later
+  await act(async () => { await client.invalidateQueries({ queryKey: ['plan-item', 'item'] }) })
+  fireEvent.click(screen.getByRole('button', { name: 'Use this boundary for my take' }))
+  await screen.findByText('A newer boundary was saved elsewhere. The latest saved boundary is shown below.')
+  expect((client.getQueryData(['plan-item', 'item']) as { listening_plan: { id: string } }).listening_plan.id).toBe(later.id)
+  expect((screen.getByRole('radio', { name: 'Version B' }) as HTMLInputElement).checked).toBe(true)
+  const before = screen.getByLabelText('Your chosen boundary').textContent
+  expect(keys).toHaveLength(2)
+  expect(keys[1]).toBe(keys[0])
+  view.unmount()
+  open('/exercise/item')
+  await screen.findByRole('heading', { name: 'Boundary for this take' })
+  expect(screen.getByLabelText('Your chosen boundary').textContent).toBe(before)
 })

@@ -444,8 +444,8 @@ test('baseline and check-in recover failed analysis, expose limitations and comp
 })
 
 
-test('audible pause contrast carries a chosen boundary into a recorded take and restored evidence', async ({ page }) => {
-  test.setTimeout(120_000)
+test('audible pause contrast reconciles an old save and recovers a newly discovered take in another open tab', async ({ page }) => {
+  test.setTimeout(150_000)
   await page.setViewportSize({ width: 390, height: 844 })
   expect((await page.request.post('/api/v1/guest-session', {
     headers: { 'Idempotency-Key': randomUUID() },
@@ -498,9 +498,28 @@ test('audible pause contrast carries a chosen boundary into a recorded take and 
   await expect.poll(() => first.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true)
   await expect.poll(() => second.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false)
   await page.getByRole('radio', { name: 'Not sure', exact: true }).check()
-  const boundary = state.listening_boundaries[0]
-  await page.getByRole('radio', { name: boundary.before + ' / ' + boundary.after, exact: true }).check()
+  const firstBoundary = state.listening_boundaries[0]
+  await page.getByRole('radio', { name: firstBoundary.before + ' / ' + firstBoundary.after, exact: true }).check()
+  const keys: string[] = []
+  await page.route('**/api/v1/plan-items/' + item.id + '/listening-plan', async (route) => {
+    keys.push(route.request().headers()['idempotency-key'])
+    const response = await route.fetch()
+    expect(response.status()).toBe(201)
+    if (keys.length === 1) await route.abort('connectionfailed') // The server committed A, but its reply was lost.
+    else await route.fulfill({ response })
+  })
   await page.getByRole('button', { name: 'Use this boundary for my take' }).click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  const boundary = state.listening_boundaries[1]
+  expect((await page.request.post('/api/v1/plan-items/' + item.id + '/listening-plan', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: { example_id: state.listening_example.id, answer: 'b', boundary_index: 1 },
+  })).status()).toBe(201)
+  await page.getByRole('button', { name: 'Use this boundary for my take' }).click()
+  await expect(page.getByText('A newer boundary was saved elsewhere. The latest saved boundary is shown below.')).toBeVisible()
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).toBe(keys[1])
+  await expect(page.getByRole('radio', { name: 'Version B', exact: true })).toBeChecked()
   await expect(page.getByRole('heading', { name: 'Boundary for this take', exact: true })).toBeVisible()
   const plan = (await (await page.request.get('/api/v1/plan-items/' + item.id)).json()).listening_plan
   expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(progress)
@@ -510,16 +529,28 @@ test('audible pause contrast carries a chosen boundary into a recorded take and 
   await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
   expect(await second.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true)
   await expect(second).toBeHidden()
+  const observer = await page.context().newPage()
+  await observer.goto('/exercise/' + item.id)
+  await expect(observer.getByRole('button', { name: 'Start recording', exact: true })).toBeVisible()
   // A later choice is for a future take; the current recording retains the explicit start-time choice.
   expect((await page.request.post('/api/v1/plan-items/' + item.id + '/listening-plan', {
     headers: { 'Idempotency-Key': randomUUID() },
-    data: { example_id: plan.example.id, answer: 'b', boundary_index: 1 },
+    data: { example_id: plan.example.id, answer: 'a', boundary_index: 0 },
   })).status()).toBe(201)
   await page.waitForTimeout(4000)
   await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+  await page.route('**/api/v1/jobs/**', (route) => route.abort('internetdisconnected'))
+  const accepted = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/recordings' && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Check my take' }).click()
-  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
-  await expect(page.getByText(/This does not judge the phrasing/)).toBeVisible()
+  expect((await accepted).status()).toBe(202)
+  // The other page is already mounted. An ordinary stale-query focus refresh must discover this take.
+  await observer.waitForTimeout(10_100)
+  await observer.bringToFront()
+  await observer.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+  await expect(observer.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  await expect(observer.getByText(/This does not judge the phrasing/)).toBeVisible()
+  await observer.close()
+  await page.unroute('**/api/v1/jobs/**')
   const completed = await (await page.request.get('/api/v1/plan-items/' + item.id)).json()
   const attempt = await (await page.request.get('/api/v1/exercise-attempts/' + completed.item.latest_attempt_id)).json()
   expect(attempt.listening_plan.id).toBe(plan.id)

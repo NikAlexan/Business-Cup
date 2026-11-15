@@ -79,18 +79,23 @@ function SelfCheck({ onFinish, busy }: { onFinish: () => void; busy: boolean }) 
   )
 }
 
-function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn, onUploadStarted, trainingFocus, listeningExample, listeningBoundaries = [], listeningPlan }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void; onUploadStarted?: (key: string) => void; trainingFocus?: TrainingFocus | null; listeningExample?: ListeningExampleData | null; listeningBoundaries?: ListeningBoundary[]; listeningPlan?: ListeningPlan | null }) {
+function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn, onUploadStarted, trainingFocus, listeningExample, listeningBoundaries = [], listeningPlan }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string, take?: PendingTake) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void; onUploadStarted?: (key: string) => void; trainingFocus?: TrainingFocus | null; listeningExample?: ListeningExampleData | null; listeningBoundaries?: ListeningBoundary[]; listeningPlan?: ListeningPlan | null }) {
   const qc = useQueryClient()
   const [savingListeningPlan, setSavingListeningPlan] = useState(false)
   const max = Math.min(item.task.verification.max_recording_seconds ?? 90, serverLimit)
   const r = useRecorder({ maxSeconds: max, accepted })
   const [draftFocus, setDraftFocus] = useState<TrainingFocus | null | undefined>(() => pendingTake ? pendingTake.training_focus ?? null : undefined)
-  const focus = draftFocus === undefined ? trainingFocus : draftFocus
+  const localFocus = draftFocus === undefined ? trainingFocus : draftFocus
   const [draftPlan, setDraftPlan] = useState<ListeningPlan | null | undefined>(() => pendingTake ? pendingTake.listening_plan ?? null : undefined)
-  const plan = (r.state !== 'idle' || pendingTake) && draftPlan !== undefined ? draftPlan : listeningPlan
-  const dockRecorder = { ...r, start: () => { if (savingListeningPlan) return Promise.resolve(); setDraftFocus(trainingFocus ?? null); setDraftPlan(listeningPlan ?? null); return r.start() }, reset: () => { setDraftFocus(undefined); setDraftPlan(undefined); r.reset() } }
-  const check = useRecordingCheck({ pendingTake, blob: r.blob, mime: r.mime, onChecked: onRecorded, onUploaded, onUploadStarted,
-    fields: { purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(basedOn ? { based_on_attempt_id: basedOn } : {}), ...(focus ? { training_focus_id: focus.id } : {}), ...(plan ? { listening_plan_id: plan.id } : {}) } })
+  const [draftSource, setDraftSource] = useState<string | null | undefined>(undefined)
+  const localSource = r.state !== 'idle' && draftSource !== undefined ? draftSource : basedOn
+  const localPlan = r.state !== 'idle' && draftPlan !== undefined ? draftPlan : listeningPlan
+  const dockRecorder = { ...r, start: () => { if (savingListeningPlan) return Promise.resolve(); setDraftSource(check.contextTake ? check.contextTake.based_on_attempt_id ?? null : basedOn ?? null); setDraftFocus(focus ?? null); setDraftPlan(plan ?? null); return r.start() }, reset: () => { setDraftSource(undefined); setDraftFocus(undefined); setDraftPlan(undefined); r.reset() } }
+  const check = useRecordingCheck({ pendingTake, blob: r.blob, mime: r.mime, canRecover: r.state === 'idle' && !busy, onChecked: onRecorded, onUploaded, onUploadStarted,
+    fields: { purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(localSource ? { based_on_attempt_id: localSource } : {}), ...(localFocus ? { training_focus_id: localFocus.id } : {}), ...(localPlan ? { listening_plan_id: localPlan.id } : {}) } })
+  const context = r.state === 'idle' || check.checking ? check.contextTake : null
+  const focus = context ? context.training_focus ?? null : localFocus
+  const plan = context ? context.listening_plan ?? null : localPlan
   const recording = r.state === 'recording'
   const spokenText = Array.from({ length: item.task.repetitions ?? 1 }, () => item.task.text).join('\n\n')
   const follow = useSpeechFollow(spokenText, recording)
@@ -101,7 +106,12 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pend
   return (
     <>
       {focus && <StoryFocus focus={focus} recording={recording || r.state === 'requesting'} />}
-      {listeningExample && <ListeningExample key={listeningExample.id} itemId={item.id} example={plan?.example ?? listeningExample} boundaries={listeningBoundaries} plan={plan} locked={r.state !== 'idle' || !!pendingTake || busy} onBusy={setSavingListeningPlan} onSaved={(saved) => qc.setQueryData<PlanItemState>(['plan-item', item.id], (previous) => previous ? { ...previous, listening_plan: saved } : previous)} />}
+      {listeningExample && <ListeningExample key={listeningExample.id} itemId={item.id} example={plan?.example ?? listeningExample} boundaries={listeningBoundaries} plan={plan} locked={r.state !== 'idle' || !!check.contextTake || busy} onBusy={setSavingListeningPlan} onSaved={async () => {
+        await qc.cancelQueries({ queryKey: ['plan-item', item.id], exact: true })
+        const state = await request<PlanItemState>('/plan-items/' + item.id)
+        qc.setQueryData(['plan-item', item.id], state)
+        return state.listening_plan ?? null
+      }} />}
       <div className="rs-card rs-stack" style={{ padding: 28, gap: 12 }}>
         <ScriptText text={spokenText} read={recording ? follow.read : playT !== null ? follow.readAt(playT) : 0} pacer={pacer} />
         {recording && (follow.supported || pacer !== undefined) && (
@@ -351,7 +361,7 @@ export default function Exercise() {
                 {v.type === 'self_confirmation' && <SelfCheck key={item.id} busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
                 {v.type === 'recording' && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
                 {v.type === 'recording' && me.isPending && <Skeleton height={160} />}
-                {v.type === 'recording' && me.data && !cancellation.intent && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} trainingFocus={itemState.data?.training_focus} listeningExample={itemState.data?.listening_example} listeningBoundaries={itemState.data?.listening_boundaries} listeningPlan={itemState.data?.listening_plan} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
+                {v.type === 'recording' && me.data && !cancellation.intent && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} trainingFocus={itemState.data?.training_focus} listeningExample={itemState.data?.listening_example} listeningBoundaries={itemState.data?.listening_boundaries} listeningPlan={itemState.data?.listening_plan} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id, take) => { if (!canceling.current) submit({ recording_id: id, ...(take ? { based_on_attempt_id: take.based_on_attempt_id ?? undefined } : {}) }) }} />}
               </>
             )}
             {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>

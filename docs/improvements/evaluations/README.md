@@ -2,7 +2,7 @@
 
 This is a small integration diagnostic using public synthetic English speech, not a user study or proof of coaching accuracy. No guest data, human recordings or credentials are included. `scripts-evaluate-coaching.py` creates two FFmpeg/flite sentences with 1.2 seconds of inserted silence, then uses the configured ASR/audio provider. The resulting WAV is 6.525 seconds; all artifacts refer to the same SHA-256. The inserted silence is not the total acoustic sentence gap because the synthesizer has its own edge silence.
 
-Four paid requests were made in total: two Whisper transcriptions and two gpt-audio-1.5 coaching requests. No request was automatically retried. The cached-transcription check made zero requests. The audio calls reused the recorded ASR result only after verifying the regenerated audio hash, expected text and transcription-model identity. Raw usage is retained; exact billed cost is not asserted.
+The historical synthetic probes made four paid requests: two Whisper transcriptions and two gpt-audio-1.5 coaching requests. The later human probe below adds two; six paid requests are now captured in this directory in total. No request was automatically retried. The cached-transcription check made zero requests. The audio calls reused the recorded ASR result only after verifying the regenerated audio hash, expected text and transcription-model identity. Raw usage is retained; exact billed cost is not asserted.
 
 | Artifact | Requests | Result |
 |---|---:|---|
@@ -53,4 +53,22 @@ The offline tool uses the installed pinned live-highlighting Zipformer and real 
 
 [Recorded offline result](offline-human-probe-v1-2026-11-15.json): all four case runs were accepted by audio-quality checks and exactly matched the reference tokens in this phrase. This covers two voices and only three distinct waveforms. Streaming timestamps are emission positions used for approximate highlighting; they are not substituted for word endpoints in assessment timing. Corpus phone alignment is automatic, not gold perceptual annotation. These checks do not establish coaching usefulness, ASR accuracy on other passages/accents, or learning transfer.
 
-The existing opt-in live CLI now accepts `--human-case` from the fixed manifest. It verifies the waveform/license source hashes and uses the case's frozen intention; cached transcription still requires the exact generated-audio hash, expected text and provider transcription-model identity. It never accepts an arbitrary private audio path. Every run remains bounded to two provider requests without retries, and original/silence-edited source metadata remains in the artifact. No live human-case invocation has been made yet; the original four paid requests above remain the complete paid-call count. A future live probe must retain negative results and cannot stand in for independent human listening or a learner study.
+The existing opt-in live CLI now accepts `--human-case` from the fixed manifest. It verifies the waveform/license source hashes and uses the case's frozen intention; cached transcription still requires the exact generated-audio hash, expected text and provider transcription-model identity. It never accepts an arbitrary private audio path. Every run remains bounded to two provider requests without retries, and original/silence-edited source metadata remains in the artifact. The first live human-case probe is recorded below. Other prepared cases have not been run live. A future live probe must retain negative results and cannot stand in for independent human listening or a learner study.
+
+
+## First live human keep case — prompt v3
+
+[Raw captured result](live-human-keep-v3-2026-11-15.json) uses the unchanged slt original (3.2050625 seconds), whose exact WAV hash matches the pinned source, with the predeclared keep focus. It made exactly two provider requests without retries: Whisper returned all eleven reference words and bounded timing; the audio model returned a valid report and a located “the two men” quote. Usage records4 billed-duration seconds reported by ASR and32 audio input tokens from coaching. Exact currency cost is unknown and is not estimated here.
+
+The response supports carrying the connected phrase into a new phrase without making the feature stronger or proposing a longer pause. Its listening question remains generic about thought boundaries. This demonstrates transport, schema/quote validation and compliance with the keep intention in one public human recording. There was no blinded listener judgment of the model's claim, no learner intervention, no comparison across intentions or repeated generations, and no demonstration of transfer. The experiment/undecided cases and the second voice remain untested with the paid provider. Historical weak synthetic responses remain negative evidence; this single response does not establish that v3 is generally better or justify a9.5 score.
+
+To reproduce only the captured transcription/timing offline, without a new provider request (after source preparation):
+
+```sh
+.venv/bin/python scripts-evaluate-coaching.py --allow-paid-calls \
+  --human-case slt-original-keep --transcription-only \
+  --cached-transcript docs/improvements/evaluations/live-human-keep-v3-2026-11-15.json \
+  --output /tmp/human-cached-timing.json
+```
+
+Omitting cached-transcript or transcription-only starts new paid work, still bounded to two requests per invocation. It is excluded from normal tests/CI.
