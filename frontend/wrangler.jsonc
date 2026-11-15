@@ -1,0 +1,13 @@
+{
+  "name": "resonance-voice",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health/*"]
+  },
+  "routes": [{ "pattern": "resonance.nikalexan.com", "custom_domain": true }],
+  "vars": { "API_ORIGIN": "https://resonance-api.nikalexan.com", "NODE_VERSION": "26" }
+}

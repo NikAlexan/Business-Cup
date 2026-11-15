@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     job_max_retry_batches: int = Field(default=1, ge=0, le=3)
     worker_poll_seconds: float = Field(default=1, gt=0)
 
+    @field_validator("database_url")
+    @classmethod
+    def psycopg_url(cls, value):
+        # Heroku gives postgres://; SQLAlchemy needs the psycopg driver name.
+        return value.replace("postgres://", "postgresql+psycopg://", 1)
+
     @field_validator("app_secret")
     @classmethod
     def validate_secret(cls, value):
