@@ -1,3 +1,4 @@
+import { AudioPlayer } from '../components/AudioPlayer'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -128,7 +129,7 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pend
       {check.retry.error && <ErrorBanner error={check.retry.error} onRetry={check.send} />}
       {check.checkError && <ErrorBanner text={check.checkError} onRetry={check.canRetryCheck ? check.send : undefined} />}
       {check.checkedRecording && !r.blob ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
-        <audio controls aria-label="Your checked take" src={'/api/v1/recordings/' + check.checkedRecording + '/audio'} />
+        <AudioPlayer aria-label="Your checked take" src={'/api/v1/recordings/' + check.checkedRecording + '/audio'} />
         <button className="rs-btn" type="button" disabled={busy} onClick={check.send}>{busy ? 'Saving…' : 'Save checked take'}</button>
       </div> : !check.checking || r.blob ? <RecorderDock r={dockRecorder} startDisabled={savingListeningPlan} sending={busy || check.busy} onSend={check.send} sendLabel="Check my take" onPlayTime={setPlayT} /> : null}
     </>
@@ -268,7 +269,7 @@ export default function Exercise() {
       <main className="rs-wrap" style={{ paddingTop: 20, paddingBottom: 48 }}>
         <DemoNotice prepared={me.data?.data_provenance?.prepared_demo_history} enabled={me.data?.demo_mode} />
         <div className="rs-cols" style={{ gridTemplateColumns: 'minmax(0, .8fr) minmax(0, 1.2fr)' }}>
-          <div className="rs-stack" style={{ gap: 12 }}>
+          <div className="rs-stack rs-gap-3">
             <h1 className="rs-h rs-h1">{item.title}</h1>
             <div className="rs-meta">
 
@@ -276,35 +277,37 @@ export default function Exercise() {
               <span>{item.difficulty ?? ''}</span>
               <span>{completed ? 'Completion already credited' : `+${item.notes_available} notes`}</span>
             </div>
-            {item.variant_label && <h2 className="rs-h" style={{ fontSize: 22 }}>{item.variant_label}</h2>}
-            <p style={{ margin: 0, color: 'var(--muted)' }}>{item.task.instruction}</p>
-            {item.task.timing?.includes_listening && <p className="rs-label">Session estimate includes recording, listening back, and reflection.</p>}
-            {item.task.timing?.expected_recording_seconds && <p className="rs-label">Typical take: {item.task.timing.expected_recording_seconds.min}–{item.task.timing.expected_recording_seconds.max} sec. Finish at your own pace.</p>}
+            {item.variant_label && <h2 className="rs-h rs-h2">{item.variant_label}</h2>}
+            <p style={{ margin: 0 }}>{item.task.instruction}</p>
+            {(item.task.timing?.expected_recording_seconds || item.task.timing?.includes_listening) && <p className="rs-label" style={{ margin: 0 }}>
+              {item.task.timing?.expected_recording_seconds && `Typical take: ${item.task.timing.expected_recording_seconds.min}–${item.task.timing.expected_recording_seconds.max} sec. Finish at your own pace. `}
+              {item.task.timing?.includes_listening && 'The session estimate includes recording, listening back and reflection.'}
+            </p>}
             {item.task.reflection_prompt && <p style={{ margin: 0 }}><strong>Listen for:</strong> {item.task.reflection_prompt}</p>}
-            {item.reason && <p style={{ margin: 0, fontSize: 15 }}>{item.reason}</p>}
+            {item.reason && <p style={{ margin: 0, fontSize: 15 }}><strong>Why today:</strong> {item.reason}</p>}
             {v.target_wpm && (
               <div>
-                <span className="rs-badge" style={{ background: 'var(--sky-tint)', color: 'var(--sky)' }}>
+                <span className="rs-badge" style={{ background: 'var(--sky-tint)', color: 'var(--sky-ink)' }}>
                   Target {v.target_wpm.min}–{v.target_wpm.max} wpm
                 </span>
               </div>
             )}
           </div>
-          <div className="rs-stack" style={{ gap: 16 }}>
+          <div className="rs-stack rs-gap-4">
             {(v.type === 'self_confirmation' || showOutcome || readOnlyTask || trainingLocked) && (
               <div className="rs-card" style={{ padding: 28 }}>
                 {item.task.steps?.length ? <ol>{item.task.steps.map((step, n) => <li key={n}>{step}</li>)}</ol> : <ScriptText text={item.task.text} />}
               </div>
             )}
             {trainingLocked && !showOutcome ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
-              <h2 className="rs-h" style={{ fontSize: 22 }}>Practice requires a subscription</h2>
+              <h2 className="rs-h rs-h2">Practice requires a subscription</h2>
               <p>Your saved task and recordings stay available. Choose a plan to record a new take.</p>
               <Link className="rs-btn" to="/paywall">See subscription plans</Link>
             </div> : readOnlyTask ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
-              {archivedTask ? <><h2 className="rs-h" style={{ fontSize: 22 }}>Saved task preview</h2><p>This older task is saved for reference. Continue practice in your current plan.</p></> : <><h2 className="rs-h" style={{ fontSize: 22 }}>Session not open yet</h2><p>You can preview this task. New sessions open in order, with one session completed per local day. Check Today for your current session.</p><button className="rs-link" type="button" disabled={itemState.isFetching} onClick={() => { void itemState.refetch() }}>Check availability</button></>}
+              {archivedTask ? <><h2 className="rs-h rs-h2">Saved task preview</h2><p>This older task is saved for reference. Continue practice in your current plan.</p></> : <><h2 className="rs-h rs-h2">Session not open yet</h2><p>You can preview this task. New sessions open in order, with one session completed per local day. Check Today for your current session.</p><button className="rs-link" type="button" disabled={itemState.isFetching} onClick={() => { void itemState.refetch() }}>Check availability</button></>}
               <Link className="rs-link" to="/today">{archivedTask ? 'Back to current plan' : 'Back to today'}</Link>
             </div> : showOutcome ? (
-              <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }}>
+              <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
                 <h2 className="rs-h" aria-live="polite" style={{ fontSize: 22 }}>{result?.status === 'needs_retry' ? 'Take needs another try' : result?.practice_only ? 'Extra practice saved' : result ? 'Practice complete' : 'Already done'}</h2>
                 {result && <p style={{ margin: 0 }}>{result.feedback.summary}</p>}
                 {result?.practice_only && <p style={{ margin: 0 }}>Extra practice does not add notes or complete the session again.</p>}
@@ -313,10 +316,10 @@ export default function Exercise() {
                 {typeof result?.feedback.metrics?.speaking_rate_wpm?.value === 'number' && <p style={{ margin: 0 }}>Measured pace: {Math.round(result.feedback.metrics.speaking_rate_wpm.value)} words/min</p>}
                 {savedAttempt.isPending && item.latest_attempt_id && !latestLocal && <p>Loading your saved feedback…</p>}
                 {savedAttempt.error && !latestLocal && <ErrorBanner error={savedAttempt.error} onRetry={() => savedAttempt.refetch()} />}
-                {savedRecording.data?.audio_url && <audio controls preload="metadata" aria-label="Your completed take" ref={audioRef} src={savedRecording.data.audio_url} style={{ width: '100%' }} />}
+                {savedRecording.data?.audio_url && <AudioPlayer preload="metadata" aria-label="Your completed take" ref={audioRef} src={savedRecording.data.audio_url} />}
                 {savedRecording.error && <ErrorBanner error={savedRecording.error} onRetry={() => savedRecording.refetch()} />}
                 {!!result?.feedback.insights?.length && <section className="rs-stack" aria-label="Measured timing notes" style={{ gap: 10 }}>
-                  <h3 className="rs-h" style={{ fontSize: 20 }}>Measured timing notes</h3>
+                  <h3 className="rs-h rs-h3">Measured timing notes</h3>
                   {result.feedback.insights.map((insight) => <div key={insight.code}>
                     <p style={{ margin: 0 }}>{insight.message}</p>
                     {insight.evidence && <button className="rs-link" type="button" disabled={!savedRecording.data?.audio_url} onClick={() => { const audio = audioRef.current; if (audio) { audio.currentTime = insight.evidence!.start_seconds; void audio.play().catch(() => {}) } }}>Hear this moment: “{insight.evidence.quote}”</button>}
@@ -332,17 +335,21 @@ export default function Exercise() {
                 {result?.training_focus && result.status === 'passed' && <FocusCheck key={"focus-check-" + result.id} take={result} onSaved={updateViewedTake} />}
                 {result && <TakeReflection key={"reflection-" + result.id} attempt={result} exerciseId={item.exercise_id} storyId={lesson.items.find((entry) => entry.exercise_id === 'E12')?.id} onSaved={updateViewedTake} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{timingDecision && tip.code === 'pace_outside_target' ? 'This take counts. The pace band is an optional drill target.' : tip.message}</p>)}
-                {result?.reward.parts.map((p) => (
-                  <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
-                  </div>
-                ))}
+                {!!result?.reward.parts.length && <div className="rs-stack" style={{ gap: 8, padding: 16, borderRadius: 18, background: 'var(--success-tint)' }}>
+                  {result.reward.parts.map((p) => (
+                    <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
+                    </div>
+                  ))}
+                </div>}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button className="rs-btn rs-btn--wide" type="button" onClick={goNext}>
+                  {closedLesson ? 'Back to today' : nextItem ? 'Next exercise' : 'Finish session'}
+                </button>
                 {trainingLocked ? <Link className="rs-btn rs-btn--secondary" to="/paywall">See subscription plans for extra practice</Link> : <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { viewedTake.current = { itemId: planItemId, attemptId: null }; canceling.current = false; uploadKey.current = null; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
                   Practice again — no extra notes
                 </button>}
-                <button className="rs-btn rs-btn--wide" type="button" onClick={goNext} style={{ alignSelf: 'flex-start' }}>
-                  {closedLesson ? 'Back to today' : nextItem ? 'Next exercise' : 'Finish session'}
-                </button>
+                </div>
               </div>
             ) : (
               <>
@@ -370,12 +377,12 @@ export default function Exercise() {
               </>
             )}
             {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>
-              <h2 className="rs-h" style={{ fontSize: 22 }}>Your takes</h2>
+              <h2 className="rs-h rs-h2">Your takes</h2>
               {history.isPending && <p>Loading your takes…</p>}
               {history.error && <ErrorBanner error={history.error} onRetry={() => history.refetch()} />}
               <ol className="rs-stack" style={{ paddingLeft: 22, gap: 10 }}>
                 {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending || practicingAgain} onClick={() => { viewedTake.current = { itemId: planItemId, attemptId: take.id }; setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
-                  {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US', { timeZone: me.data?.preferences?.timezone ?? 'UTC' }) : ''}
+                  {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: me.data?.preferences?.timezone ?? 'UTC' }) : ''}
                 </button></li>)}
               </ol>
               {history.hasNextPage && <button className="rs-btn rs-btn--secondary" type="button" disabled={history.isFetchingNextPage} onClick={() => history.fetchNextPage()}>Load earlier takes</button>}

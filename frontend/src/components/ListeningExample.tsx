@@ -1,3 +1,4 @@
+import { AudioPlayer } from './AudioPlayer'
 import { useEffect, useRef, useState } from 'react'
 import { post, useMutationWithKey } from '../api/api'
 import type { ListeningBoundary, ListeningExampleData, ListeningPlan, PlannedPauseFeedback } from '../api/types'
@@ -5,7 +6,7 @@ import { ErrorBanner } from './ui'
 
 export function PlannedBoundary({ plan, feedback, onHear }: { plan: ListeningPlan; feedback?: PlannedPauseFeedback; onHear?: (seconds: number) => void }) {
   return <section className="rs-card rs-stack" aria-label="Your chosen boundary" style={{ padding: 20, gap: 8 }}>
-    <h3 className="rs-h" style={{ fontSize: 20 }}>Boundary for this take</h3>
+    <h3 className="rs-h rs-h3">Boundary for this take</h3>
     <p style={{ margin: 0 }}>{plan.before} <strong>/</strong> {plan.after}</p>
     {feedback && <p>{feedback.available && feedback.gap_seconds !== null
       ? `About ${feedback.gap_seconds.toFixed(1)} seconds between the recognized words at your boundary. This does not judge the phrasing.`
@@ -36,16 +37,17 @@ export function ListeningExample({ itemId, example, boundaries, plan, locked, on
   const selectedAnswer = locked ? plan?.answer ?? null : editingAnswer
   const selectedBoundary = locked ? plan?.boundary_index ?? null : editingBoundary
   const alreadySaved = !!plan && plan.example.id === example.id && plan.answer === editingAnswer && plan.boundary_index === editingBoundary
-  return <section className="rs-stack" aria-label="Optional listening practice" style={{ gap: 12 }}>
-    <details className="rs-card" style={{ padding: 20 }}>
-      <summary>Listen to a short pause comparison</summary>
+  // Mockup: a sky card marked Optional, with its note inside the card rather than floating under it.
+  return <section className="rs-card rs-stack" aria-label="Optional listening practice" style={{ gap: 12, padding: 20, background: 'var(--sky-tint)' }}>
+    <details>
+      <summary className="rs-disclosure" style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><span className="rs-h" style={{ fontSize: 18 }}>Listen to a short pause comparison</span><span className="rs-badge" style={{ background: 'var(--ground)', color: 'var(--sky-ink)' }}>Optional</span></summary>
       <div className="rs-stack" style={{ gap: 12, marginTop: 12 }}>
         <p style={{ margin: 0 }}>{example.text}</p>
         <span className="rs-label">{example.provenance_note}</span>
         <div className="rs-stack" style={{ gap: 10, display: locked ? 'none' : undefined }}>
-          {example.choices.map((choice, index) => <label className="rs-stack" key={choice.id} style={{ gap: 6 }}>Version {choice.label}
-            <audio ref={(element) => { players.current[index] = element }} controls preload="none" aria-label={'Pause example ' + choice.label} src={choice.audio_url} onError={() => setAudioError(true)} style={{ width: '100%' }} />
-          </label>)}
+          {example.choices.map((choice, index) => <div className="rs-stack" key={choice.id} style={{ gap: 6 }}>Version {choice.label}
+            <AudioPlayer ref={(element) => { players.current[index] = element }} preload="none" aria-label={'Pause example ' + choice.label} src={choice.audio_url} onError={() => setAudioError(true)} />
+          </div>)}
         </div>
         {audioError && !locked && <div role="alert"><p>The examples could not load. You can read the pause patterns and continue your own practice.</p><button type="button" className="rs-link" onClick={() => { setAudioError(false); players.current.forEach((audio) => audio?.load()) }}>Retry examples</button></div>}
         <fieldset disabled={locked || save.isPending} style={{ padding: 0, margin: 0, border: 0 }}>
@@ -55,7 +57,7 @@ export function ListeningExample({ itemId, example, boundaries, plan, locked, on
           </div>
         </fieldset>
         <details><summary>Read the pause patterns</summary>{example.choices.map((choice) => <p key={choice.id}><strong>{choice.label}:</strong> {choice.paused_text}</p>)}</details>
-        {selectedAnswer && <div className="rs-stack" style={{ gap: 8 }}><p style={{ margin: 0 }}>{example.explanation}</p><p style={{ margin: 0 }}>{example.transfer_prompt}</p></div>}
+        {selectedAnswer && <div className="rs-stack rs-gap-2"><p style={{ margin: 0 }}>{example.explanation}</p><p style={{ margin: 0 }}>{example.transfer_prompt}</p></div>}
         {!!boundaries.length && <fieldset disabled={locked || save.isPending} style={{ padding: 0, margin: 0, border: 0 }}>
           <legend style={{ fontWeight: 500 }}>Choose a boundary to listen for in your take</legend>
           <div className="rs-stack" style={{ gap: 8, marginTop: 8 }}>{boundaries.map((entry) => <label key={entry.index} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>

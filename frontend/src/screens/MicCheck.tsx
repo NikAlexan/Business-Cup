@@ -124,28 +124,28 @@ export default function MicCheck() {
                   {device ? STATUS_TEXT[status] : 'Waiting for the mic…'}
                 </span>
               </div>
-              <form className="rs-stack" style={{ gap: 16 }} aria-label="Recording setup" onSubmit={(e) => (e.preventDefault(), go())}>
+              <form className="rs-stack rs-gap-4" aria-label="Recording setup" onSubmit={(e) => (e.preventDefault(), go())}>
                 {reassessment && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
                 {reassessment && previous.error && <ErrorBanner error={previous.error} onRetry={() => previous.refetch()} />}
                 {reassessment && !setupFor && !me.error && !previous.error && <p role="status">{me.data && !me.data.latest_assessment_id ? 'Complete your initial voice profile before starting a check-in.' : 'Loading your previous recording setup…'}</p>}
                 {reassessment && previous.data && <section className="rs-card rs-stack" aria-label="Previous recording setup" style={{ padding: 18, gap: 8 }}>
-                  <h2 className="rs-h" style={{ fontSize: 20 }}>{previous.data.analysis_metadata?.demo?.prepared_data ? 'Prepared demo setup' : 'Previous recording setup'}</h2>
+                  <h2 className="rs-h rs-h3">{previous.data.analysis_metadata?.demo?.prepared_data ? 'Prepared demo setup' : 'Previous recording setup'}</h2>
                   <span>Microphone: {previous.data.recording_conditions?.device_label || 'Not recorded'}</span>
                   <span>Distance: {previous.data.recording_conditions?.distance_cm ? previous.data.recording_conditions.distance_cm + ' cm' : 'Not recorded'}</span>
                   <span>Room: {ENVS.find(([id]) => id === previous.data?.recording_conditions?.environment)?.[1] ?? 'Not recorded'}</span>
                   {previous.data.recording_conditions?.notes && <span>Notes: {previous.data.recording_conditions.notes}</span>}
                 </section>}
-                <div className="rs-stack" style={{ gap: 4 }}>
-                  <h2 className="rs-h" style={{ fontSize: 20 }}>Your recording setup</h2>
+                <div className="rs-stack rs-gap-1">
+                  <h2 className="rs-h rs-h3">Your recording setup</h2>
                   <p style={{ margin: 0, fontSize: 15, color: 'var(--muted)' }}>
                     {reassessment ? 'Match the setup of your previous recording so the numbers compare.' : 'We save it with your baseline and ask you to match it at your next check-in.'}
                   </p>
                 </div>
-                <div className="rs-stack" style={{ gap: 6 }}>
+                <div className="rs-stack rs-gap-2">
                   <span style={{ font: '500 15px var(--font-text)' }}>Microphone</span>
                   <span className="rs-label">{device || '—'}</span>
                 </div>
-                <div className="rs-stack" style={{ gap: 6 }}>
+                <div className="rs-stack rs-gap-2">
                   <label htmlFor="dist" style={{ font: '500 15px var(--font-text)' }}>Distance to the mic</label>
                   <select id="dist" style={select} value={distance ?? ''} disabled={reassessment && !setupFor} onChange={(e) => setDistance(e.target.value ? +e.target.value : null)}>
                     <option value="">Not recorded</option>
@@ -165,7 +165,7 @@ export default function MicCheck() {
                     ))}
                   </div>
                 </fieldset>
-                <label className="rs-stack" style={{ gap: 6 }}>Setup notes (optional)
+                <label className="rs-stack rs-gap-2">Setup notes (optional)
                   <textarea rows={2} maxLength={500} value={notes} disabled={reassessment && !setupFor} onChange={(event) => setNotes(event.target.value)} style={{ ...select, height: 'auto', padding: 12 }} />
                 </label>
                 {reassessment && previous.data?.recording_conditions && setupFor && device && (

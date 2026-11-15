@@ -33,8 +33,10 @@ export default function Done() {
   const c = complete.data
   const tz = today.data?.timezone ?? 'UTC'
   return (
-    <div className="rs rs-page" style={{ background: 'var(--stage)', minHeight: '100dvh' }}>
-      <div className="rs-wrap" style={{ maxWidth: 760, paddingTop: 'clamp(48px, 18vh, 200px)', paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 14, color: 'var(--stage-ink)' }}>
+    <div className="rs rs-page" style={{ background: 'var(--stage)', minHeight: '100dvh', position: 'relative', overflow: 'hidden' }}>
+      {/* Mockup: the sun rising over the stage, same mark as the start screen. */}
+      <svg width="520" height="520" viewBox="0 0 520 520" aria-hidden="true" style={{ position: 'absolute', right: -140, top: -140 }}><circle cx="260" cy="260" r="250" fill="var(--primary)" opacity=".2" /><circle cx="260" cy="260" r="160" fill="var(--primary)" opacity=".3" /><circle cx="260" cy="260" r="72" fill="var(--sun)" /></svg>
+      <div className="rs-wrap" style={{ position: 'relative', maxWidth: 760, paddingTop: 'clamp(48px, 18vh, 200px)', paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 14, color: 'var(--stage-ink)' }}>
         {complete.isPending && <Skeleton height={240} />}
         {complete.error && !(complete.error instanceof ApiError && complete.error.code === 'lesson_incomplete') && (
           <>
@@ -54,7 +56,7 @@ export default function Done() {
             <span style={{ fontSize: 15, opacity: 0.8 }}>Notes earned and recorded practice time. Untimed warm-ups are not included.</span>
             <div className="rs-bars" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginTop: 20 }} aria-hidden="true">
               {SHAPE.map((h, i) => (
-                <i key={i} className={i === c.completed_lessons - 1 ? 'rs-today' : undefined} style={{ '--i': i, flex: 1, height: h + '%', borderRadius: 6, background: i < c.completed_lessons ? 'var(--sun)' : 'rgba(255,255,255,.16)' } as React.CSSProperties} />
+                <i key={i} className={i === c.completed_lessons - 1 ? 'rs-today' : undefined} style={{ '--i': i, flex: 1, height: h + '%', borderRadius: 6, background: i < c.completed_lessons ? 'var(--sun)' : 'var(--stage-dim)' } as React.CSSProperties} />
               ))}
             </div>
             <Link className="rs-btn rs-btn--sun rs-btn--wide" to="/today" style={{ alignSelf: 'flex-start', marginTop: 20 }}>

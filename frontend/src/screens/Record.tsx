@@ -99,7 +99,7 @@ export default function Record() {
       <main className="rs-wrap rs-narrow" style={{ paddingTop: 16, paddingBottom: 48, display: 'flex', flexDirection: 'column', gap: 18 }}>
         {current ? (
           <>
-            <div className="rs-stack" style={{ gap: 6 }}>
+            <div className="rs-stack rs-gap-2">
               <h1 className="rs-h rs-h1">{rejected ? `Let's record task ${index + 1} again` : KIND_TITLE[current.kind] ?? 'Read this passage'}</h1>
               <p style={{ margin: 0, color: 'var(--muted)' }}>
                 Task {index + 1} of {tasks.length} · {current.instruction}

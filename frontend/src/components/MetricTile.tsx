@@ -48,7 +48,7 @@ export function MetricTile({
     <span className="rs-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
       {spec.label}
       {focus && (
-        <span className="rs-badge" style={{ height: 24, fontSize: 12, background: 'var(--sun)', color: 'var(--ink)' }}>
+        <span className="rs-badge" style={{ height: 24, fontSize: 12, background: 'var(--sun)', color: 'var(--sun-ink)' }}>
           Working on this
         </span>
       )}
@@ -82,7 +82,8 @@ export function MetricTile({
         </span>
       )}
       {i && <span className="rs-metric__n">{targetLine(spec, m, i, all)}</span>}
-      {spec.key === 'pause_ratio' && <span className="rs-metric__n">Time in pauses does not measure where they fall. Listen back to judge the phrasing.</span>}
+      {/* Profile only: the caveat belongs next to the interpretation, not on every daily tile. */}
+      {spec.key === 'pause_ratio' && i && <span className="rs-metric__n">Time in pauses does not measure where they fall. Listen back to judge the phrasing.</span>}
       <span className="rs-metric__n">
         {c
           ? c.available && c.delta !== null

@@ -15,7 +15,7 @@ export function FlowHeader({ back, children }: { back?: string; children: ReactN
           <BackIcon />
         </Link>
       ) : (
-        <span style={{ width: 44 }} />
+        <span style={{ width: 'var(--tap)' }} />
       )}
       <div style={{ flex: 1, maxWidth: 520 }}>{children}</div>
       <span className="d-only" style={{ width: 120 }} />

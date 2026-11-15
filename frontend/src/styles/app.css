@@ -1,5 +1,7 @@
 /* App-only additions on top of design/screens/screens.css */
 body { margin: 0; background: var(--ground); }
+/* Unlit bars on the dark stage; same in both themes because the stage is always dark. */
+:root { --stage-dim: rgba(255, 255, 255, .16); }
 a { color: var(--ink); }
 a:hover { color: var(--primary-edge); }
 .rs-logo { width: 30px; height: 30px; border-radius: 50%; background: var(--stage); display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
@@ -8,12 +10,18 @@ a:hover { color: var(--primary-edge); }
 .rs-banner--danger { background: var(--danger-tint); align-items: center; justify-content: space-between; }
 .rs-banner--warn { background: var(--warning-tint); }
 .rs-banner--info { background: var(--sky-tint); align-items: center; }
-.rs-btn--quiet { height: 40px; padding: 0 18px; font-size: 16px; background: var(--ground); color: var(--ink); box-shadow: 0 3px 0 var(--line); }
+.rs-btn--quiet { height: 44px; padding: 0 18px; font-size: 16px; background: var(--ground); color: var(--ink); box-shadow: 0 3px 0 var(--line); }
 .rs-skeleton { border-radius: 18px; background: linear-gradient(90deg, var(--surface), var(--line), var(--surface)); background-size: 200% 100%; animation: rs-shimmer 1.4s ease-in-out infinite; }
 @keyframes rs-shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .rs-skeleton { animation: none; } }
 button.rs-btn { font-family: var(--font-display); }
 .rs-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.rs-cols:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+/* Desktop app header: equal side columns keep the nav centred with or without chips. */
+.rs-nav:has(> .rs-nav__links) { display: grid; grid-template-columns: 1fr auto 1fr; }
+.rs-nav:has(> .rs-nav__links) > .rs-brand { justify-self: start; }
+.rs-nav:has(> .rs-nav__links) > :last-child { justify-self: end; }
+@container page (max-width: 760px) { .rs-nav:has(> .rs-nav__links) { display: flex; } }
 .rs-tabs { position: sticky; bottom: 0; z-index: 5; }
 /* Short pages: stretch to the viewport so the tab bar sits at the bottom, not under the content. */
 .rs-page:has(> .rs-tabs) { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -33,7 +41,7 @@ button.rs-btn { font-family: var(--font-display); }
 
 /* Done: the plan grows bar by bar, today's bar lands last and lights up, then rewards arrive. */
 @keyframes rs-grow { from { transform: scaleY(0.08); } }
-@keyframes rs-light { from { background: rgba(255, 255, 255, .16); } }
+@keyframes rs-light { from { background: var(--stage-dim); } }
 @keyframes rs-arrive { from { opacity: 0; transform: translateY(8px); } }
 .rs-bars > i { transform-origin: bottom; animation: rs-grow 520ms cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i) * 35ms); }
 .rs-bars > i.rs-today { animation: rs-grow 620ms cubic-bezier(0.16, 1, 0.3, 1) 560ms both, rs-light 300ms ease-out 1080ms both; }
@@ -65,3 +73,29 @@ button.rs-btn { font-family: var(--font-display); }
   .rs-eq > i { border-radius: 6px; }
   .rs-eq > i:not(.t):not(.c) { font-size: 0; padding: 0; }
 }
+
+/* Audio player (mockup: rs-player). The track is a real range input so seeking works by keyboard and touch. */
+.rs-player { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 18px; background: var(--surface); width: 100%; }
+.rs-player__btn { width: var(--tap); height: var(--tap); flex: none; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--primary); color: var(--primary-ink); box-shadow: 0 3px 0 var(--primary-edge); margin-bottom: 3px; cursor: pointer; }
+.rs-player__btn:active { transform: translateY(3px); box-shadow: 0 0 0 transparent; }
+.rs-player__title { font: 500 15px var(--font-text); }
+.rs-player__track { -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: transparent; cursor: pointer; touch-action: none; }
+.rs-player__track:disabled { cursor: default; }
+.rs-player__track::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: linear-gradient(var(--primary-edge), var(--primary-edge)) 0 / var(--p, 0%) 100% no-repeat, var(--line); }
+.rs-player__track::-moz-range-track { height: 8px; border-radius: 999px; background: linear-gradient(var(--primary-edge), var(--primary-edge)) 0 / var(--p, 0%) 100% no-repeat, var(--line); }
+.rs-player__track::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -4px; border-radius: 50%; background: var(--primary-edge); border: 2px solid var(--ground); }
+.rs-player__track::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--primary-edge); border: 2px solid var(--ground); }
+.rs-player__track:disabled::-webkit-slider-thumb { visibility: hidden; }
+.rs-player__track:disabled::-moz-range-thumb { visibility: hidden; }
+.rs-player__time { font: 500 13px var(--font-text); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-player audio { display: none; }
+.rs-card .rs-player { background: var(--ground); } /* stays visible on surface cards */
+.rs-player__mini { min-width: 44px; height: 44px; flex: none; border-radius: 999px; border: 0; padding: 0 8px; display: grid; place-items: center; background: transparent; color: var(--muted); font: 600 14px var(--font-display); font-variant-numeric: tabular-nums; cursor: pointer; text-decoration: none; }
+.rs-player__mini:hover { color: var(--ink); background: var(--line); }
+/* Flex summaries lose the native marker; draw it back so the block still reads as expandable. */
+.rs-disclosure::before { content: ""; width: 8px; height: 8px; flex: none; margin-right: 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 150ms ease-out; }
+details[open] > .rs-disclosure::before { transform: rotate(45deg); }
+.rs-disclosure > :first-of-type { margin-right: auto; }
+@media (prefers-reduced-motion: reduce) { .rs-disclosure::before { transition: none; } }
+@container page (max-width: 760px) { .rs-player { flex-wrap: wrap; } .rs-player > .rs-stack { flex-basis: calc(100% - 60px); } }
+.rs-dock .rs-player { background: var(--ground); }

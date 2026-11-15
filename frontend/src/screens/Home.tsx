@@ -76,7 +76,7 @@ export default function Home() {
   return (
     <AppShell>
       <div className="rs-cols rs-cols--side">
-        <div className="rs-stack" style={{ gap: 24 }}>
+        <div className="rs-stack rs-gap-5">
           <PracticeFocusCard storyId={story?.id} />
           <div className="rs-card rs-stack" style={{ gap: 16, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px 12px', flexWrap: 'wrap' }}>
@@ -91,9 +91,9 @@ export default function Home() {
           </div>
 
           {(open || t.daily_status === 'completed') && lesson && (
-            <div className="rs-stack" style={{ gap: 10 }}>
+            <div className="rs-stack rs-gap-3">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <h2 className="rs-h" style={{ fontSize: 22 }}>{open ? "Today's session" : 'Review or practice again'}</h2>
+                <h2 className="rs-h rs-h2">{open ? "Today's session" : 'Review or practice again'}</h2>
                 <span className="rs-label">About {mins(lesson.estimated_duration_seconds)}</span>
               </div>
               {lesson.items.map((i) => (
@@ -125,11 +125,11 @@ export default function Home() {
             </div>
           )}
         </div>
-        <aside className="rs-stack" style={{ gap: 16 }}>
+        <aside className="rs-stack rs-gap-4">
           <Week />
           {checkIn && (
             <div className="rs-card rs-stack" style={{ gap: 8, padding: 24, background: 'var(--sky-tint)' }}>
-              <h2 className="rs-h" style={{ fontSize: 22 }}>Check-in on {formatDate(checkIn, t.timezone)}</h2>
+              <h2 className="rs-h rs-h2">Check-in on {formatDate(checkIn, t.timezone)}</h2>
               <p style={{ margin: 0, fontSize: 15 }}>Repeat the control and expression tasks, plus a fresh unfamiliar passage. Then a new plan.</p>
               {(t.reassessment.available || t.reassessment.demo_override_available) && (
                 <Link className="rs-link" to="/check-in" style={{ fontSize: 15 }}>Open check-in</Link>

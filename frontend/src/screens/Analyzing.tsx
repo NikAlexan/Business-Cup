@@ -53,21 +53,21 @@ export default function Analyzing() {
           <div style={{ width: 160, height: 160, borderRadius: '50%', background: 'var(--tonal)', display: 'grid', placeItems: 'center' }}>
             <LevelMeter level={status === 'failed' || missing || mismatch ? 0 : 0.55} label="Analyzing" />
           </div>
-          <h1 className="rs-h rs-h1">Building your voice profile</h1>
-          <p style={{ margin: 0, color: 'var(--muted)', maxWidth: '36ch' }}>{job.data && !mismatch ? 'Your accepted recordings are saved. You can leave and return to this analysis.' : 'Recovering your saved assessment.'}</p>
+          <h1 className="rs-h rs-h1">{missing ? 'Analysis not found' : status === 'failed' ? 'Analysis paused' : 'Building your voice profile'}</h1>
+          <p style={{ margin: 0, color: 'var(--muted)', maxWidth: '36ch' }}>{missing ? 'Your saved results are not affected.' : job.data && !mismatch ? 'Your accepted recordings are saved. You can leave and return to this analysis.' : 'Recovering your saved assessment.'}</p>
         </div>
         {mismatch ? <ErrorBanner text="This link combines different assessments. Open the assessment from your saved progress." />
-          : missing ? <><ErrorBanner text="This link does not identify a saved analysis." /><Link to="/">Return to your practice</Link></>
+          : missing ? <><ErrorBanner text="This link does not identify a saved analysis." /><Link className="rs-link" to="/">Return to your practice</Link></>
           : !jobId && assessment.isPending ? <Skeleton height={160} />
           : status === 'failed' ? <>
             <ErrorBanner text={job.data?.error?.message ?? 'Analysis failed.'} />
-            <p>Your recordings are saved. {job.data?.retryable ? 'Retry this analysis without uploading them again.' : 'This analysis cannot be retried here.'}</p>
+            <p style={{ margin: 0, textAlign: 'center' }}>{job.data?.retryable ? 'Retry this analysis without uploading them again.' : 'This analysis cannot be retried here.'}</p>
             {job.data?.retryable && <button className="rs-btn rs-btn--wide" type="button" style={{ alignSelf: 'center' }} disabled={retry.isPending} onClick={() => retry.mutate({}, { onSuccess: () => {
               qc.setQueryData<Job>(['job', jobId], (previous) => previous ? { ...previous, status: 'queued', error: null, retryable: false, poll_after_ms: 2000 } : previous)
               void qc.invalidateQueries({ queryKey: ['assessment', id] })
               void job.refetch()
             } })}>Retry analysis</button>}
-          </> : jobId && <div className="rs-card rs-stack" style={{ gap: 14 }} aria-label="Analysis stages">
+          </> : jobId && <div className="rs-card rs-stack rs-gap-4" aria-label="Analysis stages">
             <span role="status">{status === 'queued' ? 'Waiting to start analysis' : job.data ? STEPS[current] : 'Loading saved analysis…'}</span>
             {STEPS.map((step, index) => <div key={step} style={{ display: 'flex', gap: 12, alignItems: 'center' }} aria-current={index === current ? 'step' : undefined}>
               {index < current ? <span style={{ color: 'var(--success)' }} aria-label="Completed"><Check /></span>

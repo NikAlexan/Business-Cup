@@ -15,7 +15,7 @@ export function PracticeFocusCard({ storyId }: { storyId?: string }) {
   if (data.error) return <ErrorBanner error={data.error} onRetry={() => data.refetch()} />
   if (!focus) return null
   return <section className="rs-card rs-stack" aria-label="Your practice focus" style={{ padding: 24, gap: 12 }}>
-    <h2 className="rs-h" style={{ fontSize: 22 }}>{focus.intent === 'keep' ? 'Keep what worked' : focus.intent === 'experiment' ? 'Keep working on one change' : 'Your saved practice focus'}</h2>
+    <h2 className="rs-h rs-h2">{focus.intent === 'keep' ? 'Keep what worked' : focus.intent === 'experiment' ? 'Keep working on one change' : 'Your saved practice focus'}</h2>
     <p style={{ margin: 0 }}><strong>{focus.skill_label}:</strong> {focus.note}</p>
     <p style={{ margin: 0 }}>{focus.listening_question}</p>
     <span className="rs-label">Saved for story practice and your next session.</span>

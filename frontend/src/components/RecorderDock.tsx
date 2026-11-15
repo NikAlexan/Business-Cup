@@ -1,3 +1,4 @@
+import { AudioPlayer } from './AudioPlayer'
 import { useEffect, useRef } from 'react'
 import { LevelMeter, STATUS_TEXT } from './LevelMeter'
 import { MicBlocked } from './MicBlocked'
@@ -40,10 +41,9 @@ export function RecorderDock({
     return (
       <div className="rs-dock" style={{ flexDirection: 'column', gap: 14 }}>
         <span className="rs-label" role="status">{r.limitReached ? 'Recording reached its length limit. Listen for a complete ending before sending.' : 'Your take — listen back if you like'}</span>
-        <audio
-          controls
+        <div style={{ width: '100%', maxWidth: 420 }}><AudioPlayer
+          aria-label="Your take"
           src={r.url}
-          style={{ width: '100%', maxWidth: 420 }}
           // timeupdate fires only ~4×/s; follow every frame while playing
           onPlay={(e) => {
             const a = e.currentTarget
@@ -59,7 +59,7 @@ export function RecorderDock({
             cancelAnimationFrame(raf.current)
             onPlayTime?.(Infinity) // end of the take: everything heard, even words timed past the last frame
           }}
-        />
+        /></div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
           <button className="rs-btn" type="button" onClick={onSend} disabled={sending}>
             {sending ? 'Checking…' : sendLabel}

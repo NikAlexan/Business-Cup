@@ -17,6 +17,7 @@
   --record-ink: #ffffff;
   --sky: #1f8fff;
   --sky-tint: #e3f1ff;
+  --sky-ink: #0b62c4;
   --baseline: #a3a8b0;
   --success: #0b7a6d;
   --success-tint: #dff7f3;
@@ -24,6 +25,7 @@
   --warning-tint: #fff3d6;
   --danger: #d6332f;
   --danger-tint: #ffe4e2;
+  --danger-edge: #a3201d;
   --focus: #1f8fff;
   --stage: #1b2440;
   --stage-ink: #ffffff;
@@ -48,6 +50,7 @@
   --record-ink: #14181f;
   --sky: #5fb0ff;
   --sky-tint: #1a2c44;
+  --sky-ink: #5fb0ff;
   --baseline: #5d6673;
   --success: #2fd8c1;
   --success-tint: #163a36;
@@ -55,6 +58,7 @@
   --warning-tint: #3a2f14;
   --danger: #ff8a80;
   --danger-tint: #45252a;
+  --danger-edge: #c2564d;
   --focus: #5fb0ff;
   --stage: #0d1220;
   --stage-ink: #f1f4f7;

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { post, request, useMutationWithKey } from '../api/api'
 import { useMe } from '../api/hooks'
 import type { Me, Subscription } from '../api/types'
@@ -33,11 +33,11 @@ export function TestModeBanner({ children }: { children: ReactNode }) {
   )
 }
 
-function Page({ back, label, children }: { back?: string; label: string; children: ReactNode }) {
+function Page({ back, label, children }: { back?: string; label?: string; children: ReactNode }) {
   return (
     <div className="rs rs-page">
       <FlowHeader back={back}>
-        <span className="rs-label">{label}</span>
+        {label && <span className="rs-label">{label}</span>}
       </FlowHeader>
       <main className="rs-wrap" style={{ paddingTop: 16, paddingBottom: 56 }}>
         {children}
@@ -60,14 +60,14 @@ const Lock = () => (
   </svg>
 )
 
-// Hidden on phones so the plan picker stays within a short scroll.
-const LockedPlan = () => (
+// Hidden on phones so the plan picker stays within a short scroll. Finished sessions stay lit: the paywall must not look like it took progress away.
+const LockedPlan = ({ done }: { done: number }) => (
   <div className="rs-card rs-stack d-only" style={{ gap: 12, padding: 24 }}>
-    <div className="rs-eq" role="img" aria-label="14 locked sessions and a check-in">
-      {BARS.map((h, i) => <i key={i} style={{ height: h + '%' }}><Lock /></i>)}
+    <div className="rs-eq" role="img" aria-label={`${done} of 14 sessions done, the rest locked, then a check-in`}>
+      {BARS.map((h, i) => i < done ? <i key={i} className="d" style={{ height: h + '%' }}><Check /></i> : <i key={i} style={{ height: h + '%' }}><Lock /></i>)}
       <i className="c" style={{ height: '100%' }}><Check /></i>
     </div>
-    <span className="rs-label">5–8 minutes a day · check-in on day 14</span>
+    <span className="rs-label">{done ? `${done} of 14 done · ` : ''}5–8 minutes a day · check-in on day 14</span>
   </div>
 )
 
@@ -83,14 +83,14 @@ export function Paywall() {
   return (
     <Page back={profile} label="Your profile is saved">
       <div className="rs-cols rs-paywall">
-        <div className="rs-stack" style={{ gap: 20 }}>
-          <div className="rs-stack" style={{ gap: 8 }}>
+        <div className="rs-stack rs-gap-5">
+          <div className="rs-stack rs-gap-2">
             <h1 className="rs-h rs-h1">Unlock your 14‑session plan</h1>
             <p style={{ margin: 0, color: 'var(--muted)', maxWidth: '46ch' }}>
               Built from your recording: pace and pauses first, then intonation range. Your profile stays free either way.
             </p>
           </div>
-          <LockedPlan />
+          <LockedPlan done={me.data?.current_plan_id ? me.data.progress.completed_lessons : 0} />
           <ul className="rs-stack" style={{ gap: 12, margin: 0, padding: 0, listStyle: 'none' }}>
             {PERKS.map((t) => (
               <li key={t} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', color: 'var(--ink)' }}>
@@ -101,7 +101,7 @@ export function Paywall() {
           </ul>
         </div>
         <div className="rs-card rs-stack" style={{ gap: 14, padding: 24, borderRadius: 28 }}>
-          <h2 className="rs-h" style={{ fontSize: 22 }}>Choose a plan</h2>
+          <h2 className="rs-h rs-h2">Choose a plan</h2>
           {plans.error ? (
             <ErrorBanner error={plans.error} onRetry={() => plans.refetch()} />
           ) : !plans.data ? (
@@ -121,7 +121,7 @@ export function Paywall() {
                     <span className="rs-opt__title">{p.interval === 'month' ? 'Monthly' : 'Yearly'}</span>
                     <span className="rs-opt__meta">Renews every {p.interval}</span>
                   </span>
-                  <span className="rs-h" style={{ fontSize: 20 }}>
+                  <span className="rs-h rs-h3">
                     {money(p.amount, p.currency)}
                     <span style={{ font: '400 14px var(--font-text)', color: 'var(--muted)' }}>/{PER[p.interval]}</span>
                   </span>
@@ -186,7 +186,7 @@ export function PaySuccess() {
               <dt className="rs-label">Receipt</dt>
               <dd style={{ margin: 0 }}>Sent by Stripe to your email</dd>
               <dt className="rs-label">Mode</dt>
-              <dd style={{ margin: 0 }}><span className="rs-badge" style={{ background: 'var(--sky-tint)', color: 'var(--sky)' }}>Test — no real charge</span></dd>
+              <dd style={{ margin: 0 }}><span className="rs-badge" style={{ background: 'var(--sky-tint)', color: 'var(--sky-ink)' }}>Test — no real charge</span></dd>
             </dl>
             <Link className="rs-btn rs-btn--wide" to="/today" style={{ alignSelf: 'center' }}>
               {me.data?.progress.completed_lessons ? 'Go to today' : 'Start session 1'}
@@ -205,7 +205,7 @@ export function PayCanceled() {
   return (
     <Page back="/paywall" label="Checkout canceled">
       <div className="rs-stack" style={{ maxWidth: 640, margin: '16px auto 0', gap: 20 }}>
-        <div className="rs-stack" style={{ gap: 8 }}>
+        <div className="rs-stack rs-gap-2">
           <h1 className="rs-h rs-h1">Checkout canceled. Nothing was charged.</h1>
           <p style={{ margin: 0, color: 'var(--muted)' }}>Your voice profile and recordings are saved in this browser.</p>
         </div>
@@ -246,9 +246,10 @@ const TERMS: [string, string][] = [
 
 export function Terms() {
   const plans = usePlans()
+  const navigate = useNavigate()
   const prices = plans.data?.plans.map((p) => `${money(p.amount, p.currency)}/${PER[p.interval]}`).join(' or ')
   return (
-    <FlowShell>
+    <FlowShell end={<button className="rs-link" type="button" style={{ fontSize: 15, cursor: 'pointer' }} onClick={() => (history.length > 1 ? navigate(-1) : navigate('/'))}>Back</button>}>
       <article className="rs-stack" style={{ gap: 14, fontSize: 17, lineHeight: 1.65 }}>
         <h1 className="rs-h rs-h1">Subscription terms</h1>
         <p style={{ margin: 0, color: 'var(--muted)' }}>A plain-language summary.</p>

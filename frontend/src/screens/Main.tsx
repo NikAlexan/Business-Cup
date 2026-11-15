@@ -1,15 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { post, useMutationWithKey } from '../api/api'
 import { useMe } from '../api/hooks'
 import { Logo } from '../components/Icons'
 import { ErrorBanner } from '../components/ui'
 
+// Icons as in the mockup: each goal keeps its own mark; the selected one fills with primary.
 const GOALS = [
-  { id: 'clear_speech', title: 'Clearer speech', meta: 'Crisp words, steady pace' },
-  { id: 'expressive_voice', title: 'More expressive voice', meta: 'Intonation and stress' },
-  { id: 'confident_delivery', title: 'Confident delivery', meta: 'Steady, assured reads' },
+  { id: 'clear_speech', title: 'Clearer speech', meta: 'Crisp words, steady pace', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h14" /></svg> },
+  { id: 'expressive_voice', title: 'More expressive voice', meta: 'Intonation and stress', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="17.5" cy="16" r="2.5" /></svg> },
+  { id: 'confident_delivery', title: 'Confident delivery', meta: 'Steady, assured reads', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2" /><rect x="3" y="14" width="4" height="6" rx="2" /><rect x="17" y="14" width="4" height="6" rx="2" /></svg> },
 ]
 const HERO = [30, 45, 38, 60, 52, 72, 58, 80, 64, 88, 70, 94, 76, 100]
 
@@ -54,8 +55,8 @@ export default function Main() {
       </header>
       <div className="rs-wrap" style={{ paddingTop: 40, paddingBottom: 56 }}>
         <div className="rs-cols" style={{ alignItems: 'center' }}>
-          <div className="rs-stack" style={{ gap: 24 }}>
-            <div className="rs-stack" style={{ gap: 12 }}>
+          <div className="rs-stack rs-gap-5">
+            <div className="rs-stack rs-gap-3">
               <h1 className="rs-h rs-hero-title" style={{ lineHeight: 1.05 }}>
                 Train your voice in five minutes a day
               </h1>
@@ -63,7 +64,7 @@ export default function Main() {
                 Record three short tasks, get a voice profile and a 14-session plan.
               </p>
             </div>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>
+            <h2 className="rs-h rs-h3">
               What do you want to work on?
             </h2>
             <div role="radiogroup" aria-label="Goal" style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 520 }}>
@@ -86,7 +87,7 @@ export default function Main() {
                   onClick={() => setGoal(g.id)}
                 >
                   <span className="rs-opt__icon" style={goal === g.id ? { background: 'var(--primary)', color: 'var(--primary-ink)' } : undefined}>
-                    {goal === g.id ? '✓' : ''}
+                    {g.icon}
                   </span>
                   <span>
                     <span className="rs-opt__title">{g.title}</span>
@@ -104,7 +105,7 @@ export default function Main() {
                   onChange={(e) => setConsent(e.target.checked)}
                   style={{ width: 22, height: 22, margin: '1px 0 0', flex: 'none', accentColor: 'var(--primary-edge)' }}
                 />
-                <span>I agree that my recordings are processed to measure my voice and write feedback.</span>
+                <span>I agree that my recordings are processed to measure my voice and write feedback. <Link className="rs-link" to="/terms" style={{ fontSize: 15 }}>How recordings are used</Link></span>
               </label>
               {start.error && <ErrorBanner error={start.error} onRetry={submit} />}
               <button className="rs-btn rs-btn--wide" type="button" disabled={!consent || start.isPending} onClick={submit} style={{ alignSelf: 'flex-start' }}>
@@ -121,7 +122,7 @@ export default function Main() {
             </h2>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 180 }} aria-hidden="true">
               {HERO.map((h, i) => (
-                <i key={i} style={{ flex: 1, height: h + '%', borderRadius: 10, background: i < 5 ? 'var(--sun)' : i === 5 ? 'var(--primary)' : 'rgba(255,255,255,.16)' }} />
+                <i key={i} style={{ flex: 1, height: h + '%', borderRadius: 10, background: i < 5 ? 'var(--sun)' : i === 5 ? 'var(--primary)' : 'var(--stage-dim)' }} />
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
