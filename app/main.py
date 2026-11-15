@@ -33,6 +33,7 @@ from app.schemas import (
     PracticeFocusInput,
     Preferences,
     ReflectionInput,
+    TakeComparisonResultInput,
 )
 from app.service import COOKIE, Service, digest
 
@@ -491,6 +492,22 @@ def create_app(settings=None):
         if not values["practice_only"]:
             values.pop("practice_only")  # Preserve legacy request fingerprints for retries across deploys.
         return mutate(s, request, values, lambda: s.attempt(values))
+
+    @app.post("/api/v1/exercise-attempts/{attempt_id}/comparison")
+    def create_comparison(attempt_id: UUID, payload: Empty, request: Request, s: S):
+        return mutate(s, request, {}, lambda: s.create_take_comparison(attempt_id))
+
+    @app.get("/api/v1/listening-comparisons/{comparison_id}")
+    def take_comparison(comparison_id: UUID, s: S):
+        return s.comparison_view(s.get(comparison_id, "take_comparison"))
+
+    @app.put("/api/v1/listening-comparisons/{comparison_id}/result")
+    def take_comparison_result(comparison_id: UUID, payload: TakeComparisonResultInput, s: S):
+        return s.save_comparison_result(comparison_id, payload.model_dump())
+
+    @app.get("/api/v1/listening-comparisons/{comparison_id}/audio/{label}")
+    def take_comparison_audio(comparison_id: UUID, label: Literal["a", "b"], request: Request, s: S):
+        return audio(UUID(s.comparison_recording(comparison_id, label)), request, s)
 
     @app.get("/api/v1/exercise-attempts")
     def attempt_history(

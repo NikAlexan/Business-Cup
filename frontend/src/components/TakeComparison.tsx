@@ -1,6 +1,7 @@
 import { useAttempt } from '../api/hooks'
 import type { Attempt } from '../api/types'
 import { ErrorBanner } from './ui'
+import { ListeningComparison } from './ListeningComparison'
 
 export function TakeComparison({ take }: { take: Attempt }) {
   const previous = useAttempt(take.practice_focus?.attempt_id)
@@ -35,5 +36,6 @@ export function TakeComparison({ take }: { take: Attempt }) {
       <tbody>{rows.map((row) => <tr key={row.key}><th scope="row">{row.label}</th><td>{row.first}</td><td>{row.latest}</td></tr>)}</tbody>
     </table>}
     {before && <p style={{ margin: 0 }}>Listen to both takes with your chosen focus in mind. Which delivery supports the meaning?</p>}
+    {take.status === 'passed' && take.recording_id && before?.status === 'passed' && before.recording_id && <ListeningComparison key={take.id} takeId={take.id} />}
   </section>
 }

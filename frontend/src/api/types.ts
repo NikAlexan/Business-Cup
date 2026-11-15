@@ -259,3 +259,12 @@ export type PlannedPauseFeedback = {
   available: boolean; gap_seconds: number | null; unavailable_reason?: string | null
   evidence: { quote: string; start_seconds: number; end_seconds: number } | null
 }
+
+
+export type TakeListeningChoice = 'a' | 'b' | 'no_clear_difference' | 'unsure'
+export type TakeListeningComparison = {
+  id: string; schema_version: 'take-listening-v1'; purpose: 'self_listening'; created_at: string
+  status: 'awaiting_choice' | 'revealed'; question: string; text: string; focus_note: string; focus_changed: boolean
+  clips: { label: 'a' | 'b'; audio_url: string; role?: 'previous' | 'current'; attempt_id?: string }[]
+  result: { choice: TakeListeningChoice; note: string; source: 'user_listening'; saved_at: string } | null
+}

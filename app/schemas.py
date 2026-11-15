@@ -79,6 +79,11 @@ class ListeningPlanInput(Input):
     boundary_index: int = Field(ge=0, le=100, strict=True)
 
 
+class TakeComparisonResultInput(Input):
+    choice: Literal["a", "b", "no_clear_difference", "unsure"]
+    note: str = Field(default="", max_length=500)
+
+
 class FocusCheckInput(Input):
     outcome: Literal["heard", "partly", "not_yet", "unsure"]
 

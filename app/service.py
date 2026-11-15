@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+import secrets
 import shutil
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid5
@@ -667,6 +668,112 @@ class Service:
             "expected_words": listening_words(item["task"]["text"]),
         }
         return 201, self.put("listening_plan", plan)
+
+    def comparison_view(self, comparison):
+        result = comparison.get("result")
+        return {
+            "id": comparison["id"],
+            "schema_version": comparison["schema_version"],
+            "created_at": comparison["created_at"],
+            "purpose": "self_listening",
+            "status": "revealed" if result else "awaiting_choice",
+            "question": comparison["question"],
+            "text": comparison["text"],
+            "focus_note": comparison["focus_note"],
+            "focus_changed": comparison["focus_changed"],
+            "clips": [
+                {
+                    "label": label,
+                    "audio_url": f"/api/v1/listening-comparisons/{comparison['id']}/audio/{label}",
+                    **({"role": slot["role"], "attempt_id": slot["attempt_id"]} if result else {}),
+                }
+                for label, slot in comparison["slots"].items()
+            ],
+            "result": result,
+        }
+
+    def create_take_comparison(self, attempt_id):
+        self.auth("daily_training")
+        current = self.get(attempt_id, "attempt")
+        source_id = (current.get("practice_focus") or {}).get("attempt_id")
+        if current["status"] != "passed" or not current.get("recording_id") or not source_id:
+            fail(422, "comparison_not_available", "Choose a saved extra take with a previous recording.")
+        previous = self.get(source_id, "attempt")
+        if (
+            previous["id"] == current["id"]
+            or previous["plan_item_id"] != current["plan_item_id"]
+            or previous["status"] != "passed"
+            or not previous.get("recording_id")
+            or previous["recording_id"] == current["recording_id"]
+        ):
+            fail(
+                422,
+                "comparison_not_available",
+                "This pair needs two accepted recordings of the same exercise.",
+            )
+        comparison_id = str(uuid5(UUID(self.guest.id), f"take-listening-v1:{source_id}:{current['id']}"))
+        if self.db.get(Resource, comparison_id):
+            return 200, self.comparison_view(self.get(comparison_id, "take_comparison"))
+        if (
+            sum(self.local_date(c["created_at"]) == self.local_date() for c in self.all("take_comparison"))
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily listening-comparison limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        for take in (previous, current):
+            record = self.get(take["recording_id"], "recording")
+            if record["status"] != "completed" or record.get("dismissed_at"):
+                fail(
+                    422, "comparison_not_available", "Both saved recordings must be available for listening."
+                )
+        _, _, item = self.find_item(current["plan_item_id"])
+        focus = current.get("training_focus") or current["practice_focus"]
+        ordered = [("previous", previous), ("current", current)]
+        if secrets.randbelow(2):
+            ordered.reverse()
+        comparison = {
+            "id": comparison_id,
+            "schema_version": "take-listening-v1",
+            "created_at": iso(),
+            "question": (current.get("training_focus") or {}).get("listening_question")
+            or item["task"].get("reflection_prompt")
+            or "Which delivery supports the meaning?",
+            "text": item["task"].get("text", ""),
+            "focus_note": focus.get("note", ""),
+            "focus_changed": (previous.get("training_focus") or {}).get("id")
+            != (current.get("training_focus") or {}).get("id"),
+            "slots": {
+                label: {"attempt_id": take["id"], "recording_id": take["recording_id"], "role": role}
+                for label, (role, take) in zip(("a", "b"), ordered, strict=True)
+            },
+            "result": None,
+        }
+        self.put("take_comparison", comparison)
+        return 201, self.comparison_view(comparison)
+
+    def comparison_recording(self, comparison_id, label):
+        comparison = self.get(comparison_id, "take_comparison")
+        return comparison["slots"][label]["recording_id"]
+
+    def save_comparison_result(self, comparison_id, payload):
+        comparison = self.get(comparison_id, "take_comparison")
+        answer = {"choice": payload["choice"], "note": payload["note"].strip()}
+        previous = comparison.get("result")
+        if previous:
+            if any(previous[key] != value for key, value in answer.items()):
+                fail(
+                    409,
+                    "comparison_already_answered",
+                    "The first listening answer is saved. Add further thoughts to your take's reflection.",
+                )
+        else:
+            comparison["result"] = {**answer, "source": "user_listening", "saved_at": iso()}
+            self.put("take_comparison", comparison)
+        return self.comparison_view(comparison)
 
     def save_reflection(self, attempt, payload):
         previous = attempt.get("reflection") or {}

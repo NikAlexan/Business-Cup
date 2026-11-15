@@ -6265,6 +6265,380 @@
               "body": "{\n  \"error\": {\n    \"code\": \"focus_check_not_available\",\n    \"message\": \"This take does not have a saved story focus.\",\n    \"details\": {},\n    \"request_id\": \"70755a71-d809-5a7c-a568-2d12f8679131\"\n  }\n}"
             }
           ]
+        },
+        {
+          "name": "Create or resume an A/B self-listening pair",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}",
+                "description": "Keep the same UUID for retries of the same operation."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/exercise-attempts/{{attempt_id}}/comparison",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "{{api_prefix}}",
+                "exercise-attempts",
+                "{{attempt_id}}",
+                "comparison"
+              ]
+            },
+            "description": "Use an owned passed extra recorded attempt with a frozen previous-take source. One stable pair/order per ordered take pair; new keys reopen it without rerolling. 201 first creation, 200 resume, including after the daily creation limit. This is personal self-listening, not a blind independent test. Metadata roles/attempt IDs stay absent until the first answer. Same-key receipts remain historical: always follow with GET comparison before displaying state. No provider requests, completion, notes, minutes or curriculum changes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 — Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{idempotency_key}}",
+                    "description": "Keep the same UUID for retries of the same operation."
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/exercise-attempts/{{attempt_id}}/comparison",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "exercise-attempts",
+                    "{{attempt_id}}",
+                    "comparison"
+                  ]
+                },
+                "description": "Use an owned passed extra recorded attempt with a frozen previous-take source. One stable pair/order per ordered take pair; new keys reopen it without rerolling. 201 first creation, 200 resume, including after the daily creation limit. This is personal self-listening, not a blind independent test. Metadata roles/attempt IDs stay absent until the first answer. Same-key receipts remain historical: always follow with GET comparison before displaying state. No provider requests, completion, notes, minutes or curriculum changes.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ],
+              "body": "{\n  \"id\": \"5e836c87-48bd-5f31-91a4-f29267f6274b\",\n  \"schema_version\": \"take-listening-v1\",\n  \"created_at\": \"2026-11-15T12:00:00Z\",\n  \"purpose\": \"self_listening\",\n  \"status\": \"awaiting_choice\",\n  \"question\": \"Can you hear the final sounds comfortably?\",\n  \"text\": \"A calm voice carries the ending.\",\n  \"focus_note\": \"Keep the final words comfortable.\",\n  \"focus_changed\": false,\n  \"clips\": [\n    {\n      \"label\": \"a\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/a\"\n    },\n    {\n      \"label\": \"b\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/b\"\n    }\n  ],\n  \"result\": null\n}"
+            },
+            {
+              "name": "200 — OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{idempotency_key}}",
+                    "description": "Keep the same UUID for retries of the same operation."
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/exercise-attempts/{{attempt_id}}/comparison",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "exercise-attempts",
+                    "{{attempt_id}}",
+                    "comparison"
+                  ]
+                },
+                "description": "Use an owned passed extra recorded attempt with a frozen previous-take source. One stable pair/order per ordered take pair; new keys reopen it without rerolling. 201 first creation, 200 resume, including after the daily creation limit. This is personal self-listening, not a blind independent test. Metadata roles/attempt IDs stay absent until the first answer. Same-key receipts remain historical: always follow with GET comparison before displaying state. No provider requests, completion, notes, minutes or curriculum changes.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ],
+              "body": "{\n  \"id\": \"5e836c87-48bd-5f31-91a4-f29267f6274b\",\n  \"schema_version\": \"take-listening-v1\",\n  \"created_at\": \"2026-11-15T12:00:00Z\",\n  \"purpose\": \"self_listening\",\n  \"status\": \"revealed\",\n  \"question\": \"Can you hear the final sounds comfortably?\",\n  \"text\": \"A calm voice carries the ending.\",\n  \"focus_note\": \"Keep the final words comfortable.\",\n  \"focus_changed\": false,\n  \"clips\": [\n    {\n      \"label\": \"a\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/a\",\n      \"role\": \"current\",\n      \"attempt_id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\"\n    },\n    {\n      \"label\": \"b\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/b\",\n      \"role\": \"previous\",\n      \"attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\"\n    }\n  ],\n  \"result\": {\n    \"choice\": \"unsure\",\n    \"note\": \"\",\n    \"source\": \"user_listening\",\n    \"saved_at\": \"2026-11-15T12:01:00Z\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Comparison is created or resumed', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "if ([200, 201].includes(pm.response.code)) pm.environment.set('take_comparison_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read the current A/B listening state",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "{{api_prefix}}",
+                "listening-comparisons",
+                "{{take_comparison_id}}"
+              ]
+            },
+            "description": "Owned private comparison; no-store. Reveals mapping only after the saved first answer. Read this after a create receipt or an ambiguous result save; a lost answer reply must not reset the pair."
+          },
+          "response": [
+            {
+              "name": "200 — OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "listening-comparisons",
+                    "{{take_comparison_id}}"
+                  ]
+                },
+                "description": "Owned private comparison; no-store. Reveals mapping only after the saved first answer. Read this after a create receipt or an ambiguous result save; a lost answer reply must not reset the pair."
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ],
+              "body": "{\n  \"id\": \"5e836c87-48bd-5f31-91a4-f29267f6274b\",\n  \"schema_version\": \"take-listening-v1\",\n  \"created_at\": \"2026-11-15T12:00:00Z\",\n  \"purpose\": \"self_listening\",\n  \"status\": \"revealed\",\n  \"question\": \"Can you hear the final sounds comfortably?\",\n  \"text\": \"A calm voice carries the ending.\",\n  \"focus_note\": \"Keep the final words comfortable.\",\n  \"focus_changed\": false,\n  \"clips\": [\n    {\n      \"label\": \"a\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/a\",\n      \"role\": \"current\",\n      \"attempt_id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\"\n    },\n    {\n      \"label\": \"b\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/b\",\n      \"role\": \"previous\",\n      \"attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\"\n    }\n  ],\n  \"result\": {\n    \"choice\": \"unsure\",\n    \"note\": \"\",\n    \"source\": \"user_listening\",\n    \"saved_at\": \"2026-11-15T12:01:00Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Save the first A/B listening answer and reveal takes",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "{{api_prefix}}",
+                "listening-comparisons",
+                "{{take_comparison_id}}",
+                "result"
+              ]
+            },
+            "description": "Choices: a, b, no_clear_difference, unsure. Optional note defaults empty, max 500 characters and trimmed. First answer is saved atomically with reveal; identical retries preserve saved_at. Changed content after reveal returns 409 comparison_already_answered. Read GET and retain any unsubmitted draft; later thoughts belong in the take reflection. This is user_listening, without an accuracy or mastery claim.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"choice\": \"unsure\",\n  \"note\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 — OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/result",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "listening-comparisons",
+                    "{{take_comparison_id}}",
+                    "result"
+                  ]
+                },
+                "description": "Choices: a, b, no_clear_difference, unsure. Optional note defaults empty, max 500 characters and trimmed. First answer is saved atomically with reveal; identical retries preserve saved_at. Changed content after reveal returns 409 comparison_already_answered. Read GET and retain any unsubmitted draft; later thoughts belong in the take reflection. This is user_listening, without an accuracy or mastery claim.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"choice\": \"unsure\",\n  \"note\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ],
+              "body": "{\n  \"id\": \"5e836c87-48bd-5f31-91a4-f29267f6274b\",\n  \"schema_version\": \"take-listening-v1\",\n  \"created_at\": \"2026-11-15T12:00:00Z\",\n  \"purpose\": \"self_listening\",\n  \"status\": \"revealed\",\n  \"question\": \"Can you hear the final sounds comfortably?\",\n  \"text\": \"A calm voice carries the ending.\",\n  \"focus_note\": \"Keep the final words comfortable.\",\n  \"focus_changed\": false,\n  \"clips\": [\n    {\n      \"label\": \"a\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/a\",\n      \"role\": \"current\",\n      \"attempt_id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\"\n    },\n    {\n      \"label\": \"b\",\n      \"audio_url\": \"/api/v1/listening-comparisons/5e836c87-48bd-5f31-91a4-f29267f6274b/audio/b\",\n      \"role\": \"previous\",\n      \"attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\"\n    }\n  ],\n  \"result\": {\n    \"choice\": \"unsure\",\n    \"note\": \"\",\n    \"source\": \"user_listening\",\n    \"saved_at\": \"2026-11-15T12:01:00Z\"\n  }\n}"
+            },
+            {
+              "name": "409 — Conflict",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/result",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "listening-comparisons",
+                    "{{take_comparison_id}}",
+                    "result"
+                  ]
+                },
+                "description": "Choices: a, b, no_clear_difference, unsure. Optional note defaults empty, max 500 characters and trimmed. First answer is saved atomically with reveal; identical retries preserve saved_at. Changed content after reveal returns 409 comparison_already_answered. Read GET and retain any unsubmitted draft; later thoughts belong in the take reflection. This is user_listening, without an accuracy or mastery claim.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"choice\": \"unsure\",\n  \"note\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"comparison_already_answered\",\n    \"message\": \"The first listening answer is saved. Add further thoughts to your take's reflection.\",\n    \"details\": {},\n    \"request_id\": \"906c6689-add2-504d-bf86-fa995be138d3\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -6836,6 +7210,201 @@
               ],
               "cookie": [],
               "body": "{\n  \"error\": {\n    \"code\": \"recording_already_used\",\n    \"message\": \"This take is already part of your history.\",\n    \"details\": {},\n    \"request_id\": \"368d49be-ca55-5cbc-a8e8-eeb12b74a456\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Play private A/B comparison audio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "audio/*, application/json"
+              },
+              {
+                "key": "Range",
+                "value": "bytes=0-1023",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/audio/{{comparison_label}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "{{api_prefix}}",
+                "listening-comparisons",
+                "{{take_comparison_id}}",
+                "audio",
+                "{{comparison_label}}"
+              ]
+            },
+            "description": "Private cookie-authenticated A/B alias; comparison_label is a or b. Streams actual media through existing recording ownership/Range checks without redirect or recording IDs in the URL. Cache-Control:private, no-store. Binary placeholders in Postman are not playable speech. A/B hides labels only; users may recognize their own takes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is described by the contract', () => pm.expect(pm.response.code).to.be.oneOf([200, 206, 404]));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 — full audio (binary placeholder)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Range",
+                    "value": "bytes=0-1023",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/audio/{{comparison_label}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "listening-comparisons",
+                    "{{take_comparison_id}}",
+                    "audio",
+                    "{{comparison_label}}"
+                  ]
+                },
+                "description": "Private cookie-authenticated A/B alias; comparison_label is a or b. Streams actual media through existing recording ownership/Range checks without redirect or recording IDs in the URL. Cache-Control:private, no-store. Binary placeholders in Postman are not playable speech. A/B hides labels only; users may recognize their own takes."
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "audio/webm"
+                },
+                {
+                  "key": "Accept-Ranges",
+                  "value": "bytes"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                },
+                {
+                  "key": "Content-Disposition",
+                  "value": "inline"
+                }
+              ],
+              "cookie": [],
+              "body": "<binary audio>"
+            },
+            {
+              "name": "206 — partial audio (binary placeholder)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Range",
+                    "value": "bytes=0-1023",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/audio/{{comparison_label}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "listening-comparisons",
+                    "{{take_comparison_id}}",
+                    "audio",
+                    "{{comparison_label}}"
+                  ]
+                },
+                "description": "Private cookie-authenticated A/B alias; comparison_label is a or b. Streams actual media through existing recording ownership/Range checks without redirect or recording IDs in the URL. Cache-Control:private, no-store. Binary placeholders in Postman are not playable speech. A/B hides labels only; users may recognize their own takes."
+              },
+              "status": "Partial Content",
+              "code": 206,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "audio/webm"
+                },
+                {
+                  "key": "Accept-Ranges",
+                  "value": "bytes"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "private, no-store"
+                },
+                {
+                  "key": "Content-Disposition",
+                  "value": "inline"
+                },
+                {
+                  "key": "Content-Range",
+                  "value": "bytes 0-1023/184320"
+                }
+              ],
+              "cookie": [],
+              "body": "<binary audio>"
+            },
+            {
+              "name": "404 — foreign audio",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Range",
+                    "value": "bytes=0-1023",
+                    "disabled": true
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/listening-comparisons/{{take_comparison_id}}/audio/{{comparison_label}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "listening-comparisons",
+                    "{{take_comparison_id}}",
+                    "audio",
+                    "{{comparison_label}}"
+                  ]
+                },
+                "description": "Private cookie-authenticated A/B alias; comparison_label is a or b. Streams actual media through existing recording ownership/Range checks without redirect or recording IDs in the URL. Cache-Control:private, no-store. Binary placeholders in Postman are not playable speech. A/B hides labels only; users may recognize their own takes."
+              },
+              "status": "Not Found",
+              "code": 404,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"error\": {\n    \"code\": \"not_found\",\n    \"message\": \"Recording not found.\",\n    \"details\": {},\n    \"request_id\": \"368d49be-ca55-5cbc-a8e8-eeb12b74a456\"\n  }\n}"
             }
           ]
         }

@@ -322,7 +322,7 @@ export default function Exercise() {
                 {result?.status === 'passed' && result.recording_id && <SpeechReview key={"speech-review-" + result.id} take={result} onHear={(seconds) => { const audio = audioRef.current; if (audio) { audio.currentTime = seconds; void audio.play().catch(() => {}) } }} />}
                 {result?.listening_plan && <PlannedBoundary plan={result.listening_plan} feedback={result.feedback.planned_pause} onHear={savedRecording.data?.audio_url ? (seconds) => { const audio = audioRef.current; if (audio) { audio.currentTime = seconds; void audio.play().catch(() => {}) } } : undefined} />}
                 {result?.practice_focus?.note && <p><strong>{result.training_focus ? 'Previous take’s reflection:' : 'Your focus for this take:'}</strong> {result.practice_focus.note}</p>}
-                {result?.practice_focus && <TakeComparison take={result} />}
+                {result?.practice_focus && <TakeComparison key={"comparison-" + result.id} take={result} />}
                 {result?.training_focus && <StoryFocus focus={result.training_focus} completed />}
                 {result?.training_focus && result.status === 'passed' && <FocusCheck key={"focus-check-" + result.id} take={result} onSaved={updateViewedTake} />}
                 {result && <TakeReflection key={"reflection-" + result.id} attempt={result} exerciseId={item.exercise_id} storyId={lesson.items.find((entry) => entry.exercise_id === 'E12')?.id} onSaved={updateViewedTake} />}
