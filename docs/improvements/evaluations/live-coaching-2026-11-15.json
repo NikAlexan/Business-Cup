@@ -1,0 +1,66 @@
+{
+  "schema_version": "live-coaching-probe-v1",
+  "created_at": "2026-11-14T23:59:41.552478+00:00",
+  "scope": "synthetic_speech_only",
+  "expected_text": "The path curved toward the river. I stopped by the bridge and waited for the small boat to pass.",
+  "inserted_pause_seconds": 1.2,
+  "limitations": [
+    "One synthesized voice, one passage and one model response do not establish human usefulness or accuracy.",
+    "A validated quote locates transcript words; it does not validate the model's perceptual interpretation."
+  ],
+  "duration_seconds": 6.525,
+  "audio_sha256": "14173254e9df02cb74f2cfcd702a7e4d301ba8905cac63bedb47143768ad907f",
+  "audio_model": "gpt-audio-1.5",
+  "transcribe_model": "whisper-1",
+  "transcription": {
+    "text": "The path curved toward the river. I stopped by the bridge and waited for the small boat to pass.",
+    "verified": true,
+    "word_count": 19,
+    "alignment_ratio": 1.0
+  },
+  "measurements": {
+    "pause_count": {
+      "available": false,
+      "value": null,
+      "unit": "count",
+      "unavailable_reason": "transcription_invalid_timestamps"
+    },
+    "pause_total_seconds": {
+      "available": false,
+      "value": null,
+      "unit": "s",
+      "unavailable_reason": "transcription_invalid_timestamps"
+    },
+    "pause_ratio": {
+      "available": false,
+      "value": null,
+      "unit": "ratio",
+      "unavailable_reason": "transcription_invalid_timestamps"
+    },
+    "speaking_rate_wpm": {
+      "available": false,
+      "value": null,
+      "unit": "words/min",
+      "unavailable_reason": "transcription_invalid_timestamps"
+    },
+    "articulation_rate_wpm": {
+      "available": false,
+      "value": null,
+      "unit": "words/min",
+      "unavailable_reason": "transcription_invalid_timestamps"
+    }
+  },
+  "status": "unavailable_transcript_timing",
+  "api_calls": 1,
+  "usage": [
+    {
+      "endpoint": "audio/transcriptions",
+      "model": "whisper-1",
+      "usage": {
+        "type": "duration",
+        "seconds": 7
+      },
+      "estimated_cost_usd": null
+    }
+  ]
+}

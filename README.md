@@ -38,7 +38,9 @@ npm test        # vitest, чистые функции
 npm run build   # tsc + vite build
 ```
 
-Установка приложения: Chrome/Edge на ПК и Android — Settings → «Install app» или значок установки в адресной строке; iOS Safari — Share → Add to Home Screen. Микрофон и установка работают только на `localhost` или по HTTPS. Service worker кэширует только оболочку приложения; данные API и записи всегда идут из сети. Новая версия применяется по кнопке «Reload» в баннере.
+Установка приложения: Chrome/Edge на ПК и Android — Settings → «Install app» или значок установки в адресной строке; iOS Safari — Share → Add to Home Screen. Микрофон и установка работают только на `localhost` или по HTTPS. Service worker кэширует оболочку приложения и явно включённые публичные учебные примеры; данные API и личные записи всегда идут из сети. Новая версия применяется по кнопке «Reload» в баннере.
+
+В E08 доступно необязательное [аудиосравнение расположения пауз](docs/improvements/listening-lab.md). После прослушивания можно выбрать границу в своём тексте и закрепить её за следующим дублем. Результат даёт переход к собственной записи и, при надёжном выравнивании, описательный промежуток между словами. Синтетические примеры не являются эталоном голоса; семантическая уместность паузы не выводится из её длительности.
 
 ```bash
 docker compose logs --tail=100 web worker
@@ -68,7 +70,9 @@ docker compose down
 
 `AUDIO_MODEL`, `TRANSCRIBE_MODEL`, `NORMALIZE_MODEL` настраиваются через `.env`. Отсутствие ключа, запрет доступа к модели, сбой и rate limit провайдера видны в статусе jobs. Синтетический отчёт вместо ошибки не создаётся. Тестовый провайдер существует только в `tests/`.
 
-Ежедневные записи используют лёгкие проверки без полного ИИ-разбора. Только если упражнению нужен темп (E06), вызывается отдельная расшифровка и проверяется заданный диапазон WPM. Если расшифровку нельзя подтвердить, предлагается повтор. Для остальных ежедневных записей темп недоступен: число произнесённых слов не выдумывается.
+Каталог включает 12 типов по 24 оригинальных варианта с ротацией между планами, отдельными инструкциями, повторами и вопросами для прослушивания. [Контракт упражнений и времени](docs/improvements/exercise-contract.md). Завершённые упражнения можно повторять с отдельными дублями и историей обратной связи, без повторных notes и завершения занятия.
+
+Ежедневные записи используют лёгкие проверки без полного ИИ-разбора. Только если упражнению нужен темп (E06), вызывается отдельная расшифровка и проверяется заданный диапазон WPM. Если расшифровку нельзя подтвердить или темп выходит за рекомендуемый диапазон, попытка засчитывается по качеству аудио, а результат содержит совет для следующей практики. Для остальных ежедневных записей темп недоступен: число произнесённых слов не выдумывается.
 
 Модель Silero v5.1.2 скачивается при сборке с проверкой SHA-256, не при первом пользовательском запросе. Качественная оценка тембра и дикции не является медицинским заключением. Пороги качества и версии алгоритмов сохраняются в отчёте.
 
@@ -125,6 +129,40 @@ Smoke создаёт синтезированную тестовую речь ч
 
 `DEMO_MODE=true` разрешает `demo_override=true` при создании повторной оценки. `GET /me` и отчёт явно содержат признаки демонстрации. По умолчанию режим выключен; искусственная история не подмешивается к настоящим результатам.
 
-Фронтенд записи микрофона, проверка UI в Safari/Chrome, восстановление сессии на другом устройстве, диагностика речевых дефектов, Stripe и CMS в эту реализацию бэкенда не входят. Внутренний `AccessPolicy.check_access(subject_id, capability)` оставлен для будущей оплаты; `NoBillingAccessPolicy` разрешает возможности MVP.
+Фронтенд включает запись микрофона, сохранённую обратную связь и дополнительную практику. Автотесты проверяют Chromium; Safari и реальные мобильные микрофоны пока требуют отдельной проверки. Восстановление гостевой сессии на другом устройстве, диагностика речевых дефектов и CMS не реализованы. Stripe test mode перенесён из main: checkout, подписанные webhooks, Customer Portal и экраны подписки. При `BILLING_PROVIDER=none` доступ остаётся свободным; `stripe_test` открывает ежедневную практику после webhook. Настройка: [Stripe test mode](design/stripe-test-mode.md).
 
 Официальные источники интеграции: [Audio in Chat Completions](https://developers.openai.com/api/docs/guides/audio-chat-completions), [Transcriptions API](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create), [Silero VAD](https://github.com/snakers4/silero-vad/tree/v5.1.2), [pYIN](https://librosa.org/doc/main/generated/librosa.pyin.html).
+
+
+## Frontend and browser checks
+
+```bash
+cd frontend
+npm ci
+npm test
+npm run build
+npx playwright install --with-deps chromium
+npm run test:browser
+```
+
+Browser checks require the root `.venv`, Python dependencies, FFmpeg and the pinned models from `scripts-download-vad.py`. They start a server bound to `127.0.0.1:4173` with a temporary SQLite database and audio directory, explicit empty paid-provider credentials and prepared demo history. Chromium uses a generated speech WAV as its microphone. The API, queue, FFmpeg/VAD/pitch measurement, recorder and private playback run normally. An explicit browser-only deterministic provider checks the complete baseline/check-in report path, including a forced first analysis failure and retry of the same job. Its transcript/report are labeled test fixtures and do not validate ASR or AI coaching quality; no paid provider is called. Test data is deleted when the server stops. Traces are kept in ignored `frontend/test-results/` on failures.
+
+
+The daily practice loop restores accepted uploads after reload, keeps completed sessions reachable, and saves a listening reflection as the next take's focus. Pace/pause drills show validated transcript timing, playable word-boundary evidence and an optional practice idea; repeat results include previous audio and compatible timing side by side. E08 also offers a public synthetic pause contrast and an explicit selected-boundary snapshot with descriptive private playback feedback. These are timing observations and subjective reflections, not automated pronunciation or expressiveness scores. Prepared demo history stays labeled and cannot act as a comparable numerical baseline for real audio.
+
+
+When provider credentials are configured, each saved accepted exercise recording can start separate background speech coaching. The attempt's `speech_review` survives reload, offers one audio-grounded listening note and one next action, and cannot revoke completion. Configure `EXERCISE_REVIEWS_ENABLED`, `MAX_EXERCISE_REVIEWS_PER_DAY` and `MAX_TOTAL_EXERCISE_REVIEWS_PER_DAY` to control automatic work; these are job-count budgets, not currency caps. Provider calls use actual audio through the existing [Chat Completions audio integration](https://developers.openai.com/api/docs/guides/audio-chat-completions). Automated tests mock paid calls and do not establish real-world coaching accuracy.
+
+
+Baseline/check-in and daily exercises share accepted-upload recovery and saved-check retries. Before a check-in, the mic screen displays and prefills the prior setup; each recording screen also shows the assessment's saved conditions. Canceling extra practice during an in-flight upload uses its original operation UUID: the server either dismisses the accepted take or rejects a later upload. Cancellation is confirmed only when its request succeeds; a cancellation transport error keeps late check results from auto-saving an attempt while the user retries.
+
+
+A chosen listening reflection can now carry from a recorded drill into narration and the next session. The story recorder freezes the focus shown at start; later edits cannot rewrite a take. Playback offers a saved subjective check against a skill-specific question, with no extra rewards or mastery claim. See the [exercise contract](docs/improvements/exercise-contract.md) and [API guide](postman/README.md).
+
+A bounded real-provider probe with public synthetic speech exposed and fixed partial Whisper alignment handling. Public human-recording probes then exposed weak pause impressions and an action that ignored the undecided choice, alongside one compliant keep result. The application now enforces saved keep/undecided actions in code and presents model impressions as hypotheses for playback checking. Original model advice remains separately inspectable; prompt-v4 itself has not been live-validated. The [raw responses and assessment](docs/improvements/evaluations/README.md) retain negative results, exact source hashes, request counts and limits. These observations do not establish perceptual accuracy or learning transfer.
+
+
+The completed profile exposes its saved limitations, private source takes and measurement scope. Unfinished profile links resume the saved recording/analysis flow; failed analysis retries its existing job. The analysis screen can restore that job from the assessment alone and reports server stages rather than marking uncompleted stages as finished. New assessment reports store `analysis_metadata.prompt_version`; limitations are user-facing uncertainty notes.
+
+
+Listening reflections can now record one of three intentions: try an experiment, keep a useful feature, or listen again before deciding. A story focus freezes the chosen intention and appropriate steps; keeping a feature does not require making it stronger. An undecided note can be empty and does not replace an existing focus. AI ideas remain optional alongside playback; they are no longer copied into the next goal by a shortcut. These user choices do not establish the correctness of a model's advice or mastery of a skill.

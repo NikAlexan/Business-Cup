@@ -6,3 +6,7 @@ export const formatDate = (iso: string, timezone: string) =>
     day: 'numeric',
     timeZone: iso.length === 10 ? 'UTC' : timezone,
   })
+
+export const formatEstimate = (seconds: number) => seconds < 60
+  ? `${Math.round(seconds)} sec`
+  : `${Math.round(seconds / 60 * 2) / 2} min`

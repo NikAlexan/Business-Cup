@@ -5,7 +5,7 @@ import threading
 import time
 
 import numpy as np
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, case, or_, select, text, update
 
 from app.audio import (
     QUALITY_RULES,
@@ -16,36 +16,56 @@ from app.audio import (
     quality_check,
     timing_metrics,
 )
+from app.coaching import listening_intent_policy, next_action_intent, quote_evidence, timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
-from app.provider import OpenAIAudioProvider, ProviderFailure
+from app.listening import planned_pause_feedback
+from app.provider import (
+    ASSESSMENT_PROMPT_VERSION,
+    EXERCISE_PROMPT_VERSION,
+    OpenAIAudioProvider,
+    ProviderFailure,
+)
 from app.service import Service
 
 log = logging.getLogger("voice.worker")
 
 
-MEASUREMENT_VERSION = "voice-metrics-v2"
+MEASUREMENT_VERSION = "voice-metrics-v3"
 
 
 class WorkCancelled(Exception):
     pass
 
 
-def comparable_measurements(previous):
-    """Baseline measurements for interpretation, only if measured the same way."""
-    if previous and previous.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION:
-        return previous["measurements"]
-    return None
+def serialize_sqlite(db):
+    # FOR UPDATE is ignored by SQLite. Acquire its writer lock before reading JSON
+    # that will later be replaced, matching API write transactions.
+    if db.bind.dialect.name == "sqlite":
+        db.execute(text("BEGIN IMMEDIATE"))
+
+
+def assessments_comparable(before, after):
+    return bool(
+        before
+        and not before.get("analysis_metadata", {}).get("demo", {}).get("prepared_data", False)
+        and not after.get("analysis_metadata", {}).get("demo", {}).get("prepared_data", False)
+        and before.get("protocol_version")
+        and before.get("recording_conditions") is not None
+        and before.get("recording_conditions") == after.get("recording_conditions")
+        and before.get("protocol_version") == after.get("protocol_version")
+        and before.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION
+    )
+
+
+def comparable_measurements(previous, current):
+    """Interpretation and comparison share the same conditions/version gate."""
+    return previous["measurements"] if assessments_comparable(previous, current) else None
 
 
 def compare(before, after, measurements):
-    conditions_match = before["recording_conditions"] == after["recording_conditions"]
-    compatible = (
-        conditions_match
-        and before["protocol_version"] == after["protocol_version"]
-        and before.get("analysis_metadata", {}).get("measurement_version") == MEASUREMENT_VERSION
-    )
+    compatible = assessments_comparable(before, after)
     metrics = {}
     for name, value in measurements.items():
         if name in ("f0_timeline", "f0_range_hz"):
@@ -79,6 +99,8 @@ def compare(before, after, measurements):
                 "after_audio_url": f"/api/v1/recordings/{t['recording_id']}/audio",
             }
             for t in after["tasks"]
+            if t.get("recording_id")
+            and any(b["kind"] == t["kind"] and b.get("recording_id") for b in before["tasks"])
         ],
     }
 
@@ -92,6 +114,7 @@ class Worker:
     def claim(self):
         now = time.time()
         with self.database.session.begin() as db:
+            serialize_sqlite(db)
             row = db.scalar(
                 select(Job)
                 .where(
@@ -100,7 +123,11 @@ class Worker:
                         and_(Job.status == "processing", Job.lease_until <= now),
                     )
                 )
-                .order_by(Job.id)
+                .order_by(
+                    case((Job.data["type"].as_string() == "recording_check", 0), else_=1),
+                    Job.data["created_at"].as_string(),
+                    Job.id,
+                )
                 .with_for_update(skip_locked=True)
                 .limit(1)
             )
@@ -124,6 +151,7 @@ class Worker:
             }
 
     def locked(self, db, claim):
+        serialize_sqlite(db)
         guest = db.scalar(select(Guest).where(Guest.id == claim["guest_id"]).with_for_update())
         if not guest:
             raise WorkCancelled()
@@ -140,6 +168,10 @@ class Worker:
             d = copy.deepcopy(j.data)
             d.update(stage=stage, updated_at=iso())
             j.data, j.lease_until = d, time.time() + self.settings.job_lease_seconds
+            if d["type"] == "exercise_review":
+                a = s.get(d["attempt_id"], "attempt")
+                a["speech_review"]["status"] = "processing"
+                s.put("attempt", a)
             if d["assessment_id"] and d["type"] == "assessment_analysis":
                 a = s.get(d["assessment_id"], "assessment")
                 a["status"] = "processing"
@@ -170,9 +202,10 @@ class Worker:
             s, _ = self.locked(db, claim)
             return s.get(rid, kind)
 
-    def publish_recording(self, claim, rec, quality, measurements=None):
+    def publish_recording(self, claim, rec, quality, measurements=None, speech_feedback=None):
         with self.database.session.begin() as db:
             s, job = self.locked(db, claim)
+            rec = s.get(rec["id"], "recording")  # Preserve a dismissal made while processing.
             rec.update(
                 status="completed" if quality["status"] == "accepted" else "needs_rerecord",
                 duration_seconds=quality["duration_seconds"],
@@ -180,6 +213,8 @@ class Worker:
             )
             if measurements is not None:
                 rec["measurements"] = measurements
+            if speech_feedback is not None:
+                rec["speech_feedback"] = speech_feedback
             s.put("recording", rec)
             if rec["assessment_id"]:
                 a = s.get(rec["assessment_id"], "assessment")
@@ -216,20 +251,45 @@ class Worker:
                     self.settings.max_recording_seconds, item["task"]["verification"]["max_recording_seconds"]
                 )
         path = self.settings.audio_data / claim["guest_id"] / rec["id"]
+        speech_feedback = None
+        transcript = {}
         try:
             signal = decode(path, self.settings, max_seconds)
             self.stage(claim, "quality_check")
-            quality, segments = quality_check(signal, self.settings, rec["purpose"])
+            quality, segments = quality_check(
+                signal,
+                self.settings,
+                rec["purpose"],
+                item["task"]["verification"].get("quality_rules") if rec["purpose"] == "exercise" else None,
+            )
             measurements = timing_metrics(signal, segments) if rec["purpose"] == "exercise" else None
             if rec["purpose"] == "exercise" and quality["status"] == "accepted":
-                required = EXERCISES[item["exercise_id"]]["verification"]["required_metrics"]
-                if "speaking_rate_wpm" in required:
+                required = item["task"]["verification"].get("required_metrics")
+                if required is None:  # Legacy snapshots predate required-metric persistence.
+                    required = (
+                        EXERCISES.get(item["exercise_id"], {})
+                        .get("verification", {})
+                        .get("required_metrics", [])
+                    )
+                if set(required) & {"speaking_rate_wpm", "pause_ratio", "pause_count"} or rec.get(
+                    "listening_plan"
+                ):
                     self.stage(claim, "transcription")
-                    provider = self.provider_factory(self.settings)
+                    provider = None
                     try:
-                        transcript = provider.transcribe(signal, item["task"]["text"])
+                        provider = self.provider_factory(self.settings)
+                        transcript = provider.transcribe(
+                            signal, " ".join([item["task"]["text"]] * item["task"].get("repetitions", 1))
+                        )
                         measurements = timing_metrics(
                             signal, segments, transcript["word_count"], transcript["words"]
+                        )
+                        speech_feedback = timing_feedback(
+                            transcript,
+                            measurements,
+                            item["task"]["verification"],
+                            quality["duration_seconds"],
+                            (rec.get("training_focus") or rec.get("practice_focus") or {}).get("intent"),
                         )
                         with self.database.session.begin() as db:
                             s, _ = self.locked(db, claim)
@@ -242,8 +302,13 @@ class Worker:
                                     "calls": copy.deepcopy(provider.usage),
                                 },
                             )
+                    except ProviderFailure:
+                        # An optional coaching metric must not invalidate a usable daily take.
+                        for value in measurements.values():
+                            value["unavailable_reason"] = "transcription_provider_unavailable"
                     finally:
-                        provider.close()
+                        if provider is not None:
+                            provider.close()
         except AudioRejected as exc:
             quality = {
                 "status": "rejected",
@@ -254,7 +319,109 @@ class Worker:
                 "issues": [{"code": exc.code, "message": exc.message}],
             }
             measurements = None
-        self.publish_recording(claim, rec, quality, measurements)
+        if rec.get("listening_plan") and quality["status"] == "accepted":
+            speech_feedback = speech_feedback or {
+                "scope": "audio_quality_only",
+                "insights": [],
+                "next_step": None,
+            }
+            speech_feedback["planned_pause"] = planned_pause_feedback(
+                rec["listening_plan"], transcript, quality["duration_seconds"]
+            )
+            if speech_feedback["planned_pause"]["available"]:
+                speech_feedback["scope"] = "quality_and_timing"
+            if (rec.get("training_focus") or rec.get("practice_focus") or {}).get("intent") not in (
+                "keep",
+                "undecided",
+            ):
+                speech_feedback["next_step"] = (
+                    "Listen to your chosen boundary. Keep it if it supports the meaning; try a variation only if you hear a reason."
+                )
+        self.publish_recording(claim, rec, quality, measurements, speech_feedback)
+
+    def exercise_review(self, claim):
+        attempt = self.snapshot(claim, claim["job"]["attempt_id"], "attempt")
+        rec = self.snapshot(claim, attempt["recording_id"], "recording")
+        with self.database.session.begin() as db:
+            s, _ = self.locked(db, claim)
+            _, _, item = s.find_item(attempt["plan_item_id"])
+        path = self.settings.audio_data / claim["guest_id"] / rec["id"]
+        signal = decode(path, self.settings, item["task"]["verification"]["max_recording_seconds"])
+        self.stage(claim, "transcription")
+        provider = self.provider_factory(self.settings)
+        try:
+            transcript = provider.transcribe(
+                signal, " ".join([item["task"]["text"]] * item["task"].get("repetitions", 1))
+            )
+            metrics = timing_metrics(signal, [], transcript["word_count"], transcript["words"])
+            report = None
+            if not metrics["speaking_rate_wpm"]["available"]:
+                status, reason = "unavailable", "transcription_unverified"
+            else:
+                self.stage(claim, "speech_coaching")
+                report = provider.exercise_review(
+                    signal,
+                    {
+                        "goal": attempt["speech_review"]["goal"],
+                        "title": item["title"],
+                        "task": item["task"],
+                        "saved_focus": (
+                            attempt.get("training_focus") or attempt.get("practice_focus") or {}
+                        ).get("note", ""),
+                        "practice_intent": (
+                            attempt.get("training_focus") or attempt.get("practice_focus") or {}
+                        ).get("intent"),
+                        "story_focus": {
+                            key: attempt["training_focus"][key]
+                            for key in ("skill_label", "listening_question", "rubric_version")
+                        }
+                        if attempt.get("training_focus")
+                        else None,
+                        "verified_transcript": transcript["text"],
+                        "measurements": metrics,
+                    },
+                )
+                observation = report.get("observation")
+                if observation:
+                    evidence = quote_evidence(
+                        observation["evidence_quote"],
+                        transcript,
+                        len(signal) / 16000,
+                        observation.get("occurrence", 1),
+                    )
+                    if not evidence:
+                        raise ProviderFailure("analysis_invalid_evidence")
+                    observation["evidence"] = evidence
+                status, reason = "completed", None
+            usage = copy.deepcopy(provider.usage)
+        finally:
+            provider.close()
+        with self.database.session.begin() as db:
+            s, job = self.locked(db, claim)
+            # Re-read to preserve reflections saved while the analysis was in flight.
+            a = s.get(attempt["id"], "attempt")
+            report = listening_intent_policy(report, next_action_intent(a))
+            a["speech_review"].update(
+                status=status,
+                report=report,
+                reason=reason,
+                completed_at=iso(),
+                source="audio_model",
+                model=self.settings.audio_model,
+                prompt_version=EXERCISE_PROMPT_VERSION,
+                error=None,
+            )
+            s.put("attempt", a)
+            s.put("ai_usage", {"id": new_id(), "attempt_id": a["id"], "created_at": iso(), "calls": usage})
+            d = copy.deepcopy(job.data)
+            d.update(
+                status="completed",
+                stage="done",
+                updated_at=iso(),
+                poll_after_ms=None,
+                result={"attempt_id": a["id"], "review_status": status},
+            )
+            job.status, job.data, job.lease_until = "completed", d, None
 
     def assessment(self, claim):
         a = self.snapshot(claim, claim["job"]["assessment_id"], "assessment")
@@ -277,7 +444,12 @@ class Worker:
             transcripts = [provider.transcribe(signals[i], a["tasks"][i]["text"]) for i in (0, 1)]
             measurements = {
                 **pitch_metrics,
-                **combine_timing(*((t["word_count"], t["words"]) for t in transcripts)),
+                **combine_timing(
+                    *(
+                        (t["word_count"], t["words"], len(signals[i]) / 16000)
+                        for i, t in enumerate(transcripts)
+                    )
+                ),
                 "intonation_range_semitones": intonation,
             }
             previous = (
@@ -286,13 +458,15 @@ class Worker:
                 else None
             )
             comparison = compare(previous, a, measurements) if previous else None
-            interpretation = interpret(a["goal"], measurements, comparable_measurements(previous))
+            interpretation = interpret(a["goal"], measurements, comparable_measurements(previous, a))
             self.stage(claim, "ai_analysis")
             report = provider.report(signals, a, measurements, comparison, interpretation)
             transcript = {"verified": all(t["verified"] for t in transcripts)}
-            if not transcript["verified"]:
+            if not transcript["verified"] or any(
+                not measurements[key]["available"] for key in ("speaking_rate_wpm", "pause_ratio")
+            ):
                 report["limitations"].append(
-                    "Pace could not be measured reliably because transcription did not align with the task."
+                    "Some timing measurements are unavailable because word alignment was incomplete or unreliable."
                 )
             usage = copy.deepcopy(provider.usage)
         finally:
@@ -301,7 +475,7 @@ class Worker:
         with self.database.session.begin() as db:
             s, job = self.locked(db, claim)
             old_plans = s.all("plan")
-            p = generate_plan(a, report, max((p["version"] for p in old_plans), default=0) + 1)
+            p = generate_plan(a, report, max((p["version"] for p in old_plans), default=0) + 1, old_plans)
             for old in old_plans:
                 if old["status"] != "archived":
                     old["status"] = "archived"
@@ -325,6 +499,7 @@ class Worker:
                     "protocol_version": a["protocol_version"],
                     "measurement_version": MEASUREMENT_VERSION,
                     "targets_version": TARGETS_VERSION,
+                    "prompt_version": ASSESSMENT_PROMPT_VERSION,
                     "quality_rules_version": "quality-v1",
                     "thresholds": QUALITY_RULES,
                     "transcription_status": "completed" if transcript["verified"] else "unverified",
@@ -389,6 +564,10 @@ class Worker:
                 a = s.get(d["assessment_id"], "assessment")
                 a["status"] = d["status"]
                 s.put("assessment", a)
+            elif d["type"] == "exercise_review":
+                a = s.get(d["attempt_id"], "attempt")
+                a["speech_review"].update(status=d["status"], error=d["error"])
+                s.put("attempt", a)
             elif d["recording_id"]:
                 rec = s.get(d["recording_id"], "recording")
                 rec["status"] = d["status"]
@@ -415,7 +594,11 @@ class Worker:
         thread.start()
         try:
             self.stage(claim, "decoding")
-            (self.recording if claim["job"]["type"] == "recording_check" else self.assessment)(claim)
+            {
+                "recording_check": self.recording,
+                "assessment_analysis": self.assessment,
+                "exercise_review": self.exercise_review,
+            }[claim["job"]["type"]](claim)
         except WorkCancelled:
             log.info("Discarded canceled/stale result job_id=%s", claim["job"]["id"])
         except Exception as exc:

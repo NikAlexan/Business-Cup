@@ -29,13 +29,21 @@ def test_no_words_means_unavailable_not_zero():
 def test_combine_timing():
     from app.audio import combine_timing
 
-    a = (10, W((0, 2), (3, 5)))  # 5 s span, 1 s pause
-    b = (20, W((0, 4), (6, 10)))  # 10 s span, 2 s pause
+    a = (
+        10,
+        W(*[(i * 0.4 + (1 if i >= 5 else 0), (i + 1) * 0.4 + (1 if i >= 5 else 0)) for i in range(10)]),
+        5,
+    )  # 5 s span, 1 s pause
+    b = (
+        20,
+        W(*[(i * 0.4 + (2 if i >= 10 else 0), (i + 1) * 0.4 + (2 if i >= 10 else 0)) for i in range(20)]),
+        10,
+    )  # 10 s span, 2 s pause
     m = combine_timing(a, b)
     assert m["speaking_rate_wpm"]["value"] == 120
     assert m["pause_ratio"]["value"] == 0.2 and m["pause_count"]["value"] == 2
     assert m["articulation_rate_wpm"]["value"] == 150
-    assert all(not v["available"] for v in combine_timing(a, (None, [])).values())
+    assert all(not v["available"] for v in combine_timing(a, (None, [], 10)).values())
 
 
 def test_interpretation_ignores_incomparable_baseline():
@@ -43,7 +51,88 @@ def test_interpretation_ignores_incomparable_baseline():
 
     m = {"intonation_range_semitones": {"available": True, "value": 9}}
     old = {"measurements": m, "analysis_metadata": {"measurement_version": "voice-metrics-v1"}}
-    new = {"measurements": m, "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION}}
-    assert comparable_measurements(None) is None
-    assert comparable_measurements(old) is None
-    assert comparable_measurements(new) is m
+    new = {
+        "measurements": m,
+        "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION},
+        "protocol_version": "assessment-v2",
+        "recording_conditions": {"device_label": "same mic"},
+    }
+    assert comparable_measurements(None, new) is None
+    assert comparable_measurements(old, new) is None
+    assert comparable_measurements(new, new) is m
+
+
+def test_same_measurement_version_is_not_enough_when_setup_or_protocol_changed():
+    from app.worker import MEASUREMENT_VERSION, comparable_measurements
+
+    baseline = {
+        "measurements": {"intonation_range_semitones": {"available": True, "value": 9}},
+        "recording_conditions": {"device_label": "old mic"},
+        "protocol_version": "assessment-v2",
+        "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION},
+    }
+    new_setup = {**baseline, "recording_conditions": {"device_label": "new mic"}}
+    new_protocol = {**baseline, "protocol_version": "assessment-v3"}
+    assert comparable_measurements(baseline, new_setup) is None
+    assert comparable_measurements(baseline, new_protocol) is None
+    assert comparable_measurements(baseline, dict(baseline)) == baseline["measurements"]
+
+
+def test_invalid_word_timestamps_are_unavailable_without_partial_metrics():
+    invalid = [
+        [{"start": 0}, {"start": 1, "end": 2}],
+        [{"start": 0, "end": 0}, {"start": 0, "end": 0}],
+        [{"start": 0, "end": 1}, {"start": 0.5, "end": 2}],
+        [{"start": 0, "end": 1}, {"start": 1, "end": float("inf")}],
+        [{"start": -1, "end": 0}, {"start": 0, "end": 1}],
+        [{"start": 0, "end": 1}, {"start": True, "end": 2}],
+        ["not an object", {"start": 1, "end": 2}],
+    ]
+    for words in invalid:
+        result = timing_metrics(np.zeros(16000), [], 2, words)
+        assert all(not m["available"] and m["value"] is None for m in result.values())
+        assert result["speaking_rate_wpm"]["unavailable_reason"] == "transcription_invalid_timestamps"
+
+
+def test_timing_is_bounded_by_the_decoded_audio_and_requires_complete_word_intervals():
+    signal = np.zeros(16000 * 5)
+    for count, spans in [(2, W((0, 1), (10000, 10001))), (200, W((0, 1), (2, 3)))]:
+        measured = timing_metrics(signal, [], count, spans)
+        assert all(not v["available"] and v["value"] is None for v in measured.values())
+
+
+def test_real_whisper_internal_zero_word_preserves_span_pace_without_inventing_pauses():
+    import json
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).parent / "fixtures/whisper-internal-zero-word.json").read_text())
+    transcript = fixture["transcript"]
+    measured = timing_metrics(
+        np.zeros(round(fixture["duration_seconds"] * 16000)),
+        [],
+        transcript["word_count"],
+        transcript["words"],
+    )
+    assert measured["speaking_rate_wpm"]["available"] and measured["speaking_rate_wpm"]["value"] == 179.81
+    for key in ("pause_count", "pause_total_seconds", "pause_ratio", "articulation_rate_wpm"):
+        assert not measured[key]["available"] and measured[key]["value"] is None
+        assert measured[key]["unavailable_reason"] == "word_alignment_incomplete"
+
+
+def test_unresolvable_edge_words_and_subsample_spans_still_make_timing_unavailable():
+    for spans in [W((0, 0), (1, 2)), W((0, 1), (2, 2)), W((0, 1e-310), (1e-310, 2e-310))]:
+        measured = timing_metrics(np.zeros(16000 * 3), [], 2, spans)
+        assert all(not value["available"] for value in measured.values())
+
+
+def test_prepared_demo_measurements_are_not_a_baseline_for_real_comparisons():
+    from app.worker import MEASUREMENT_VERSION, comparable_measurements
+
+    before = {
+        "measurements": {},
+        "recording_conditions": {"environment": "quiet_room"},
+        "protocol_version": "v2",
+        "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION, "demo": {"prepared_data": True}},
+    }
+    after = {**before, "analysis_metadata": {"measurement_version": MEASUREMENT_VERSION}}
+    assert comparable_measurements(before, after) is None

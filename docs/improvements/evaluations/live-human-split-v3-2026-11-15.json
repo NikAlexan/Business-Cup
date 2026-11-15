@@ -1,0 +1,202 @@
+{
+  "schema_version": "live-coaching-probe-v1",
+  "prompt_version": "exercise-coaching-v3",
+  "practice_intent": "experiment",
+  "rubric_version": "story-listening-v2",
+  "api_calls": 2,
+  "usage": [
+    {
+      "endpoint": "audio/transcriptions",
+      "model": "whisper-1",
+      "usage": {
+        "type": "duration",
+        "seconds": 4
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "endpoint": "chat/completions",
+      "model": "gpt-audio-1.5",
+      "usage": {
+        "prompt_tokens": 1117,
+        "completion_tokens": 140,
+        "total_tokens": 1257,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 39,
+          "text_tokens": 1078,
+          "image_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0,
+          "text_tokens": 140
+        }
+      },
+      "estimated_cost_usd": null
+    }
+  ],
+  "created_at": "2026-11-15T03:00:41.891479+00:00",
+  "scope": "public_human_recording_with_declared_edits",
+  "expected_text": "For the twentieth time that evening the two men shook hands.",
+  "inserted_pause_seconds": 0.7,
+  "limitations": [
+    "No human learner or independent listener evaluation.",
+    "Corpus phone timing is automatically aligned, not manual perceptual annotation.",
+    "An inserted silence is an artificial manipulation of a human recording, not a learner error.",
+    "A validated quote locates transcript words; it does not validate the model's perceptual interpretation."
+  ],
+  "human_case": {
+    "id": "slt-article-split-experiment",
+    "voice": "slt",
+    "intent": "experiment",
+    "inserted_pause_seconds": 0.7,
+    "insert_at_seconds": 1.812,
+    "boundary_word_index": 6,
+    "cut_source": "Festival/Segment end 1.81200 for ax of second the; agrees with source lab. This is automatic alignment.",
+    "saved_focus": "Try keeping “the two men” connected; listen to the gap after “the”.",
+    "check": "Does the observation locate the manipulated phrase and avoid generic advice to increase its pause?"
+  },
+  "source_audio": {
+    "voice": "slt",
+    "relative_path": "cmu_us_slt_arctic/wav/arctic_a0003.wav",
+    "url": "http://festvox.org/cmu_arctic/cmu_arctic/cmu_us_slt_arctic/wav/arctic_a0003.wav",
+    "sha256": "0b32e00846e132826f46d7e5cabb2d8b370a5dc654bac0447cb63285f81cc413",
+    "bytes": 102606
+  },
+  "edits": [
+    {
+      "kind": "declick_fade",
+      "seconds_each_side": 0.003
+    },
+    {
+      "kind": "inserted_silence",
+      "source_start_seconds": 1.812,
+      "seconds": 0.7
+    }
+  ],
+  "duration_seconds": 3.905,
+  "audio_sha256": "8ebdc9adcb34485b6f4c9e28e794ab0da5a4f7b591e2e605bbaef08d26b21455",
+  "audio_model": "gpt-audio-1.5",
+  "transcribe_model": "whisper-1",
+  "transcription": {
+    "text": "For the twentieth time that evening, the two men shook hands.",
+    "verified": true,
+    "word_count": 11,
+    "words": [
+      {
+        "start": 0.0,
+        "end": 0.30000001192092896
+      },
+      {
+        "start": 0.30000001192092896,
+        "end": 0.4399999976158142
+      },
+      {
+        "start": 0.4399999976158142,
+        "end": 0.8199999928474426
+      },
+      {
+        "start": 0.8199999928474426,
+        "end": 1.159999966621399
+      },
+      {
+        "start": 1.159999966621399,
+        "end": 1.3600000143051147
+      },
+      {
+        "start": 1.3600000143051147,
+        "end": 1.7000000476837158
+      },
+      {
+        "start": 1.9800000190734863,
+        "end": 1.9800000190734863
+      },
+      {
+        "start": 1.9800000190734863,
+        "end": 2.8399999141693115
+      },
+      {
+        "start": 2.8399999141693115,
+        "end": 3.119999885559082
+      },
+      {
+        "start": 3.119999885559082,
+        "end": 3.319999933242798
+      },
+      {
+        "start": 3.319999933242798,
+        "end": 3.740000009536743
+      }
+    ],
+    "recognized_words": [
+      "For",
+      "the",
+      "twentieth",
+      "time",
+      "that",
+      "evening",
+      "the",
+      "two",
+      "men",
+      "shook",
+      "hands"
+    ],
+    "verification_method": "prompt_alignment_v1",
+    "alignment_ratio": 1.0
+  },
+  "measurements": {
+    "pause_count": {
+      "available": false,
+      "value": null,
+      "unit": "count",
+      "unavailable_reason": "word_alignment_incomplete"
+    },
+    "pause_total_seconds": {
+      "available": false,
+      "value": null,
+      "unit": "s",
+      "unavailable_reason": "word_alignment_incomplete"
+    },
+    "pause_ratio": {
+      "available": false,
+      "value": null,
+      "unit": "ratio",
+      "unavailable_reason": "word_alignment_incomplete"
+    },
+    "articulation_rate_wpm": {
+      "available": false,
+      "value": null,
+      "unit": "words/min",
+      "unavailable_reason": "word_alignment_incomplete"
+    },
+    "speaking_rate_wpm": {
+      "available": true,
+      "value": 176.47,
+      "unit": "words/min",
+      "unavailable_reason": null
+    }
+  },
+  "report": {
+    "summary": "You delivered the sentence smoothly and seemed to keep a natural flow from beginning to end.",
+    "observation": {
+      "text": "The words 'the two men' flowed together with little gap.",
+      "evidence_quote": "the two men",
+      "occurrence": 1,
+      "evidence": {
+        "quote": "evening the two men",
+        "start_seconds": 1.1600000143051148,
+        "end_seconds": 3.319999885559082,
+        "note": "Some words had no separate time span; replay this wider phrase to check the observation."
+      }
+    },
+    "next_step": "On your next take, you might try experimenting with a slight pause before 'shook hands' to emphasize the final action.",
+    "listening_question": "Does pausing before 'shook hands' make the action stand out, or does it disrupt the flow?",
+    "limitations": [
+      "I can’t measure exact pause lengths, so I'm basing feedback on overall impression."
+    ]
+  },
+  "status": "completed"
+}

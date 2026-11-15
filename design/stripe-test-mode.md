@@ -1,33 +1,28 @@
-# Тестовая оплата Stripe (сценарий для фронтенда и бэкенда)
+# Stripe test mode
 
-Сейчас в бэкенде оплаты нет: `NoBillingAccessPolicy` разрешает `assessment` и `daily_training`. Ниже — сценарий, нарисованный в макетах, и что понадобится в API. Только Stripe **test mode**.
+Реализация из main интегрирована в `improve/speech-training-loop`: Checkout, подписанный webhook, Customer Portal, paywall, страницы success/canceled, условия и управление подпиской. Live mode не поддерживается.
 
-## Что бесплатно, что по подписке
+## Настройка
 
-- Бесплатно: гостевая сессия, базовая запись, профиль голоса (`assessment`).
-- По подписке: план из 14 занятий, ежедневные упражнения, проверки и новый план (`daily_training`).
+По умолчанию `BILLING_PROVIDER=none`: оплата отключена, MVP доступен без подписки. Для test mode задать серверные `BILLING_PROVIDER=stripe_test`, `STRIPE_SECRET_KEY=sk_test_…`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`; необязательный `STRIPE_TRIAL_DAYS` по умолчанию 7. Секреты не передаются на frontend и не коммитятся. Без корректной test-конфигурации запуск отклоняется. Реальные ключи в рамках интеграции не настраивались.
 
-## Путь пользователя
+## Доступ и API
 
-`Profile` → *See my 14-session plan* → `Paywall` (месяц / год, цена, условия, плашка Test mode) → Stripe Checkout (страница Stripe) → `PaySuccess` → `Home`. Отмена в Checkout → `PayCanceled` → назад на `Paywall`. *Not now* на `Paywall` оставляет профиль.
+Baseline и голосовой профиль бесплатны. Новые ежедневные записи/попытки, фокус рассказа и check-in требуют daily_training при включённой оплате. Статусы доступа соответствуют main: active, trialing, past_due. Старые собственные записи и результаты остаются читаемыми.
 
-Управление: `Settings` → раздел Subscription → *Manage subscription* (Stripe Customer Portal).
+| Метод | Путь | Поведение |
+| --- | --- | --- |
+| GET | `/api/v1/billing/plans` | Два серверных Price ID, сумма/валюта, trial_days и test_mode |
+| POST | `/api/v1/billing/checkout-session` | `{"interval":"month"}` либо year; ссылка Checkout с subject_id |
+| POST | `/api/v1/billing/webhook` | Подпись Stripe-Signature; subscription events обновляют права, старые события пропускаются |
+| POST | `/api/v1/billing/portal-session` | Customer Portal для существующего customer |
+| GET | `/api/v1/me` | capabilities и subscription; exercise_coaching учитывает оплату и конфигурацию AI |
+| DELETE | `/api/v1/guest-data` | Перед удалением отменяет существующую подписку |
 
-## Что нужно от бэкенда
+Возврат на `/pay/success` не выдаёт доступ сам по себе: страница ждёт обновления GET me после webhook. `/pay/canceled` сохраняет профиль и позволяет вернуться к тарифам. Origin для ссылок берётся из разрешённых origins. В SQLite webhook сериализуется до чтения Guest JSON, как остальные записи профиля/учебного фокуса.
 
-| Эндпоинт | Назначение |
-| --- | --- |
-| `POST /billing/checkout-session` | Создаёт Checkout Session (mode `subscription`, price из `.env`), `client_reference_id = subject_id`, `success_url` и `cancel_url` на фронтенд. Возвращает `url` |
-| `POST /billing/webhook` | Проверка подписи; `checkout.session.completed`, `customer.subscription.updated` и `.deleted` меняют права по `subject_id` |
-| `POST /billing/portal-session` | Ссылка на Customer Portal |
-| `GET /me` | `capabilities.daily_training` и `subscription: {status, plan, current_period_end, test_mode}` |
+## Совместимость с практикой
 
-Доступ открывает только вебхук. Страница `PaySuccess` опрашивает `GET /me`, пока `daily_training` не станет `true` («Still confirming? Refresh in a minute — you won't be charged twice»).
+Каталог, архивная история, восстановление записей, A/B и reflection сохраняются. Платные мутации проверяются сервером. График использует ту же фактическую длительность, что и totals; нетаймированные подтверждения не превращаются в минуту практики. Подготовленная демоистория явно помечена и не является оплатой или реальной записью.
 
-Настройки: `BILLING_PROVIDER=stripe_test`, `STRIPE_SECRET_KEY` (sk_test_…), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`. Ключи только на сервере.
-
-## Открытые вопросы
-
-- Цены, пробный период, политика возврата — заглушки [PRICE], [YOUR REFUND POLICY] на `Paywall` и `Terms`.
-- Подписка привязана к гостевой сессии в браузере. Восстановление на другом устройстве (например, по email из чека Stripe) не предусмотрено.
-- `DELETE /guest-data` при активной подписке: отменять подписку автоматически или требовать отмены вручную (сейчас в дизайне — предупреждение).
+Подписка привязана к гостевой cookie; переноса на другое устройство нет. Доступ выдаётся по событию подписки, а не результату редиректа Checkout. Автотесты используют локальные заглушки Stripe и подписанные fixtures; реальная оплата через размещённую страницу Stripe в этой интеграции не выполнялась.

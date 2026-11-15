@@ -26,9 +26,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // App shell only: API responses and audio are private and must stay fresh.
-        globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
-        navigateFallbackDenylist: [/^\/api\//, /^\/health\//, /^\/docs/, /^\/openapi\.json/],
+        // App shell and explicit public examples only. Private API responses/audio stay uncached.
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg}', 'practice-examples/**/*.wav', 'practice-examples/NOTICE.txt'],
+        navigateFallbackDenylist: [/^\/api\//, /^\/health\//, /^\/docs/, /^\/openapi\.json/, /^\/practice-examples\//],
       },
     }),
   ],

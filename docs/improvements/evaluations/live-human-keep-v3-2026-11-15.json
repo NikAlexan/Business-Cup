@@ -1,0 +1,188 @@
+{
+  "schema_version": "live-coaching-probe-v1",
+  "prompt_version": "exercise-coaching-v3",
+  "practice_intent": "keep",
+  "rubric_version": "story-listening-v2",
+  "api_calls": 2,
+  "usage": [
+    {
+      "endpoint": "audio/transcriptions",
+      "model": "whisper-1",
+      "usage": {
+        "type": "duration",
+        "seconds": 4
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "endpoint": "chat/completions",
+      "model": "gpt-audio-1.5",
+      "usage": {
+        "prompt_tokens": 1096,
+        "completion_tokens": 127,
+        "total_tokens": 1223,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "audio_tokens": 32,
+          "text_tokens": 1064,
+          "image_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "audio_tokens": 0,
+          "accepted_prediction_tokens": 0,
+          "rejected_prediction_tokens": 0,
+          "text_tokens": 127
+        }
+      },
+      "estimated_cost_usd": null
+    }
+  ],
+  "created_at": "2026-11-15T02:54:31.830743+00:00",
+  "scope": "public_human_recording_with_declared_edits",
+  "expected_text": "For the twentieth time that evening the two men shook hands.",
+  "inserted_pause_seconds": 0,
+  "limitations": [
+    "No human learner or independent listener evaluation.",
+    "Corpus phone timing is automatically aligned, not manual perceptual annotation.",
+    "An inserted silence is an artificial manipulation of a human recording, not a learner error.",
+    "A validated quote locates transcript words; it does not validate the model's perceptual interpretation."
+  ],
+  "human_case": {
+    "id": "slt-original-keep",
+    "voice": "slt",
+    "intent": "keep",
+    "inserted_pause_seconds": 0,
+    "saved_focus": "Keep the words “the two men” connected, without extra emphasis or a longer gap.",
+    "check": "Does optional advice respect keeping the connected phrase without unsupported escalation?"
+  },
+  "source_audio": {
+    "voice": "slt",
+    "relative_path": "cmu_us_slt_arctic/wav/arctic_a0003.wav",
+    "url": "http://festvox.org/cmu_arctic/cmu_arctic/cmu_us_slt_arctic/wav/arctic_a0003.wav",
+    "sha256": "0b32e00846e132826f46d7e5cabb2d8b370a5dc654bac0447cb63285f81cc413",
+    "bytes": 102606
+  },
+  "edits": [],
+  "duration_seconds": 3.205,
+  "audio_sha256": "0b32e00846e132826f46d7e5cabb2d8b370a5dc654bac0447cb63285f81cc413",
+  "audio_model": "gpt-audio-1.5",
+  "transcribe_model": "whisper-1",
+  "transcription": {
+    "text": "For the twentieth time that evening the two men shook hands.",
+    "verified": true,
+    "word_count": 11,
+    "words": [
+      {
+        "start": 0.0,
+        "end": 0.30000001192092896
+      },
+      {
+        "start": 0.30000001192092896,
+        "end": 0.4399999976158142
+      },
+      {
+        "start": 0.4399999976158142,
+        "end": 0.8600000143051147
+      },
+      {
+        "start": 0.8600000143051147,
+        "end": 1.159999966621399
+      },
+      {
+        "start": 1.159999966621399,
+        "end": 1.340000033378601
+      },
+      {
+        "start": 1.340000033378601,
+        "end": 1.6799999475479126
+      },
+      {
+        "start": 1.6799999475479126,
+        "end": 1.899999976158142
+      },
+      {
+        "start": 1.899999976158142,
+        "end": 2.200000047683716
+      },
+      {
+        "start": 2.200000047683716,
+        "end": 2.4000000953674316
+      },
+      {
+        "start": 2.4000000953674316,
+        "end": 2.619999885559082
+      },
+      {
+        "start": 2.619999885559082,
+        "end": 3.0
+      }
+    ],
+    "recognized_words": [
+      "For",
+      "the",
+      "twentieth",
+      "time",
+      "that",
+      "evening",
+      "the",
+      "two",
+      "men",
+      "shook",
+      "hands"
+    ],
+    "verification_method": "prompt_alignment_v1",
+    "alignment_ratio": 1.0
+  },
+  "measurements": {
+    "pause_count": {
+      "available": true,
+      "value": 0,
+      "unit": "count",
+      "unavailable_reason": null
+    },
+    "pause_total_seconds": {
+      "available": true,
+      "value": 0,
+      "unit": "s",
+      "unavailable_reason": null
+    },
+    "pause_ratio": {
+      "available": true,
+      "value": 0.0,
+      "unit": "ratio",
+      "unavailable_reason": null
+    },
+    "speaking_rate_wpm": {
+      "available": true,
+      "value": 220.0,
+      "unit": "words/min",
+      "unavailable_reason": null
+    },
+    "articulation_rate_wpm": {
+      "available": true,
+      "value": 220.0,
+      "unit": "words/min",
+      "unavailable_reason": null
+    }
+  },
+  "report": {
+    "summary": "You read the phrase smoothly and kept your words flowing as one connected thought.",
+    "observation": {
+      "text": "The group 'the two men' stayed closely connected, which keeps the narration smooth.",
+      "evidence_quote": "the two men",
+      "occurrence": 1,
+      "evidence": {
+        "quote": "the two men",
+        "start_seconds": 1.4799999475479126,
+        "end_seconds": 2.600000095367432
+      }
+    },
+    "next_step": "On your next take, try maintaining that connected feel with a different short phrase to build consistency.",
+    "listening_question": "Do the pauses you use let one idea settle before moving to the next?",
+    "limitations": [
+      "I can only comment on this single take and not compare it to others."
+    ]
+  },
+  "status": "completed"
+}

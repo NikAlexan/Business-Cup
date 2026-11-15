@@ -1,0 +1,54 @@
+{
+  "schema_version": "listening-examples-v1",
+  "default_by_exercise": {
+    "E08": "pauses-thought-groups-v1"
+  },
+  "examples": {
+    "pauses-thought-groups-v1": {
+      "id": "pauses-thought-groups-v1",
+      "version": "v1",
+      "exercise_id": "E08",
+      "source": "synthetic",
+      "title": "Hear where a pause falls",
+      "text": "At the old bridge the path turns toward the river.",
+      "question": "Which version keeps ‘the old bridge’ together?",
+      "grouped_choice": "a",
+      "explanation": "A pauses after ‘bridge’, leaving ‘the old bridge’ together. B puts the same added silence after ‘the’, splitting that group. Notice the position rather than copying the length.",
+      "transfer_prompt": "Choose one thought boundary in your own text to listen for. Keep short word groups connected when that supports the meaning.",
+      "provenance_note": "Synthesized speech for comparing pause positions, not a target voice or an assessment of your speech.",
+      "synthesizer": "Flite/cmu_us_slt",
+      "synthesizer_package_version": "2.2-6build3",
+      "notice_url": "/practice-examples/NOTICE.txt",
+      "inserted_pause_seconds": 0.7,
+      "base_pcm_sha256": "ad9e82c7d0c35fbde25d63c9fdd890f04a6edd3653c4a55c2b9489f58661c198",
+      "base_samples": 44320,
+      "edge_padding_samples": 2400,
+      "choices": [
+        {
+          "id": "a",
+          "label": "A",
+          "audio_url": "/practice-examples/pauses-v1/a-92086551bca4b4e2.wav",
+          "sha256": "92086551bca4b4e2998d936d25155196b3ba60f195c31fbc5288905cea172c9f",
+          "duration_seconds": 3.77,
+          "sample_rate": 16000,
+          "pause_after_word_index": 3,
+          "inserted_pause_start_sample": 19976,
+          "inserted_pause_samples": 11200,
+          "paused_text": "At the old bridge / the path turns toward the river."
+        },
+        {
+          "id": "b",
+          "label": "B",
+          "audio_url": "/practice-examples/pauses-v1/b-990ab1e1de0108b6.wav",
+          "sha256": "990ab1e1de0108b6376f2ccc2113378ce5fb1e80efef8dc8e7280fda950eacc4",
+          "duration_seconds": 3.77,
+          "sample_rate": 16000,
+          "pause_after_word_index": 1,
+          "inserted_pause_start_sample": 10499,
+          "inserted_pause_samples": 11200,
+          "paused_text": "At the / old bridge the path turns toward the river."
+        }
+      ]
+    }
+  }
+}

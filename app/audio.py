@@ -106,7 +106,8 @@ def speech_segments(signal, model_path):
     return segments
 
 
-def quality_check(signal, settings, purpose):
+def quality_check(signal, settings, purpose, rules=None):
+    rules = QUALITY_RULES if rules is None else rules
     duration = len(signal) / SAMPLE_RATE
     segments = speech_segments(signal, settings.vad_model_path)
     speech_seconds = sum(b - a for a, b in segments) / SAMPLE_RATE
@@ -119,13 +120,9 @@ def quality_check(signal, settings, purpose):
         speech_rms = float(np.sqrt(np.mean(signal[mask] ** 2)))
         noise_rms = float(np.sqrt(np.mean(signal[~mask] ** 2)))
         snr = 20 * math.log10(max(speech_rms, 1e-8) / max(noise_rms, 1e-8))
-        noise_level = "low" if snr >= 15 else "moderate" if snr >= 3 else "high"
+        noise_level = "low" if snr >= 15 else "moderate" if snr >= rules["min_speech_noise_db"] else "high"
     issues = []
-    minimum = (
-        QUALITY_RULES["min_speech_seconds"]
-        if purpose == "assessment"
-        else QUALITY_RULES["exercise_min_speech_seconds"]
-    )
+    minimum = rules["min_speech_seconds"] if purpose == "assessment" else rules["exercise_min_speech_seconds"]
     if speech_seconds < minimum:
         issues.append(
             {
@@ -133,7 +130,7 @@ def quality_check(signal, settings, purpose):
                 "message": f"Please record at least {minimum} seconds of audible speech.",
             }
         )
-    if clipping > QUALITY_RULES["max_clipping_ratio"]:
+    if clipping > rules["max_clipping_ratio"]:
         issues.append(
             {"code": "clipping", "message": "Move farther from the microphone or lower its input volume."}
         )
@@ -193,21 +190,63 @@ def pitch(signal):
 def timing_metrics(signal, segments, word_count=None, words=None):
     # Pauses are gaps between transcribed words: Silero VAD holds speech probability through
     # sentence pauses, and edge silence must not dilute pace. segments stay for quality checks.
-    return combine_timing((word_count, words))
+    return combine_timing((word_count, words, len(signal) / SAMPLE_RATE))
+
+
+def valid_word_timestamps(words):
+    if not isinstance(words, list) or len(words) < 2:
+        return False
+    previous_end = 0
+    for word in words:
+        if not isinstance(word, dict):
+            return False
+        start, end = word.get("start"), word.get("end")
+        if any(
+            isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)
+            for v in (start, end)
+        ):
+            return False
+        if start < previous_end or end < start:
+            return False
+        previous_end = end
+    return words[0]["end"] > words[0]["start"] and words[-1]["end"] > words[-1]["start"]
 
 
 def combine_timing(*parts):
-    """Timing pooled over (word_count, words) parts; unavailable if any part lacks words, never partial."""
+    """Pool verified utterance spans. Untimed internal words preserve pace, never pause precision."""
     total_words = span = pause_time = pause_count = 0
-    for word_count, words in parts:
+    incomplete_words = False
+    for word_count, words, duration in parts:
         if not word_count or not words or len(words) < 2:
             return {k: metric(None, u, "transcription_unavailable") for k, u in TIMING_UNITS.items()}
+        if (
+            not valid_word_timestamps(words)
+            or isinstance(word_count, bool)
+            or not isinstance(word_count, int)
+            or word_count != len(words)
+            or not math.isfinite(duration)
+            or duration <= 0
+            or words[-1]["end"] > duration + 0.05
+            or words[-1]["start"] >= duration
+            or min(duration, words[-1]["end"]) - words[0]["start"] < 1 / SAMPLE_RATE
+        ):
+            return {k: metric(None, u, "transcription_invalid_timestamps") for k, u in TIMING_UNITS.items()}
         pauses = [b["start"] - a["end"] for a, b in zip(words, words[1:])]
+        incomplete_words = incomplete_words or any(word["end"] == word["start"] for word in words)
         pauses = [g for g in pauses if g >= 0.3]
         total_words += word_count
-        span += words[-1]["end"] - words[0]["start"]
+        span += min(duration, words[-1]["end"]) - words[0]["start"]
         pause_time += sum(pauses)
         pause_count += len(pauses)
+    if incomplete_words:
+        return {
+            **{
+                k: metric(None, u, "word_alignment_incomplete")
+                for k, u in TIMING_UNITS.items()
+                if k != "speaking_rate_wpm"
+            },
+            "speaking_rate_wpm": metric(round(total_words * 60 / span, 2), "words/min"),
+        }
     return {
         "pause_count": metric(pause_count, "count"),
         "pause_total_seconds": metric(round(pause_time, 3), "s"),

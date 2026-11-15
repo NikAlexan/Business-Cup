@@ -67,12 +67,21 @@ export default function Main() {
               What do you want to work on?
             </h2>
             <div role="radiogroup" aria-label="Goal" style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 520 }}>
-              {GOALS.map((g) => (
+              {GOALS.map((g, index) => (
                 <button
                   key={g.id}
                   type="button"
                   className={'rs-opt' + (goal === g.id ? ' rs-opt--on' : '')}
                   role="radio"
+                  tabIndex={goal === g.id ? 0 : -1}
+                  onKeyDown={(event) => {
+                    const delta = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0
+                    if (!delta && event.key !== 'Home' && event.key !== 'End') return
+                    event.preventDefault()
+                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? GOALS.length - 1 : (index + delta + GOALS.length) % GOALS.length
+                    setGoal(GOALS[next].id)
+                    event.currentTarget.parentElement?.querySelectorAll('button')[next]?.focus()
+                  }}
                   aria-checked={goal === g.id}
                   onClick={() => setGoal(g.id)}
                 >

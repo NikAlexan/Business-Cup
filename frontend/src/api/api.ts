@@ -36,15 +36,30 @@ export function queryRetry(failureCount: number, error: unknown): boolean {
 
 export type KeyState = { key: string; body: string }
 
+const blobIds = new WeakMap<Blob, number>()
+let blobSequence = 0
+
+// Retrying the same Blob keeps its key; a newly recorded Blob represents a new operation.
+// JSON.stringify alone serializes every Blob as {}, hiding changes between takes.
+function operationBody(body: unknown) {
+  return JSON.stringify(body ?? null, (_, value) => {
+    if (typeof Blob !== 'undefined' && value instanceof Blob) {
+      if (!blobIds.has(value)) blobIds.set(value, ++blobSequence)
+      return { blob: blobIds.get(value), size: value.size, type: value.type }
+    }
+    return value
+  })
+}
+
 // Same body after a failure reuses the key so the server can replay; a new body gets a new key.
 export function nextKey(prev: KeyState | null, body: unknown): KeyState {
-  const s = JSON.stringify(body ?? null)
+  const s = operationBody(body)
   return prev && prev.body === s ? prev : { key: crypto.randomUUID(), body: s }
 }
 
 export function useMutationWithKey<TVars, TRes>(fn: (vars: TVars, key: string) => Promise<TRes>) {
   const last = useRef<KeyState | null>(null)
-  return useMutation<TRes, Error, TVars>({
+  const mutation = useMutation<TRes, Error, TVars>({
     mutationFn: (vars) => {
       last.current = nextKey(last.current, vars)
       return fn(vars, last.current.key)
@@ -53,6 +68,7 @@ export function useMutationWithKey<TVars, TRes>(fn: (vars: TVars, key: string) =
       last.current = null
     },
   })
+  return { ...mutation, reset: () => { last.current = null; mutation.reset() } }
 }
 
 export const post = <T,>(path: string, body: unknown, key: string) =>

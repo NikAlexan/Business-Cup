@@ -7,7 +7,7 @@ import { formatDate } from '../lib/format'
 export default function CheckIn() {
   const me = useMe()
   if (!me.data) return <AppShell><Skeleton height={280} /></AppShell>
-  if (!me.data.capabilities.daily_training) return <Navigate to="/paywall" replace />
+  if (!me.data.capabilities?.daily_training) return <Navigate to="/paywall" replace />
   const r = me.data.reassessment
   return (
     <AppShell>
@@ -15,9 +15,9 @@ export default function CheckIn() {
         <h1 className="rs-h rs-h1">Your 14-day check-in</h1>
         <div className="rs-cols">
           <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
-            <h2 className="rs-h" style={{ fontSize: 20 }}>Same 3 tasks as your baseline</h2>
+            <h2 className="rs-h" style={{ fontSize: 20 }}>Three recording tasks</h2>
             <p style={{ margin: 0 }}>
-              Record the same passages with the same mic, distance and room. We put the numbers side by side and build your next plan.
+              Repeat the control passage and expression task, then read a fresh passage with the same mic, distance and room. We compare the recordings and build your next plan.
             </p>
             <p style={{ margin: 0, fontSize: 15, color: 'var(--muted)' }}>
               Numbers describe these recordings only. Some changes may be day-to-day variation.

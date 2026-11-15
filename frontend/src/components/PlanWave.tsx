@@ -1,14 +1,15 @@
 import type { Lesson } from '../api/types'
 import { Check } from './Icons'
+import { formatEstimate } from '../lib/format'
 
 const STUB = 12 // % height of a session with no practice yet; today's bar gets twice that to fit its number
 
-const minutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`
+const minutes = formatEstimate
 
 // Bar height = minutes actually practiced in that session, scaled to the longest session or the planned length.
 export function PlanWave({ lessons, todayId, height = 150 }: { lessons: Lesson[]; todayId?: string; height?: number }) {
   const done = lessons.filter((l) => l.status === 'completed').length
-  const scale = Math.max(...lessons.map((l) => Math.max(l.practice_seconds ?? 0, l.estimated_duration_seconds)))
+  const scale = Math.max(1, ...lessons.map((l) => Math.max(l.practice_seconds ?? 0, l.estimated_duration_seconds)))
   const total = lessons.reduce((s, l) => s + (l.practice_seconds ?? 0), 0)
   return (
     <div className="rs-eq" style={{ height }} role="img" aria-label={`${done} of ${lessons.length} sessions done, ${minutes(total)} practiced, check-in after session ${lessons.length}`}>

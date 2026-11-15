@@ -8,6 +8,7 @@ import { useMe } from '../api/hooks'
 import { AppShell } from '../components/AppShell'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { useInstallPrompt } from '../lib/install'
+import { clearCancellationIntents } from '../lib/cancellationIntent'
 
 const GOALS = [
   ['clear_speech', 'Clearer speech'],
@@ -31,6 +32,7 @@ export default function Settings() {
   const wipe = useMutation({
     mutationFn: () => request('/guest-data', { method: 'DELETE' }),
     onSuccess: () => {
+      clearCancellationIntents()
       qc.clear()
       navigate('/', { replace: true })
     },
@@ -41,7 +43,7 @@ export default function Settings() {
   })
   const portal = useMutationWithKey((_: null, key) => post<{ url: string }>('/billing/portal-session', {}, key))
   const sub = me.data?.subscription
-  const paid = me.data?.capabilities.daily_training
+  const paid = me.data?.capabilities?.daily_training
   const pref = me.data?.preferences
   const zones = pref && !ZONES.includes(pref.timezone) ? [pref.timezone, ...ZONES] : ZONES
 

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { request } from '../api/api'
 import { usePlan, useProgress } from '../api/hooks'
@@ -19,7 +20,7 @@ function Takes({ tz }: { tz: string }) {
     queryFn: ({ pageParam }) => request<P>('/progress?days=1&recordings_limit=10' + (pageParam ? '&recordings_cursor=' + encodeURIComponent(pageParam) : '')),
     getNextPageParam: (p) => p.next_recordings_cursor ?? undefined,
   })
-  const titles = new Map(plan.data?.lessons.flatMap((l) => l.items.map((i) => [i.id, `${i.exercise_id} · ${i.title}`] as const)) ?? [])
+  const titles = new Map(plan.data?.lessons.flatMap((l) => l.items.map((i) => [i.id, i.title] as const)) ?? [])
   const recs = q.data?.pages.flatMap((p) => p.recordings).filter((r) => r.status === 'completed') ?? []
   return (
     <div className="rs-stack" style={{ gap: 10 }}>
@@ -37,6 +38,7 @@ function Takes({ tz }: { tz: string }) {
               {formatDate(r.created_at, tz)} · {clock(r.duration_seconds)}
             </span>
           </span>
+          {r.plan_item_id && <Link className="rs-link" to={'/exercise/' + r.plan_item_id}>Feedback and practice again</Link>}
           <audio controls preload="none" src={r.audio_url} style={{ width: '100%', maxWidth: 280, height: 36 }} aria-label="Play take" />
         </div>
       ))}
@@ -67,7 +69,7 @@ export default function Progress() {
           <div className="rs-metric"><span className="rs-label">Sessions</span><span className="rs-metric__v">{s.current_plan_completed_lessons}<small>/ {s.current_plan_total_lessons}</small></span><span className="rs-metric__n">{s.completed_lessons_all_time} all time</span></div>
           <div className="rs-metric"><span className="rs-label">Streak</span><span className="rs-metric__v">{s.current_streak_days}<small>days</small></span><span className="rs-metric__n">Longest {s.longest_streak_days}</span></div>
           <div className="rs-metric"><span className="rs-label">Notes</span><span className="rs-metric__v">{s.notes_total}</span><span className="rs-metric__n">For finished practice</span></div>
-          <div className="rs-metric"><span className="rs-label">Practice</span><span className="rs-metric__v">{Math.floor(s.practice_seconds_total / 60)}<small>min</small></span><span className="rs-metric__n">{s.last_practice_on ? 'Last ' + formatDate(s.last_practice_on, d.timezone) : 'No sessions yet'}</span></div>
+          <div className="rs-metric"><span className="rs-label">Recorded practice</span><span className="rs-metric__v">{Math.floor(s.practice_seconds_total / 60)}<small>min</small></span><span className="rs-metric__n">{s.last_practice_on ? 'Last ' + formatDate(s.last_practice_on, d.timezone) : 'No sessions yet'}</span></div>
         </div>
         <div className="rs-cols">
           <div className="rs-stack" style={{ gap: 16 }}>
