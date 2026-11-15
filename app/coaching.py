@@ -58,7 +58,7 @@ def quote_evidence(quote, transcript, duration, occurrence=1):
     return None
 
 
-def timing_feedback(transcript, metrics, verification, duration):
+def timing_feedback(transcript, metrics, verification, duration, practice_intent=None):
     pace = metrics.get("speaking_rate_wpm", {})
     pauses = metrics.get("pause_ratio", {})
     result = {
@@ -122,13 +122,21 @@ def timing_feedback(transcript, metrics, verification, duration):
                 }
             )
     target = verification.get("target_wpm")
-    if target and pace["value"] > target["max"]:
+    if practice_intent == "keep":
+        step = "Listen for the feature you wanted to keep. Carry it into a new phrase without automatically making it stronger."
+    elif practice_intent == "undecided":
+        step = (
+            "Listen to one phrase again before deciding whether to change anything. A new take is optional."
+        )
+    elif target and pace["value"] > target["max"]:
         step = "On your next take, let one sentence settle before starting the next. Keep your voice comfortable."
     elif target and pace["value"] < target["min"]:
         step = "Try one pass with smoother connections between words. Keep pauses that help the meaning."
     elif target:
-        step = "Keep this comfortable pace and change the emphasis on one key word in your next take."
+        step = "If this pace feels comfortable, keep it in a new phrase. Listen before choosing any further change."
     else:
         step = "Choose one marked thought boundary. Listen to it, then try a different pause there and compare the takes."
+    if practice_intent:
+        result["practice_intent"] = practice_intent
     result["next_step"] = step
     return result

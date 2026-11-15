@@ -285,6 +285,7 @@ class Worker:
                             measurements,
                             item["task"]["verification"],
                             quality["duration_seconds"],
+                            (rec.get("training_focus") or rec.get("practice_focus") or {}).get("intent"),
                         )
                         with self.database.session.begin() as db:
                             s, _ = self.locked(db, claim)

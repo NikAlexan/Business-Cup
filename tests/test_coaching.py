@@ -92,3 +92,79 @@ def test_worker_publishes_timing_feedback_with_the_saved_take(
     assert feedback["insights"][0]["code"] == "observed_pace"
     assert feedback["metrics"]["pause_ratio"]["available"]
     assert feedback["next_step"]
+
+
+@pytest.mark.parametrize("exercise_id,tag", [("E06", "pace"), ("E08", "pauses")])
+@pytest.mark.parametrize("intent", ["keep", "undecided"])
+def test_recording_worker_respects_frozen_intent_in_local_timing_advice(
+    client, app, worker, speech_file, exercise_id, tag, intent
+):
+    from uuid import uuid4
+
+    from app.content import generate_plan
+    from app.db import Resource
+    from tests.conftest import guest, post, upload
+
+    gid = guest(client).json()["guest_id"]
+    plan = generate_plan(
+        {"id": str(uuid4())}, {"priorities": [{"tag": tag, "exercise_ids": [exercise_id]}]}, 1
+    )
+    item = next(i for i in plan["lessons"][0]["items"] if i["exercise_id"] == exercise_id)
+    with app.state.database.session.begin() as db:
+        db.add(Resource(id=plan["id"], guest_id=gid, kind="plan", data=plan))
+    first = upload(client, speech_file, {"purpose": "exercise", "plan_item_id": item["id"]})
+    assert worker.run_once()
+    source = post(
+        client,
+        "/exercise-attempts",
+        {"plan_item_id": item["id"], "recording_id": first.json()["recording"]["id"]},
+    ).json()
+    client.put(
+        "/api/v1/exercise-attempts/" + source["id"] + "/reflection",
+        json={"note": "Listen to this phrase.", "intent": intent},
+    )
+    repeated = upload(
+        client,
+        speech_file,
+        {
+            "purpose": "exercise",
+            "plan_item_id": item["id"],
+            "practice_only": "true",
+            "based_on_attempt_id": source["id"],
+        },
+    )
+    assert repeated.status_code == 202
+    # Later reflection edits cannot change the instruction for the accepted take.
+    client.put(
+        "/api/v1/exercise-attempts/" + source["id"] + "/reflection",
+        json={"note": "A later experiment.", "intent": "experiment"},
+    )
+    assert worker.run_once()
+    saved = post(
+        client,
+        "/exercise-attempts",
+        {
+            "plan_item_id": item["id"],
+            "recording_id": repeated.json()["recording"]["id"],
+            "practice_only": True,
+        },
+    ).json()
+    assert saved["practice_focus"]["intent"] == saved["feedback"]["practice_intent"] == intent
+    assert saved["reward"]["notes"] == 0
+    if intent == "keep":
+        assert "wanted to keep" in saved["feedback"]["next_step"]
+    else:
+        assert "before deciding" in saved["feedback"]["next_step"]
+
+
+def test_in_range_pace_does_not_introduce_an_unrelated_emphasis_correction():
+    times = [{"start": 0, "end": 0.3}, {"start": 0.35, "end": 0.6}, {"start": 0.7, "end": 1.3}]
+    metrics = timing_metrics(np.zeros(32000), [], 3, times)
+    result = timing_feedback(
+        {"words": times, "recognized_words": ["One", "clear", "thought"]},
+        metrics,
+        {"target_wpm": {"min": 120, "max": 150}},
+        2,
+    )
+    assert 120 <= metrics["speaking_rate_wpm"]["value"] <= 150
+    assert "keep it" in result["next_step"] and "emphasis" not in result["next_step"]

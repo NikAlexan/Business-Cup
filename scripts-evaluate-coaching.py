@@ -14,6 +14,7 @@ import soundfile as sf
 from app.audio import timing_metrics
 from app.coaching import quote_evidence
 from app.config import Settings
+from app.focus import RUBRIC_VERSION
 from app.provider import EXERCISE_PROMPT_VERSION, OpenAIAudioProvider, ProviderFailure, wav_bytes
 
 PHRASES = [
@@ -35,10 +36,12 @@ class BoundedProvider(OpenAIAudioProvider):
         return super().request(endpoint, **kwargs)
 
 
-def run(output, transcription_only=False, cached_transcript=None):
+def run(output, transcription_only=False, cached_transcript=None, practice_intent="experiment"):
     result = {
         "schema_version": "live-coaching-probe-v1",
         "prompt_version": EXERCISE_PROMPT_VERSION,
+        "practice_intent": practice_intent,
+        "rubric_version": RUBRIC_VERSION,
         "api_calls": 0,
         "usage": [],
         "created_at": datetime.now(UTC).isoformat(),
@@ -120,11 +123,16 @@ def run(output, transcription_only=False, cached_transcript=None):
                             "text": TEXT,
                             "instruction": "Read both thoughts comfortably, leaving room between them.",
                         },
-                        "saved_focus": "Leave room for the thought to land.",
+                        "practice_intent": practice_intent,
+                        "saved_focus": {
+                            "experiment": "Explore the boundary between these two thoughts.",
+                            "keep": "Keep the pause that lets the first thought land, without making it longer.",
+                            "undecided": "Listen to the thought boundary again before choosing a change.",
+                        }[practice_intent],
                         "story_focus": {
                             "skill_label": "Meaningful pauses",
                             "listening_question": "Does the pause help one thought land before the next?",
-                            "rubric_version": "story-listening-v1",
+                            "rubric_version": RUBRIC_VERSION,
                         },
                         "verified_transcript": transcript["text"],
                         "measurements": metrics,
@@ -163,5 +171,6 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--transcription-only", action="store_true")
     parser.add_argument("--cached-transcript", type=Path)
+    parser.add_argument("--intent", choices=("experiment", "keep", "undecided"), default="experiment")
     args = parser.parse_args()
-    raise SystemExit(run(args.output, args.transcription_only, args.cached_transcript))
+    raise SystemExit(run(args.output, args.transcription_only, args.cached_transcript, args.intent))

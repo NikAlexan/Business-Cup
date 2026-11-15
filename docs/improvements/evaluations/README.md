@@ -35,3 +35,5 @@ To validate the captured timing without a network call, use both cached and tran
 ```
 
 The real ASR response is also frozen as `tests/fixtures/whisper-internal-zero-word.json` for normal offline regression tests. Existing zero-length edges, mismatched counts, out-of-audio timestamps and unusably short spans remain unavailable.
+
+The current CLI accepts --intent experiment|keep|undecided and sends the choice with the current story rubric. The original four paid responses above still describe their historical prompts/context; they are not evidence for later prompt versions. A cached-transcription-only keep run has been checked with zero provider requests. To exercise another intention offline, add --intent keep (or undecided) to the cached command above; without --transcription-only, a new paid coaching request is made.

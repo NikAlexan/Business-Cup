@@ -818,3 +818,23 @@ test('an undecided listening note can be empty and survives reload without repla
   expect(screen.queryByRole('button', { name: 'Save for story practice' })).toBeNull()
   expect(focusPosts).toBe(0)
 })
+
+test.each([['keep', 'experiment'], ['experiment', 'keep']] as const)('repeat comparison uses current %s intention over previous %s and corrects old local advice', async (currentIntent, previousIntent) => {
+  const extra = { ...savedAttempt, id: 'extra', practice_only: true,
+    practice_focus: { attempt_id: 'attempt', note: 'A previous reflection.', intent: previousIntent },
+    training_focus: { ...storyFocus, intent: currentIntent },
+    feedback: { ...savedAttempt.feedback, next_step: 'Keep this pace and change the emphasis on a word.' } }
+  setup({ ...baseItem, exercise_id: 'E12' }, (path) => {
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [extra, savedAttempt], next_cursor: null })
+    if (path === '/api/v1/exercise-attempts/extra') return Response.json(extra)
+  })
+  open('/exercise/item')
+  await screen.findByLabelText('Previous take for comparison')
+  if (currentIntent === 'keep') {
+    expect(screen.getByText('You chose to keep a useful feature for this take.')).toBeTruthy()
+    expect(screen.getByText(/Listen for the feature you wanted to keep/)).toBeTruthy()
+    expect(screen.queryByText('Keep this pace and change the emphasis on a word.')).toBeNull()
+  } else expect(screen.queryByText('You chose to keep a useful feature for this take.')).toBeNull()
+  expect(screen.getByText('Optional practice idea:')).toBeTruthy()
+  expect(screen.queryByText('Try next:')).toBeNull()
+})
