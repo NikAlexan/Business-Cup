@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { request } from '../api/api'
 import type { Recording } from '../api/types'
+import { pauseOtherAudio } from './audioPlayback'
 
 const CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
 const base = (t: string) => t.split(';')[0].trim()
@@ -158,6 +159,7 @@ export function useRecorder({ maxSeconds, accepted }: { maxSeconds: number; acce
 
   const start = useCallback(async () => {
     if (request.current || rec.current) return
+    pauseOtherAudio()
     const controller = new AbortController()
     request.current = controller
     setError(null)

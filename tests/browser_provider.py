@@ -33,12 +33,13 @@ class BrowserAssessmentProvider:
         if assessment["id"] not in self.failed_once:
             self.failed_once.add(assessment["id"])
             raise ProviderFailure("analysis_provider_rate_limited", True)
+        tag, exercise = ("pauses", "E08") if assessment["goal"] == "expressive_voice" else ("clarity", "E03")
         return {
             "summary": "Test-only listening summary for browser verification.",
             "observations": [],
             "limitations": [
                 "Test-only report from a deterministic provider; no AI listening assessment was performed."
             ],
-            "priorities": [{"tag": "clarity", "reason": "Test practice focus.", "exercise_ids": ["E03"]}],
-            "recommended_exercise_ids": ["E03"],
+            "priorities": [{"tag": tag, "reason": "Test practice focus.", "exercise_ids": [exercise]}],
+            "recommended_exercise_ids": [exercise],
         }

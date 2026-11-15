@@ -23,9 +23,11 @@ export function RecorderDock({
   onSend,
   sendLabel = 'Use this take',
   onPlayTime,
+  startDisabled = false,
 }: {
   r: ReturnType<typeof useRecorder>
   sending: boolean
+  startDisabled?: boolean
   onSend: () => void
   sendLabel?: string
   onPlayTime?: (seconds: number) => void // playback position for word highlighting
@@ -77,7 +79,7 @@ export function RecorderDock({
           {on ? (status === 'waiting' ? 'Recording · read at your own pace' : 'Recording · ' + STATUS_TEXT[status].toLowerCase() + ' · press stop when done') : requesting ? 'Waiting for microphone permission…' : 'Press to record'}
         </span>
       </div>
-      <button className="rs-rec" type="button" disabled={requesting || sending} aria-label={on ? 'Stop recording' : requesting ? 'Waiting for microphone permission' : 'Start recording'} onClick={on ? r.stop : r.start} style={{ marginBottom: 5, cursor: 'pointer' }}>
+      <button className="rs-rec" type="button" disabled={requesting || (!on && (sending || startDisabled))} aria-label={on ? 'Stop recording' : requesting ? 'Waiting for microphone permission' : 'Start recording'} onClick={on ? r.stop : r.start} style={{ marginBottom: 5, cursor: 'pointer' }}>
         {on ? <StopIcon /> : <MicIcon />}
       </button>
       {requesting && <button className="rs-btn rs-btn--secondary" type="button" onClick={r.reset}>Cancel microphone request</button>}

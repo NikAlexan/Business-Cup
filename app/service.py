@@ -14,6 +14,8 @@ from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
 from app.errors import ApiError, fail
 from app.focus import KEEP_STEPS, RUBRIC_VERSION, RUBRICS, STORY_STEPS, suggested_skill
+from app.listening import CATALOG as LISTENING_CATALOG
+from app.listening import boundaries, example_for, listening_words
 
 COOKIE = "guest_session"
 ACTIVE = {"draft", "queued", "processing", "needs_rerecord"}
@@ -551,6 +553,7 @@ class Service:
                 "based_on_attempt_id": (record.get("practice_focus") or {}).get("attempt_id"),
                 "practice_focus": record.get("practice_focus"),
                 "training_focus": record.get("training_focus"),
+                "listening_plan": record.get("listening_plan"),
                 "status": record["status"],
             }
             if job_id
@@ -594,6 +597,13 @@ class Service:
             "item_index": next(n for n, value in enumerate(lesson["items"]) if value["id"] == item["id"]),
             "pending_take": pending,
             "training_focus": self.active_practice_focus() if item["exercise_id"] == "E12" else None,
+            "listening_example": example_for(item["exercise_id"]),
+            "listening_boundaries": boundaries(item["task"]) if item["exercise_id"] == "E08" else [],
+            "listening_plan": max(
+                (p for p in self.all("listening_plan") if p["plan_item_id"] == item["id"]),
+                key=lambda p: (p["created_at"], p["id"]),
+                default=None,
+            ),
         }
 
     def dismiss_recording(self, recording_id):
@@ -621,6 +631,41 @@ class Service:
             "note": reflection.get("note", ""),
             **({"intent": reflection["intent"]} if reflection.get("intent") else {}),
         }
+
+    def save_listening_plan(self, item_id, payload):
+        self.auth("daily_training")
+        _, _, item = self.find_item(item_id)
+        example = LISTENING_CATALOG["examples"].get(payload["example_id"])
+        options = boundaries(item["task"]) if item["exercise_id"] == "E08" else []
+        if not example or example["exercise_id"] != item["exercise_id"] or not options:
+            fail(422, "listening_example_unavailable", "This example does not apply to the saved exercise.")
+        if payload["boundary_index"] >= len(options):
+            fail(422, "invalid_listening_boundary", "Choose a marked boundary in your assigned text.")
+        if (
+            sum(self.local_date(p["created_at"]) == self.local_date() for p in self.all("listening_plan"))
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily listening-plan limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        boundary = options[payload["boundary_index"]]
+        plan = {
+            "id": new_id(),
+            "plan_item_id": item["id"],
+            "created_at": iso(),
+            "example": copy.deepcopy(example),
+            "answer": payload["answer"],
+            "source": "user_listening",
+            "boundary_index": boundary["index"],
+            "boundary_word_index": boundary["word_index"],
+            "before": boundary["before"],
+            "after": boundary["after"],
+            "expected_words": listening_words(item["task"]["text"]),
+        }
+        return 201, self.put("listening_plan", plan)
 
     def save_reflection(self, attempt, payload):
         previous = attempt.get("reflection") or {}
@@ -788,6 +833,11 @@ class Service:
             if not item or item["exercise_id"] != "E12":
                 fail(422, "validation_error", "A saved story focus applies only to a narration task.")
             training_focus = self.get(fields["training_focus_id"], "practice_focus")
+        listening_plan = None
+        if fields.get("listening_plan_id"):
+            listening_plan = self.get(fields["listening_plan_id"], "listening_plan")
+            if not item or item["exercise_id"] != "E08" or listening_plan["plan_item_id"] != item["id"]:
+                fail(404, "not_found", "Listening plan not found for this exercise.")
         used = sum(self.local_date(r["created_at"]) == self.local_date() for r in self.all("recording"))
         if used >= self.settings.max_uploads_per_day:
             fail(429, "rate_limit_exceeded", "Daily recording limit reached.", {"retry_after_seconds": 3600})
@@ -807,6 +857,7 @@ class Service:
                 **fields,
                 "practice_focus": practice_focus,
                 "training_focus": training_focus,
+                "listening_plan": listening_plan,
                 "status": "queued",
                 "mime_type": mime_type,
                 "bytes": path.stat().st_size,
@@ -929,6 +980,7 @@ class Service:
             "practice_only": practice_only,
             "practice_focus": practice_focus,
             "training_focus": rec.get("training_focus") if kind == "recording" else None,
+            "listening_plan": rec.get("listening_plan") if kind == "recording" else None,
             "reward": {"notes": 0, "parts": []},
             "practice_seconds": 0,
             "practice_seconds_source": {

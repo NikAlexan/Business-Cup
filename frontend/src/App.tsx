@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { Skeleton } from './components/ui'
+import { useExclusiveAudio } from './lib/audioPlayback'
 
 const screens = {
   Main: lazy(() => import('./screens/Main')),
@@ -17,6 +18,8 @@ const screens = {
 }
 
 export default function App() {
+  const location = useLocation()
+  useExclusiveAudio(location.key)
   const S = screens
   return (
     <Suspense fallback={<Skeleton height={240} />}>

@@ -98,6 +98,7 @@ export type Today = {
 export type Issue = { code: string; message: string }
 export type Recording = {
   training_focus?: TrainingFocus | null
+  listening_plan?: ListeningPlan | null
   id: string
   status: 'queued' | 'processing' | 'completed' | 'needs_rerecord' | 'failed'
   duration_seconds: number | null
@@ -170,6 +171,7 @@ export type Job = {
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
   exercise_id?: string
+  listening_plan?: ListeningPlan | null
   training_focus?: TrainingFocus | null
   focus_check?: { outcome: FocusOutcome; source: 'user_listening'; updated_at: string }
   speech_review?: {
@@ -188,7 +190,7 @@ export type Attempt = {
   status: 'passed' | 'needs_retry'
   reward: Reward
   practice_seconds: number
-  feedback: { version?: string; scope?: string; insights?: { code: string; source: string; message: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } | null }[]; next_step?: string | null; summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
+  feedback: { planned_pause?: PlannedPauseFeedback; version?: string; scope?: string; insights?: { code: string; source: string; message: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } | null }[]; next_step?: string | null; summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
 }
 export type Completion = {
   lesson_id: string
@@ -225,8 +227,8 @@ export type Exercise = {
   tags: string[]
 }
 
-export type PendingTake = { training_focus?: TrainingFocus | null; based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
-export type PlanItemState = { training_focus?: TrainingFocus | null; plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }
+export type PendingTake = { listening_plan?: ListeningPlan | null; training_focus?: TrainingFocus | null; based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
+export type PlanItemState = { listening_example?: ListeningExampleData | null; listening_boundaries?: ListeningBoundary[]; listening_plan?: ListeningPlan | null; training_focus?: TrainingFocus | null; plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }
 
 export type PracticeIntent = 'experiment' | 'keep' | 'undecided'
 export type FocusOutcome = 'heard' | 'partly' | 'not_yet' | 'unsure'
@@ -240,4 +242,20 @@ export type PracticeFocusState = {
   focus: TrainingFocus | null
   skills: Record<string, { label: string; question: string; exercise_ids: string[] }>
   last_check: { outcome: FocusOutcome; source: 'user_listening'; attempt_id: string; updated_at: string } | null
+}
+
+
+export type ListeningExampleData = {
+  id: string; version: string; title: string; source: 'synthetic'; text: string; question: string
+  explanation: string; transfer_prompt: string; provenance_note: string; notice_url: string
+  choices: { id: 'a' | 'b'; label: string; audio_url: string; paused_text: string }[]
+}
+export type ListeningBoundary = { index: number; before: string; after: string; word_index: number }
+export type ListeningPlan = {
+  id: string; plan_item_id: string; created_at: string; example: ListeningExampleData
+  answer: 'a' | 'b' | 'unsure'; boundary_index: number; boundary_word_index: number; before: string; after: string
+}
+export type PlannedPauseFeedback = {
+  available: boolean; gap_seconds: number | null; unavailable_reason?: string | null
+  evidence: { quote: string; start_seconds: number; end_seconds: number } | null
 }

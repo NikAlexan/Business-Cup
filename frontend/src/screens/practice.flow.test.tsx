@@ -838,3 +838,87 @@ test.each([['keep', 'experiment'], ['experiment', 'keep']] as const)('repeat com
   expect(screen.getByText('Optional practice idea:')).toBeTruthy()
   expect(screen.queryByText('Try next:')).toBeNull()
 })
+
+const pauseExample = {
+  id: 'pause-example-v1', version: 'v1', title: 'Hear where a pause falls', source: 'synthetic' as const,
+  text: 'At the old bridge the path turns toward the river.', question: 'Which version keeps the group together?',
+  explanation: 'A keeps the words together; B separates the article.', transfer_prompt: 'Choose one boundary to listen for.',
+  provenance_note: 'Synthesized comparison, not a target voice.', notice_url: '/practice-examples/NOTICE.txt',
+  choices: [{ id: 'a' as const, label: 'A', audio_url: '/practice-examples/a.wav', paused_text: 'At the old bridge / the path turns.' }, { id: 'b' as const, label: 'B', audio_url: '/practice-examples/b.wav', paused_text: 'At the / old bridge the path turns.' }],
+}
+const pauseBoundaries = [{ index: 0, before: 'The first thought', after: 'the second thought', word_index: 2 }, { index: 1, before: 'the second thought', after: 'the ending', word_index: 5 }]
+const plannedPause = { id: 'listening-a', plan_item_id: 'item', created_at: '2026-11-15T00:00:00Z', example: pauseExample, answer: 'a' as const, boundary_index: 0, boundary_word_index: 2, before: 'The first thought', after: 'the second thought' }
+
+test('a listening comparison remains optional after audio failure and saves an owned boundary with retry identity', async () => {
+  const item = { ...baseItem, exercise_id: 'E08', status: 'pending' as const, latest_attempt_id: null }
+  const state = { item, lesson: { id: 'lesson', items: [item] }, plan_status: 'active', item_index: 0, pending_take: null, listening_example: pauseExample, listening_boundaries: pauseBoundaries, listening_plan: null }
+  const keys: string[] = []
+  setup(item, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json(state)
+    if (path.endsWith('/listening-plan')) {
+      keys.push(String((init?.headers as Record<string, string>)['Idempotency-Key']))
+      expect(JSON.parse(String(init?.body))).toEqual({ example_id: pauseExample.id, answer: 'unsure', boundary_index: 0 })
+      return keys.length === 1 ? Response.json({ error: { message: 'Boundary save offline.' } }, { status: 503 }) : Response.json({ ...plannedPause, answer: 'unsure' }, { status: 201 })
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  fireEvent.click(await screen.findByText('Listen to a short pause comparison'))
+  fireEvent.error(screen.getByLabelText('Pause example A'))
+  expect(screen.getByText(/The examples could not load/)).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'Start recording' }) as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('radio', { name: 'Not sure' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'The first thought / the second thought' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Use this boundary for my take' }))
+  await screen.findByText('Boundary save offline.')
+  fireEvent.click(screen.getByRole('button', { name: 'Use this boundary for my take' }))
+  await screen.findByRole('heading', { name: 'Boundary for this take' })
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
+  expect(keys[1]).toBe(keys[0])
+  act(() => client.setQueryData(['plan-item', 'item'], { ...state, listening_plan: { ...plannedPause, answer: 'b', boundary_index: 1 } }))
+  await waitFor(() => expect((screen.getByRole('radio', { name: 'Version B' }) as HTMLInputElement).checked).toBe(true))
+  expect((screen.getByRole('radio', { name: 'the second thought / the ending' }) as HTMLInputElement).checked).toBe(true)
+})
+
+test('a started take keeps its chosen boundary when another tab saves a new one', async () => {
+  const blob = new Blob(['take'])
+  vi.spyOn(recorder, 'useRecorder').mockImplementation(() => {
+    const [state, setState] = useState<'idle' | 'recording' | 'recorded'>('idle')
+    return { state, level: { level: 0, status: 'waiting' }, seconds: 10, error: null, limitReached: false,
+      mime: state === 'recorded' ? 'audio/webm' : null, blob: state === 'recorded' ? blob : null, url: state === 'recorded' ? 'blob:take' : null,
+      start: async () => { setState('recording') }, stop: () => setState('recorded'), reset: () => setState('idle') }
+  })
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+  const item = { ...baseItem, exercise_id: 'E08', status: 'pending' as const, latest_attempt_id: null }
+  const state = { item, lesson: { id: 'lesson', items: [item] }, plan_status: 'active', item_index: 0, pending_take: null, listening_example: pauseExample, listening_boundaries: pauseBoundaries, listening_plan: plannedPause }
+  let sent: string | null = null
+  setup(item, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json(state)
+    if (path === '/api/v1/recordings') { sent = String((init?.body as FormData).get('listening_plan_id')); return Response.json({ error: { message: 'Stop after boundary probe.' } }, { status: 503 }) }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
+  await screen.findByRole('button', { name: 'Stop recording' })
+  act(() => client.setQueryData(['plan-item', 'item'], { ...state, listening_plan: { ...plannedPause, id: 'listening-b', boundary_index: 1, before: 'A future boundary', after: 'for another take' } }))
+  expect(screen.queryByText(/A future boundary/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Check my take' }))
+  await screen.findByText('Stop after boundary probe.')
+  expect(sent).toBe(plannedPause.id)
+})
+
+test('saved chosen-boundary timing and private evidence playback survive exercise reload', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
+  const saved = { ...savedAttempt, listening_plan: plannedPause, feedback: { ...savedAttempt.feedback, planned_pause: { available: true, gap_seconds: 0.7, evidence: { quote: 'thought … the', start_seconds: 2, end_seconds: 4 } } } }
+  setup({ ...baseItem, exercise_id: 'E08' }, (path) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(saved)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [saved], next_cursor: null })
+  })
+  open('/exercise/item')
+  await screen.findByText(/About 0.7 seconds between the recognized words/)
+  fireEvent.click(await screen.findByRole('button', { name: 'Hear your chosen boundary: “thought … the”' }))
+  expect((screen.getByLabelText('Your completed take') as HTMLAudioElement).currentTime).toBe(2)
+  expect(play).toHaveBeenCalledOnce()
+})

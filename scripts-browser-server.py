@@ -72,6 +72,8 @@ def main():
             resource = (DIST / path).resolve()
             if resource.is_relative_to(DIST) and resource.is_file():
                 return FileResponse(resource)
+            if path.startswith("practice-examples/"):
+                raise HTTPException(404)
             return FileResponse(DIST / "index.html")
 
         stopped = threading.Event()

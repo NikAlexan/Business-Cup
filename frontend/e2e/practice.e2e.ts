@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 
 async function seed(page: Page) {
   const guest = await page.request.post('/api/v1/guest-session', {
@@ -433,4 +434,95 @@ test('baseline and check-in recover failed analysis, expose limitations and comp
   await page.getByRole('link', { name: 'See my new plan' }).click()
   await expect(page.getByRole('heading', { name: 'Your plan', exact: true })).toBeVisible()
   await expect(page.getByText('Session 1 of 14', { exact: true })).toBeVisible()
+})
+
+
+test('audible pause contrast carries a chosen boundary into a recorded take and restored evidence', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect((await page.request.post('/api/v1/guest-session', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: { goal: 'expressive_voice', timezone: 'UTC', locale: 'en-US', consent: { audio_processing: true, policy_version: '2026-11-14' } },
+  })).ok()).toBe(true)
+  // Real uploads and queue; the report/timestamps come from the explicit deterministic test provider.
+  const created = await page.request.post('/api/v1/assessments', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: { kind: 'initial', recording_conditions: { device_label: 'Fixture mic', distance_cm: 20, environment: 'quiet_room' } },
+  })
+  expect(created.status()).toBe(201)
+  const assessment = await created.json()
+  const buffer = await readFile('.browser-fixtures/speech.wav')
+  const terminalJob = async (id: string) => {
+    await expect.poll(async () => (await (await page.request.get('/api/v1/jobs/' + id)).json()).status,
+      { timeout: 45_000, intervals: [300, 600, 1000] }).toMatch(/^(completed|failed)$/)
+    return (await (await page.request.get('/api/v1/jobs/' + id)).json()).status
+  }
+  for (const task of assessment.tasks) {
+    const upload = await page.request.post('/api/v1/recordings', {
+      headers: { 'Idempotency-Key': randomUUID() },
+      multipart: { purpose: 'assessment', assessment_id: assessment.id, task_id: task.id,
+        file: { name: 'speech.wav', mimeType: 'audio/wav', buffer } },
+    })
+    expect(upload.status()).toBe(202)
+    expect(await terminalJob((await upload.json()).job_id)).toBe('completed')
+  }
+  const submitted = await page.request.post('/api/v1/assessments/' + assessment.id + '/submit', {
+    headers: { 'Idempotency-Key': randomUUID() }, data: {},
+  })
+  expect(submitted.status()).toBe(202)
+  const analysisId = (await submitted.json()).job_id
+  expect(await terminalJob(analysisId)).toBe('failed')
+  expect((await page.request.post('/api/v1/jobs/' + analysisId + '/retry', {
+    headers: { 'Idempotency-Key': randomUUID() }, data: {},
+  })).ok()).toBe(true)
+  expect(await terminalJob(analysisId)).toBe('completed')
+  const today = await (await page.request.get('/api/v1/today')).json()
+  const item = today.lesson.items.find((value: { exercise_id: string }) => value.exercise_id === 'E08')!
+  expect(item).toBeTruthy()
+  const state = await (await page.request.get('/api/v1/plan-items/' + item.id)).json()
+  const progress = (await (await page.request.get('/api/v1/me')).json()).progress
+  await page.goto('/exercise/' + item.id)
+  await page.getByText('Listen to a short pause comparison', { exact: true }).click()
+  const first = page.getByLabel('Pause example A')
+  const second = page.getByLabel('Pause example B')
+  await first.evaluate((audio: HTMLAudioElement) => audio.play())
+  await expect.poll(() => first.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false)
+  await second.evaluate((audio: HTMLAudioElement) => audio.play())
+  await expect.poll(() => first.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true)
+  await expect.poll(() => second.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false)
+  await page.getByRole('radio', { name: 'Not sure', exact: true }).check()
+  const boundary = state.listening_boundaries[0]
+  await page.getByRole('radio', { name: boundary.before + ' / ' + boundary.after, exact: true }).check()
+  await page.getByRole('button', { name: 'Use this boundary for my take' }).click()
+  await expect(page.getByRole('heading', { name: 'Boundary for this take', exact: true })).toBeVisible()
+  const plan = (await (await page.request.get('/api/v1/plan-items/' + item.id)).json()).listening_plan
+  expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(progress)
+  // Play once more, then starting the microphone must stop reference audio immediately.
+  await second.evaluate((audio: HTMLAudioElement) => audio.play())
+  await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+  expect(await second.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true)
+  await expect(second).toBeHidden()
+  // A later choice is for a future take; the current recording retains the explicit start-time choice.
+  expect((await page.request.post('/api/v1/plan-items/' + item.id + '/listening-plan', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: { example_id: plan.example.id, answer: 'b', boundary_index: 1 },
+  })).status()).toBe(201)
+  await page.waitForTimeout(4000)
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+  await page.getByRole('button', { name: 'Check my take' }).click()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  await expect(page.getByText(/This does not judge the phrasing/)).toBeVisible()
+  const completed = await (await page.request.get('/api/v1/plan-items/' + item.id)).json()
+  const attempt = await (await page.request.get('/api/v1/exercise-attempts/' + completed.item.latest_attempt_id)).json()
+  expect(attempt.listening_plan.id).toBe(plan.id)
+  expect(attempt.listening_plan.boundary_word_index).toBe(boundary.word_index)
+  expect(attempt.feedback.planned_pause.available).toBe(true)
+  await page.reload()
+  await expect(page.getByText(/This does not judge the phrasing/)).toBeVisible()
+  await page.getByRole('button', { name: /Hear your chosen boundary:/ }).click()
+  const ownAudio = page.getByLabel('Your completed take')
+  await expect.poll(() => ownAudio.evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(0)
+  await expect.poll(() => ownAudio.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false)
+  await noOverflow(page)
 })

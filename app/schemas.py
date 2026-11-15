@@ -72,6 +72,12 @@ class PracticeFocusInput(Input):
     ) = None
 
 
+class ListeningPlanInput(Input):
+    example_id: str = Field(min_length=1, max_length=100)
+    answer: Literal["a", "b", "unsure"]
+    boundary_index: int = Field(ge=0, le=100, strict=True)
+
+
 class FocusCheckInput(Input):
     outcome: Literal["heard", "partly", "not_yet", "unsure"]
 

@@ -29,6 +29,7 @@ from app.schemas import (
     Empty,
     FocusCheckInput,
     GuestInput,
+    ListeningPlanInput,
     PracticeFocusInput,
     Preferences,
     ReflectionInput,
@@ -319,6 +320,7 @@ def create_app(settings=None):
         practice_only: Annotated[bool, Form()] = False,
         based_on_attempt_id: Annotated[UUID | None, Form()] = None,
         training_focus_id: Annotated[UUID | None, Form()] = None,
+        listening_plan_id: Annotated[UUID | None, Form()] = None,
     ):
         s.auth()
         fields = {
@@ -333,6 +335,8 @@ def create_app(settings=None):
             fields["based_on_attempt_id"] = str(based_on_attempt_id)
         if training_focus_id:
             fields["training_focus_id"] = str(training_focus_id)
+        if listening_plan_id:
+            fields["listening_plan_id"] = str(listening_plan_id)
         fingerprint, size = hashlib.sha256(), 0
         while chunk := file.file.read(1024 * 1024):
             size += len(chunk)
@@ -508,6 +512,11 @@ def create_app(settings=None):
         attempt = s.get(attempt_id, "attempt")
         values = payload.model_dump(exclude_unset=True)
         return s.save_reflection(attempt, values)
+
+    @app.post("/api/v1/plan-items/{item_id}/listening-plan")
+    def listening_plan(item_id: UUID, payload: ListeningPlanInput, request: Request, s: S):
+        values = payload.model_dump()
+        return mutate(s, request, values, lambda: s.save_listening_plan(item_id, values))
 
     @app.get("/api/v1/practice-focus")
     def practice_focus(s: S):

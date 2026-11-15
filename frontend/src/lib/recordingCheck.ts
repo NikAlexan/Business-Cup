@@ -55,7 +55,7 @@ export function useRecordingCheck({ pendingTake, fields, blob, mime, onChecked, 
     setCheckError(null)
     if (checkedRecording) { onChecked(checkedRecording); return }
     if (blob && mime) upload.mutate({ fields, blob, mime }, { onSuccess: (data) => {
-      const saved = { training_focus: data.recording.training_focus ?? null, recording_id: data.recording.id, job_id: data.job_id, practice_only: fields.practice_only === 'true', status: 'queued' }
+      const saved = { listening_plan: data.recording.listening_plan ?? null, training_focus: data.recording.training_focus ?? null, recording_id: data.recording.id, job_id: data.job_id, practice_only: fields.practice_only === 'true', status: 'queued' }
       onUploaded?.(saved); setTake(saved)
     } })
   }

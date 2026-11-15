@@ -20,6 +20,7 @@ from app.coaching import quote_evidence, timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
+from app.listening import planned_pause_feedback
 from app.provider import (
     ASSESSMENT_PROMPT_VERSION,
     EXERCISE_PROMPT_VERSION,
@@ -251,6 +252,7 @@ class Worker:
                 )
         path = self.settings.audio_data / claim["guest_id"] / rec["id"]
         speech_feedback = None
+        transcript = {}
         try:
             signal = decode(path, self.settings, max_seconds)
             self.stage(claim, "quality_check")
@@ -269,7 +271,9 @@ class Worker:
                         .get("verification", {})
                         .get("required_metrics", [])
                     )
-                if set(required) & {"speaking_rate_wpm", "pause_ratio", "pause_count"}:
+                if set(required) & {"speaking_rate_wpm", "pause_ratio", "pause_count"} or rec.get(
+                    "listening_plan"
+                ):
                     self.stage(claim, "transcription")
                     provider = None
                     try:
@@ -315,6 +319,24 @@ class Worker:
                 "issues": [{"code": exc.code, "message": exc.message}],
             }
             measurements = None
+        if rec.get("listening_plan") and quality["status"] == "accepted":
+            speech_feedback = speech_feedback or {
+                "scope": "audio_quality_only",
+                "insights": [],
+                "next_step": None,
+            }
+            speech_feedback["planned_pause"] = planned_pause_feedback(
+                rec["listening_plan"], transcript, quality["duration_seconds"]
+            )
+            if speech_feedback["planned_pause"]["available"]:
+                speech_feedback["scope"] = "quality_and_timing"
+            if (rec.get("training_focus") or rec.get("practice_focus") or {}).get("intent") not in (
+                "keep",
+                "undecided",
+            ):
+                speech_feedback["next_step"] = (
+                    "Listen to your chosen boundary. Keep it if it supports the meaning; try a variation only if you hear a reason."
+                )
         self.publish_recording(claim, rec, quality, measurements, speech_feedback)
 
     def exercise_review(self, claim):

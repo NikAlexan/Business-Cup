@@ -127,6 +127,7 @@ class FakeProvider:
         pass
 
     def transcribe(self, signal, text):
+        text = text.replace("/", " ")  # Authored thought markers are not spoken words.
         words, t = [], 0.5
         for w in text.split():
             words.append({"start": t, "end": t + 0.3})
