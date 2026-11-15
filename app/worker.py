@@ -16,7 +16,7 @@ from app.audio import (
     quality_check,
     timing_metrics,
 )
-from app.coaching import quote_evidence, timing_feedback
+from app.coaching import listening_intent_policy, next_action_intent, quote_evidence, timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
@@ -400,6 +400,7 @@ class Worker:
             s, job = self.locked(db, claim)
             # Re-read to preserve reflections saved while the analysis was in flight.
             a = s.get(attempt["id"], "attempt")
+            report = listening_intent_policy(report, next_action_intent(a))
             a["speech_review"].update(
                 status=status,
                 report=report,

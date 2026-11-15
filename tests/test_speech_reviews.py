@@ -143,3 +143,99 @@ def test_review_does_not_publish_unsupported_evidence(client, app, worker, setti
     assert result["status"] == "passed"
     assert result["speech_review"]["status"] == ("unavailable" if malformed == "timing" else "failed")
     assert result["speech_review"]["report"] is None
+
+
+def captured_undecided_report():
+    import copy
+    import json
+    from pathlib import Path
+
+    raw = json.loads(
+        Path("docs/improvements/evaluations/live-human-undecided-v3-2026-11-15.json").read_text()
+    )
+    return copy.deepcopy(raw)
+
+
+@pytest.mark.parametrize("intent", ["keep", "undecided"])
+def test_current_saved_decision_is_enforced_when_a_contradictory_model_response_finishes(
+    client, app, worker, settings, speech_file, intent
+):
+    from app.coaching import KEEP_ACTION, UNDECIDED_ACTION
+
+    raw = captured_undecided_report()
+    _, attempt = saved_take(client, app, worker, settings, speech_file)
+    path = "/api/v1/exercise-attempts/" + attempt["id"]
+    before = client.get("/api/v1/me").json()["progress"]
+
+    class ConcurrentDecision(ReviewProvider):
+        def transcribe(self, signal, text):
+            # Captured public ASR intervals; this worker transport test stubs the paid provider.
+            return raw["transcription"]
+
+        def exercise_review(self, signal, context):
+            assert client.put(path + "/reflection", json={"note": "", "intent": intent}).status_code == 200
+            return raw["report"]
+
+    worker.provider_factory = ConcurrentDecision
+    assert worker.run_once()
+    result = client.get(path).json()
+    report = result["speech_review"]["report"]
+    assert result["reflection"]["intent"] == intent
+    assert report["action_intent"] == intent
+    assert report["action_source"] == "user_listening_decision"
+    assert report["next_step"] == (KEEP_ACTION if intent == "keep" else UNDECIDED_ACTION)
+    assert report["model_next_step"] == raw["report"]["next_step"]
+    assert report["model_listening_question"] == raw["report"]["listening_question"]
+    assert report["observation_status"] == "hypothesis"
+    assert report["observation"]["text"] == raw["report"]["observation"]["text"]
+    assert report["intent_policy_version"] == "listening-decision-v1"
+    assert client.get("/api/v1/me").json()["progress"] == before
+    assert result["status"] == "passed"
+
+
+def test_later_reflection_reapplies_policy_idempotently_without_losing_the_original_model_idea(
+    client, app, worker, settings, speech_file
+):
+    from app.coaching import KEEP_ACTION, UNDECIDED_ACTION
+
+    _, attempt = saved_take(client, app, worker, settings, speech_file)
+    assert worker.run_once()
+    path = "/api/v1/exercise-attempts/" + attempt["id"]
+    original = client.get(path).json()["speech_review"]["report"]
+    before = client.get("/api/v1/me").json()["progress"]
+    for intent, expected in [
+        ("undecided", UNDECIDED_ACTION),
+        ("keep", KEEP_ACTION),
+        ("experiment", original["model_next_step"]),
+    ]:
+        response = client.put(path + "/reflection", json={"note": "", "intent": intent})
+        assert response.status_code == 200
+        result = response.json()
+        report = result["speech_review"]["report"]
+        assert report["next_step"] == expected
+        assert report["model_next_step"] == original["model_next_step"]
+        assert client.put(path + "/reflection", json={"note": "", "intent": intent}).json() == result
+    assert client.get("/api/v1/me").json()["progress"] == before
+
+
+def test_captured_model_impressions_remain_hypotheses_instead_of_becoming_verified_findings():
+    import copy
+    import json
+    from pathlib import Path
+
+    from app.coaching import listening_intent_policy, next_action_intent
+
+    raw = json.loads(Path("docs/improvements/evaluations/live-human-split-v3-2026-11-15.json").read_text())[
+        "report"
+    ]
+    original = copy.deepcopy(raw)
+    guided = listening_intent_policy(raw, "experiment")
+    assert guided["observation"]["text"] == raw["observation"]["text"]
+    assert guided["observation_status"] == "hypothesis"
+    assert guided["next_step"] == raw["next_step"]
+    assert raw == original
+    assert listening_intent_policy(None, "undecided") is None
+    assert (
+        next_action_intent({"reflection": {"intent": "undecided"}, "training_focus": {"intent": "keep"}})
+        == "undecided"
+    )

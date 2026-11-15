@@ -178,7 +178,7 @@ export type Attempt = {
     status: 'queued' | 'processing' | 'completed' | 'unavailable' | 'failed'
     job_id: string | null
     reason?: string | null
-    report: { summary: string; observation: { text: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; limitations: string[] } | null
+    report: { summary: string; observation: { text: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; model_next_step?: string; model_listening_question?: string; action_intent?: PracticeIntent | null; action_source?: 'audio_model' | 'user_listening_decision'; intent_policy_version?: string; observation_status?: 'hypothesis' | 'unavailable'; limitations: string[] } | null
   }
   reflection?: { note: string; updated_at: string; intent?: PracticeIntent }
   practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null

@@ -12,7 +12,7 @@ import numpy as np
 import soundfile as sf
 
 from app.audio import timing_metrics
-from app.coaching import quote_evidence
+from app.coaching import INTENT_POLICY_VERSION, listening_intent_policy, quote_evidence
 from app.config import Settings
 from app.focus import RUBRIC_VERSION
 from app.provider import EXERCISE_PROMPT_VERSION, OpenAIAudioProvider, ProviderFailure, wav_bytes
@@ -82,6 +82,7 @@ def run(
     result = {
         "schema_version": "live-coaching-probe-v1",
         "prompt_version": EXERCISE_PROMPT_VERSION,
+        "intent_policy_version": INTENT_POLICY_VERSION,
         "practice_intent": practice_intent,
         "rubric_version": RUBRIC_VERSION,
         "api_calls": 0,
@@ -208,7 +209,11 @@ def run(
                     )
                     if observation["evidence"] is None:
                         raise ProviderFailure("analysis_invalid_evidence", False)
-                result.update(status="completed", report=report)
+                result.update(
+                    status="completed",
+                    report=report,
+                    effective_report=listening_intent_policy(report, practice_intent),
+                )
     except ProviderFailure as exc:
         result.update(status="provider_failed", error_code=exc.code)
     except Exception as exc:

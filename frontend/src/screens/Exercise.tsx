@@ -19,6 +19,7 @@ import { useSpeechFollow } from '../lib/follow'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { useRecorder } from '../lib/recorder'
 import { useRecordingCheck } from '../lib/recordingCheck'
+import { listeningDecision, nextListeningIntent } from '../lib/listeningDecision'
 import { forgetCancellation, rememberCancellation, useCancellationIntent, type CancellationIntent } from '../lib/cancellationIntent'
 
 import { formatEstimate } from '../lib/format'
@@ -172,12 +173,8 @@ export default function Exercise() {
     if (viewedTake.current.itemId === updated.plan_item_id && viewedTake.current.attemptId === updated.id) setResult(updated)
     void qc.invalidateQueries({ queryKey: ['attempt-history', updated.plan_item_id] })
   }
-  const timingIntent = (result?.training_focus ?? result?.practice_focus)?.intent
-  const timingIdea = timingIntent === 'keep'
-    ? 'Listen for the feature you wanted to keep. Carry it into a new phrase without automatically making it stronger.'
-    : timingIntent === 'undecided'
-      ? 'Listen to one phrase again before deciding whether to change anything. A new take is optional.'
-      : result?.feedback.next_step
+  const timingDecision = result ? listeningDecision(nextListeningIntent(result)) : null
+  const timingIdea = timingDecision?.step ?? result?.feedback.next_step
   const savedRecording = useRecording(result?.recording_id)
   const dismiss = useMutation({ mutationFn: (id: string) => request('/recordings/' + id + '/dismiss', { method: 'PUT', body: {} }) })
   const cancelUpload = useMutation({ mutationFn: (value: { key: string; itemId: string }) => request<{ recording_id: string | null }>('/recording-uploads/' + encodeURIComponent(value.key) + '/cancellation', { method: 'PUT', body: { plan_item_id: value.itemId } }) })
@@ -326,7 +323,7 @@ export default function Exercise() {
                 {result?.training_focus && <StoryFocus focus={result.training_focus} completed />}
                 {result?.training_focus && result.status === 'passed' && <FocusCheck key={"focus-check-" + result.id} take={result} onSaved={updateViewedTake} />}
                 {result && <TakeReflection key={"reflection-" + result.id} attempt={result} exerciseId={item.exercise_id} storyId={lesson.items.find((entry) => entry.exercise_id === 'E12')?.id} onSaved={updateViewedTake} />}
-                {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
+                {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{timingDecision && tip.code === 'pace_outside_target' ? 'This take counts. The pace band is an optional drill target.' : tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}

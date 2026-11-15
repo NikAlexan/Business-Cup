@@ -564,3 +564,42 @@ test('audible pause contrast reconciles an old save and recovers a newly discove
   await expect.poll(() => ownAudio.evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(false)
   await noOverflow(page)
 })
+
+test('a saved listening-first decision overrides legacy model advice and retains private playback', async ({ page }) => {
+  const lesson = await seed(page)
+  const item = lesson.items.find((value) => value.task.verification.type === 'recording')!
+  await page.goto('/exercise/' + item.id)
+  await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+  await page.waitForTimeout(4000)
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+  await page.getByRole('button', { name: 'Check my take' }).click()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  const state = await (await page.request.get('/api/v1/plan-items/' + item.id)).json()
+  const id = state.item.latest_attempt_id
+  const saved = await page.request.put('/api/v1/exercise-attempts/' + id + '/reflection', { data: { note: '', intent: 'undecided' } })
+  expect(saved.status()).toBe(200)
+  const progress = (await (await page.request.get('/api/v1/me')).json()).progress
+  const fixture = JSON.parse(await readFile('../docs/improvements/evaluations/live-human-undecided-v3-2026-11-15.json', 'utf8'))
+  // Inject a legacy model report only. Recording, cookie ownership, reflection and playback use the real API.
+  // This checks UI policy under an untrusted suggestion, not the model's judgment of this browser recording.
+  await page.route('**/api/v1/exercise-attempts/' + id, async (route) => {
+    const response = await route.fetch()
+    const body = await response.json()
+    body.speech_review = { status: 'completed', job_id: null, report: fixture.report }
+    await route.fulfill({ response, json: body })
+  })
+  await page.reload()
+  await expect(page.getByText('Listening hypothesis', { exact: true })).toBeVisible()
+  await expect(page.getByText('Your listening step:', { exact: true })).toBeVisible()
+  const guide = page.getByRole('region', { name: 'Speech coaching', exact: true })
+  await expect(guide).not.toContainText(fixture.report.next_step)
+  await expect(guide).not.toContainText(fixture.report.listening_question)
+  await expect(guide).toContainText('What do you hear in this phrase, and is there enough reason to choose a change?')
+  await page.getByRole('button', { name: 'Listen to “the two men”', exact: true }).click()
+  const audio = page.getByLabel('Your completed take')
+  await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0)
+  expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(progress)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+})

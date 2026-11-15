@@ -1,8 +1,8 @@
-# Bounded live audio-coaching probe — 2026-11-15
+# Bounded audio-coaching diagnostics — 2026-11-15
 
-This is a small integration diagnostic using public synthetic English speech, not a user study or proof of coaching accuracy. No guest data, human recordings or credentials are included. `scripts-evaluate-coaching.py` creates two FFmpeg/flite sentences with 1.2 seconds of inserted silence, then uses the configured ASR/audio provider. The resulting WAV is 6.525 seconds; all artifacts refer to the same SHA-256. The inserted silence is not the total acoustic sentence gap because the synthesizer has its own edge silence.
+These are small integration diagnostics using public synthetic speech and licensed human recordings, not a user study or proof of coaching accuracy. No guest data or credentials are included; original human WAVs remain in ignored corpus storage. The first synthetic probe below predates the human cases. `scripts-evaluate-coaching.py` creates two FFmpeg/flite sentences with 1.2 seconds of inserted silence, then uses the configured ASR/audio provider. The resulting WAV is 6.525 seconds; all artifacts refer to the same SHA-256. The inserted silence is not the total acoustic sentence gap because the synthesizer has its own edge silence.
 
-The historical synthetic probes made four paid requests: two Whisper transcriptions and two gpt-audio-1.5 coaching requests. The later human probe below adds two; six paid requests are now captured in this directory in total. No request was automatically retried. The cached-transcription check made zero requests. The audio calls reused the recorded ASR result only after verifying the regenerated audio hash, expected text and transcription-model identity. Raw usage is retained; exact billed cost is not asserted.
+The historical synthetic probes made four paid requests: two Whisper transcriptions and two gpt-audio-1.5 coaching requests. The later human probes below add five; nine paid requests are now captured in this directory in total. No request was automatically retried. The cached-transcription check made zero requests. The audio calls reused the recorded ASR result only after verifying the regenerated audio hash, expected text and transcription-model identity. Raw usage is retained; exact billed cost is not asserted.
 
 | Artifact | Requests | Result |
 |---|---:|---|
@@ -53,14 +53,14 @@ The offline tool uses the installed pinned live-highlighting Zipformer and real 
 
 [Recorded offline result](offline-human-probe-v1-2026-11-15.json): all four case runs were accepted by audio-quality checks and exactly matched the reference tokens in this phrase. This covers two voices and only three distinct waveforms. Streaming timestamps are emission positions used for approximate highlighting; they are not substituted for word endpoints in assessment timing. Corpus phone alignment is automatic, not gold perceptual annotation. These checks do not establish coaching usefulness, ASR accuracy on other passages/accents, or learning transfer.
 
-The existing opt-in live CLI now accepts `--human-case` from the fixed manifest. It verifies the waveform/license source hashes and uses the case's frozen intention; cached transcription still requires the exact generated-audio hash, expected text and provider transcription-model identity. It never accepts an arbitrary private audio path. Every run remains bounded to two provider requests without retries, and original/silence-edited source metadata remains in the artifact. The first live human-case probe is recorded below. Other prepared cases have not been run live. A future live probe must retain negative results and cannot stand in for independent human listening or a learner study.
+The existing opt-in live CLI now accepts `--human-case` from the fixed manifest. It verifies the waveform/license source hashes and uses the case's frozen intention; cached transcription still requires the exact generated-audio hash, expected text and provider transcription-model identity. It never accepts an arbitrary private audio path. Every run remains bounded to two provider requests without retries, and original/silence-edited source metadata remains in the artifact. The first live human-case probe is recorded below. The declared split and undecided cases were subsequently run as recorded below; the second human voice remains offline-only. A future live probe must retain negative results and cannot stand in for independent human listening or a learner study.
 
 
 ## First live human keep case — prompt v3
 
 [Raw captured result](live-human-keep-v3-2026-11-15.json) uses the unchanged slt original (3.2050625 seconds), whose exact WAV hash matches the pinned source, with the predeclared keep focus. It made exactly two provider requests without retries: Whisper returned all eleven reference words and bounded timing; the audio model returned a valid report and a located “the two men” quote. Usage records4 billed-duration seconds reported by ASR and32 audio input tokens from coaching. Exact currency cost is unknown and is not estimated here.
 
-The response supports carrying the connected phrase into a new phrase without making the feature stronger or proposing a longer pause. Its listening question remains generic about thought boundaries. This demonstrates transport, schema/quote validation and compliance with the keep intention in one public human recording. There was no blinded listener judgment of the model's claim, no learner intervention, no comparison across intentions or repeated generations, and no demonstration of transfer. The experiment/undecided cases and the second voice remain untested with the paid provider. Historical weak synthetic responses remain negative evidence; this single response does not establish that v3 is generally better or justify a9.5 score.
+The response supports carrying the connected phrase into a new phrase without making the feature stronger or proposing a longer pause. Its listening question remains generic about thought boundaries. This demonstrates transport, schema/quote validation and compliance with the keep intention in one public human recording. There was no blinded listener judgment of the model's claim, no learner intervention, no comparison across intentions or repeated generations, and no demonstration of transfer. This first result preceded the experiment/undecided probes below. The second voice remains untested with the paid provider. Historical weak synthetic responses remain negative evidence; this single response does not establish that v3 is generally better or justify a9.5 score.
 
 To reproduce only the captured transcription/timing offline, without a new provider request (after source preparation):
 
@@ -72,3 +72,25 @@ To reproduce only the captured transcription/timing offline, without a new provi
 ```
 
 Omitting cached-transcript or transcription-only starts new paid work, still bounded to two requests per invocation. It is excluded from normal tests/CI.
+
+
+## Subsequent v3 probes: adverse results, not discarded
+
+Two more predeclared cases consumed exactly three additional requests, without retries:
+
+- [Artificial article split, experiment](live-human-split-v3-2026-11-15.json): one ASR and one audio call. The human waveform has700ms of inserted silence at the corpus-aligned end of the second “the”, plus declared de-click fades. The model nevertheless described the group as connected with little gap and proposed a new pause before a different phrase. This fails the planned diagnostic criterion; the reply is preserved. Its pause metrics remain unavailable because Whisper assigned the article a zero-length interval. The playable quote expands to a wider phrase with an alignment note instead of inventing a precise boundary gap.
+- [Unchanged original, undecided](live-human-undecided-v3-2026-11-15.json): one audio call reusing the hash/model/text-verified original ASR capture. The action proposes a new take with a new pause, and the question assumes that changed performance, contrary to listening before deciding. The raw result is preserved.
+
+Five human-case requests plus four historical synthetic requests make nine captured paid calls. These three cases use one speaker/short phrase and compare different contexts/intentions; they are not a blinded controlled experiment, a comparison of repeated generations, or independent listener validation. The experiment note itself identifies the suspected gap, so even a successful response would not independently prove that the model detected it. No extra paid call was made to seek a better reply.
+
+## Deterministic listening-decision policy
+
+`listening-decision-v1` governs the next action in application feedback independently of model compliance. Keep carries the chosen feature without intensification; undecided only replays/inspects before deciding. The original model action/question remain in `model_next_step` and `model_listening_question`; `action_source=user_listening_decision` identifies substituted guidance. A later saved reflection takes priority for future practice, while the recorded objective remains its original snapshot. Experiment restores the original optional model idea. This policy does not verify or repair the model's auditory claim: `observation_status=hypothesis` and the UI mark it as an impression to check against playback.
+
+The worker rechecks the current saved decision before publication; saving a later reflection reapplies the policy without another provider request or reward. The frontend applies the same decision to historical reports that lack policy metadata. [Offline replay](intent-policy-replay-v1-2026-11-15.json) preserves the SHA of each raw v3 capture and shows the deterministic action separately. Reproduce with:
+
+```sh
+.venv/bin/python scripts-replay-coaching-policy.py --output /tmp/intent-policy-replay.json
+```
+
+Prompt-v4 additionally requests a replay-only undecided action and a question about the existing recording. It has not received a new paid test. The code policy, rather than assumed prompt compliance, enforces the user decision. Regression tests use the captured adverse v3 response, including a decision saved while coaching is in flight; they do not prove the model now hears pauses accurately. Independent listening agreement and learner transfer remain unvalidated.

@@ -4,6 +4,47 @@ import re
 
 from app.audio import SAMPLE_RATE, valid_word_timestamps
 
+INTENT_POLICY_VERSION = "listening-decision-v1"
+KEEP_ACTION = "Listen for the feature you wanted to keep. Carry it into a new phrase without automatically making it stronger."
+UNDECIDED_ACTION = (
+    "Listen to one phrase again before deciding whether to change anything. A new take is optional."
+)
+KEEP_QUESTION = "Can you hear the useful feature you chose to keep, without needing to make it stronger?"
+UNDECIDED_QUESTION = "What do you hear in this phrase, and is there enough reason to choose a change?"
+
+
+def next_action_intent(attempt):
+    """A later saved listening decision governs the next action, not the frozen take objective."""
+    return (attempt.get("reflection") or {}).get("intent") or (
+        attempt.get("training_focus") or attempt.get("practice_focus") or {}
+    ).get("intent")
+
+
+def listening_intent_policy(report, intent):
+    """Respect the listener's decision without pretending to validate model impressions."""
+    if report is None:
+        return None
+    original_step = report.get("model_next_step", report["next_step"])
+    original_question = report.get("model_listening_question", report["listening_question"])
+    result = {
+        **report,
+        "model_next_step": original_step,
+        "model_listening_question": original_question,
+        "next_step": original_step,
+        "listening_question": original_question,
+        "action_source": "audio_model",
+        "action_intent": intent,
+        "intent_policy_version": INTENT_POLICY_VERSION,
+        "observation_status": "hypothesis" if report.get("observation") else "unavailable",
+    }
+    if intent in ("keep", "undecided"):
+        result.update(
+            next_step=KEEP_ACTION if intent == "keep" else UNDECIDED_ACTION,
+            listening_question=KEEP_QUESTION if intent == "keep" else UNDECIDED_QUESTION,
+            action_source="user_listening_decision",
+        )
+    return result
+
 
 def quote_evidence(quote, transcript, duration, occurrence=1):
     """Locate model-selected words in ASR output; never accept a model-invented timestamp."""
@@ -123,11 +164,9 @@ def timing_feedback(transcript, metrics, verification, duration, practice_intent
             )
     target = verification.get("target_wpm")
     if practice_intent == "keep":
-        step = "Listen for the feature you wanted to keep. Carry it into a new phrase without automatically making it stronger."
+        step = KEEP_ACTION
     elif practice_intent == "undecided":
-        step = (
-            "Listen to one phrase again before deciding whether to change anything. A new take is optional."
-        )
+        step = UNDECIDED_ACTION
     elif target and pace["value"] > target["max"]:
         step = "On your next take, let one sentence settle before starting the next. Keep your voice comfortable."
     elif target and pace["value"] < target["min"]:

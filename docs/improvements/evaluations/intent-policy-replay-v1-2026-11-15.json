@@ -1,0 +1,99 @@
+{
+  "schema_version": "intent-policy-replay-v1",
+  "policy_version": "listening-decision-v1",
+  "api_calls": 0,
+  "scope": "user_action_policy_only_not_auditory_validation",
+  "cases": [
+    {
+      "source_artifact": "live-human-keep-v3-2026-11-15.json",
+      "source_sha256": "7259662247716cea360dfd77459c0244552d4d31b4f081032c2b79f03dc23781",
+      "source_prompt_version": "exercise-coaching-v3",
+      "intent": "keep",
+      "effective_report": {
+        "summary": "You read the phrase smoothly and kept your words flowing as one connected thought.",
+        "observation": {
+          "text": "The group 'the two men' stayed closely connected, which keeps the narration smooth.",
+          "evidence_quote": "the two men",
+          "occurrence": 1,
+          "evidence": {
+            "quote": "the two men",
+            "start_seconds": 1.4799999475479126,
+            "end_seconds": 2.600000095367432
+          }
+        },
+        "next_step": "Listen for the feature you wanted to keep. Carry it into a new phrase without automatically making it stronger.",
+        "listening_question": "Can you hear the useful feature you chose to keep, without needing to make it stronger?",
+        "limitations": [
+          "I can only comment on this single take and not compare it to others."
+        ],
+        "model_next_step": "On your next take, try maintaining that connected feel with a different short phrase to build consistency.",
+        "model_listening_question": "Do the pauses you use let one idea settle before moving to the next?",
+        "action_source": "user_listening_decision",
+        "action_intent": "keep",
+        "intent_policy_version": "listening-decision-v1",
+        "observation_status": "hypothesis"
+      }
+    },
+    {
+      "source_artifact": "live-human-split-v3-2026-11-15.json",
+      "source_sha256": "41e74def8e69f7d4b855f054a5fa408db62b72b40cf805eef1725454108e62a5",
+      "source_prompt_version": "exercise-coaching-v3",
+      "intent": "experiment",
+      "effective_report": {
+        "summary": "You delivered the sentence smoothly and seemed to keep a natural flow from beginning to end.",
+        "observation": {
+          "text": "The words 'the two men' flowed together with little gap.",
+          "evidence_quote": "the two men",
+          "occurrence": 1,
+          "evidence": {
+            "quote": "evening the two men",
+            "start_seconds": 1.1600000143051148,
+            "end_seconds": 3.319999885559082,
+            "note": "Some words had no separate time span; replay this wider phrase to check the observation."
+          }
+        },
+        "next_step": "On your next take, you might try experimenting with a slight pause before 'shook hands' to emphasize the final action.",
+        "listening_question": "Does pausing before 'shook hands' make the action stand out, or does it disrupt the flow?",
+        "limitations": [
+          "I can’t measure exact pause lengths, so I'm basing feedback on overall impression."
+        ],
+        "model_next_step": "On your next take, you might try experimenting with a slight pause before 'shook hands' to emphasize the final action.",
+        "model_listening_question": "Does pausing before 'shook hands' make the action stand out, or does it disrupt the flow?",
+        "action_source": "audio_model",
+        "action_intent": "experiment",
+        "intent_policy_version": "listening-decision-v1",
+        "observation_status": "hypothesis"
+      }
+    },
+    {
+      "source_artifact": "live-human-undecided-v3-2026-11-15.json",
+      "source_sha256": "82eed6ef6561acdce0dfbcdecff6ab33ced8a3841c937a62f8617256840b1de7",
+      "source_prompt_version": "exercise-coaching-v3",
+      "intent": "undecided",
+      "effective_report": {
+        "summary": "You read the sentence smoothly, grouping the words together without any noticeable pauses.",
+        "observation": {
+          "text": "The phrase 'the two men' flowed smoothly, showing connected word grouping.",
+          "evidence_quote": "the two men",
+          "occurrence": 1,
+          "evidence": {
+            "quote": "the two men",
+            "start_seconds": 1.4799999475479126,
+            "end_seconds": 2.600000095367432
+          }
+        },
+        "next_step": "Listen to one phrase again before deciding whether to change anything. A new take is optional.",
+        "listening_question": "What do you hear in this phrase, and is there enough reason to choose a change?",
+        "limitations": [
+          "I can't be sure how intentional your pacing choices were without more context."
+        ],
+        "model_next_step": "For the next take, try reading the sentence again and see if bringing a slight pause before 'shook hands' helps the final action stand out.",
+        "model_listening_question": "Did a brief pause before 'shook hands' make the handshake feel more distinct?",
+        "action_source": "user_listening_decision",
+        "action_intent": "undecided",
+        "intent_policy_version": "listening-decision-v1",
+        "observation_status": "hypothesis"
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 
 from app.access import NoBillingAccessPolicy
+from app.coaching import listening_intent_policy, next_action_intent
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
 from app.errors import ApiError, fail
@@ -672,8 +673,16 @@ class Service:
         reflection = {**previous, "note": payload["note"].strip()}
         if payload.get("intent") is not None:
             reflection["intent"] = payload["intent"]
-        if reflection != previous:
+        changed = reflection != previous
+        if changed:
             attempt["reflection"] = {**reflection, "updated_at": iso()}
+        review = attempt.get("speech_review")
+        if review and review.get("report"):
+            report = listening_intent_policy(review["report"], next_action_intent(attempt))
+            if report != review["report"]:
+                review["report"] = report
+                changed = True
+        if changed:
             self.put("attempt", attempt)
         return attempt
 

@@ -416,7 +416,7 @@ test('background speech coaching refreshes after its job finishes and seeks grou
   open('/exercise/item')
   await screen.findByText('Listen to the phrase ending.')
   expect(screen.getByText('Let the final word land.')).toBeTruthy()
-  expect(screen.getByText('AI listening notes can be mistaken. Check the observation against your own playback.')).toBeTruthy()
+  expect(screen.getByText('AI impressions need your listening check. They do not score this take.')).toBeTruthy()
   expect(screen.getByText('Some words had no separate time span; replay this wider phrase to check the observation.')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Listen to “clear message”' }))
   expect((screen.getByLabelText('Your completed take') as HTMLAudioElement).currentTime).toBe(3)
@@ -779,12 +779,16 @@ test('keeping a useful feature survives a failed focus save and reload without c
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(note)
   fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
   await screen.findByText('Saved for story practice and your next session.')
+  expect(screen.queryByText('Make the pause longer.')).toBeNull()
+  expect(screen.getByText('Your listening step:')).toBeTruthy()
   expect(keys).toHaveLength(2)
   expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
   expect(keys[0]).toBe(keys[1])
   view.unmount()
   open('/exercise/item')
   await screen.findByText('Saved for story practice and your next session.')
+  expect(screen.queryByText('Make the pause longer.')).toBeNull()
+  expect(screen.getByText('Your listening step:')).toBeTruthy()
   expect((screen.getByRole('radio', { name: 'Keep a useful feature' }) as HTMLInputElement).checked).toBe(true)
   expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(note)
 })
@@ -1074,4 +1078,41 @@ test('an old save receipt is reconciled with a newer server boundary and remains
   open('/exercise/item')
   await screen.findByRole('heading', { name: 'Boundary for this take' })
   expect(screen.getByLabelText('Your chosen boundary').textContent).toBe(before)
+})
+
+test.each(['keep', 'undecided'] as const)('a saved %s decision governs old AI advice while the recorded objective stays frozen', async (intent) => {
+  const modelIdea = "Try a pause before shook hands."
+  const modelQuestion = 'Did your new pause make the action stand out?'
+  const original = { ...savedAttempt, training_focus: { ...storyFocus, intent: 'experiment' as const }, reflection: { note: '', updated_at: 'now', intent },
+    speech_review: { status: 'completed', job_id: null, report: { summary: 'A model impression.', observation: { text: 'The words seem connected.', evidence: { quote: 'a calm', start_seconds: 0, end_seconds: 1 } }, next_step: modelIdea, listening_question: modelQuestion, limitations: ['One take only.'] } } }
+  setup({ ...baseItem, exercise_id: 'E12' }, (path) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+  })
+  open('/exercise/item')
+  await screen.findByText('Listening hypothesis')
+  expect(screen.getByText('AI impressions need your listening check. They do not score this take.')).toBeTruthy()
+  expect(screen.getByText('Your listening step:')).toBeTruthy()
+  expect(screen.queryByText('For future practice, explore a gentler pace.')).toBeNull()
+  expect(screen.getByText('This take counts. The pace band is an optional drill target.')).toBeTruthy()
+  expect(screen.queryByText(modelIdea)).toBeNull()
+  expect(screen.queryByText(modelQuestion)).toBeNull()
+  if (intent === 'undecided') expect(screen.getByText('What do you hear in this phrase, and is there enough reason to choose a change?')).toBeTruthy()
+  else expect(screen.getByText('Can you hear the useful feature you chose to keep, without needing to make it stronger?')).toBeTruthy()
+  expect(screen.getByText(storyFocus.note)).toBeTruthy() // The recorded story objective remains its original snapshot.
+})
+
+test('an explicit experiment restores the original optional model idea from an earlier keep policy', async () => {
+  const original = { ...savedAttempt, training_focus: { ...storyFocus, intent: 'keep' as const }, reflection: { note: '', updated_at: 'now', intent: 'experiment' as const },
+    speech_review: { status: 'completed', job_id: null, report: { summary: 'An impression to check.', observation: null,
+      next_step: 'Old keep policy action.', listening_question: 'Old keep policy question.', model_next_step: 'Try the original optional idea.', model_listening_question: 'What happened in this take?', action_intent: 'keep', limitations: ['One take only.'] } } }
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+  })
+  open('/exercise/item')
+  await screen.findByText('Try the original optional idea.')
+  expect(screen.getByText('What happened in this take?')).toBeTruthy()
+  expect(screen.queryByText('Old keep policy action.')).toBeNull()
+  expect(screen.getByText('Optional idea:')).toBeTruthy()
 })
