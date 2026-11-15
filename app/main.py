@@ -14,9 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm.attributes import flag_modified
 from starlette.exceptions import HTTPException
 
-from app import billing
+from app import billing, push
 from app.asr import feed, recognizer
 from app.config import Settings
 from app.content import CATALOG, EXERCISES
@@ -34,6 +35,7 @@ from app.schemas import (
     ListeningPlanInput,
     PracticeFocusInput,
     Preferences,
+    PushSubscriptionInput,
     ReflectionInput,
     TakeComparisonResultInput,
 )
@@ -322,6 +324,38 @@ def create_app(settings=None):
             fail(422, "validation_error", "Provide at least one non-null preference.")
         s.guest.data["preferences"].update(values)
         return s.guest.data["preferences"]
+
+    def push_guest(s):
+        s.auth()
+        if not settings.push_enabled:
+            fail(503, "push_disabled", "Push notifications are not configured.")
+
+    @app.put("/api/v1/push/subscription", status_code=204)
+    def push_subscribe(payload: PushSubscriptionInput, s: S):
+        push_guest(s)
+        s.guest.data["push"] = {"subscription": payload.model_dump(), "last_sent_on": None}
+
+    @app.delete("/api/v1/push/subscription", status_code=204)
+    def push_unsubscribe(s: S):
+        push_guest(s)
+        s.guest.data.pop("push", None)
+
+    @app.post("/api/v1/push/test", status_code=204)
+    def push_test(request: Request, s: S):
+        push_guest(s)
+        sub = s.guest.data.get("push")
+        if not sub:
+            fail(409, "push_not_subscribed", "Turn on reminders first.")
+        if not push.send(settings, sub["subscription"], push.message(max(s.streak()["current_days"], 1))):
+            s.guest.data.pop("push")
+            flag_modified(s.guest, "data")  # streak() autoflushed; in-place edits after that go unseen
+            # Returned, not raised: raising would roll the removal back.
+            return error_response(
+                request,
+                410,
+                "push_subscription_gone",
+                "This browser's subscription expired. Turn reminders on again.",
+            )
 
     @app.post("/api/v1/assessments")
     def create_assessment(payload: AssessmentInput, request: Request, s: S):

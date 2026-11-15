@@ -155,8 +155,10 @@ class Service:
         return {
             "guest_id": self.guest.id,
             "subject_id": self.guest.subject_id,
-            **self.guest.data,
+            **{k: v for k, v in self.guest.data.items() if k != "push"},
             "demo_mode": s.demo_mode,
+            "push_public_key": s.vapid_public_key if s.push_enabled else None,
+            "push_enabled": "push" in self.guest.data,
             "limits": {
                 "max_file_bytes": s.max_file_bytes,
                 "max_recording_seconds": s.max_recording_seconds,

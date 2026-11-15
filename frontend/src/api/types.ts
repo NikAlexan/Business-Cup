@@ -27,6 +27,8 @@ export type Me = {
   subscription: Subscription | null // null when billing is disabled
   preferences: { goal: string; timezone: string; locale: string }
   demo_mode: boolean
+  push_public_key: string | null // null when push is not configured on the server
+  push_enabled: boolean
   limits: {
     max_file_bytes: number
     max_recording_seconds: number

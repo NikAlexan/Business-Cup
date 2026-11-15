@@ -7,6 +7,7 @@ import { useToday } from '../api/hooks'
 import type { Completion } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { RewardChips } from '../components/RewardChips'
+import { StreakReminderToggle } from '../components/StreakReminderToggle'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { formatDate } from '../lib/format'
 
@@ -54,6 +55,7 @@ export default function Done() {
             </p>
             <RewardChips streak={c.streak.current_days} notes={c.session_reward.notes} seconds={c.session_reward.practice_seconds} className="rs-arrive" style={{ marginTop: 8, color: 'var(--ink)' }} />
             <span style={{ fontSize: 15, opacity: 0.8 }}>Notes earned and recorded practice time. Untimed warm-ups are not included.</span>
+            <StreakReminderToggle style={{ marginTop: 8 }} />
             <div className="rs-bars" style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90, marginTop: 20 }} aria-hidden="true">
               {SHAPE.map((h, i) => (
                 <i key={i} className={i === c.completed_lessons - 1 ? 'rs-today' : undefined} style={{ '--i': i, flex: 1, height: h + '%', borderRadius: 6, background: i < c.completed_lessons ? 'var(--sun)' : 'var(--stage-dim)' } as React.CSSProperties} />
