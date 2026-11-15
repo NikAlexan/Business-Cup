@@ -6,6 +6,7 @@ import { usePlan, useProgress } from '../api/hooks'
 import type { Progress as P } from '../api/types'
 import { AppShell, useRedirectOn401 } from '../components/AppShell'
 import { Check, ClockIcon, NoteIcon, StreakIcon } from '../components/Icons'
+import { StreakReminderToggle } from '../components/StreakReminderToggle'
 import { METRICS, MetricTile } from '../components/MetricTile'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { formatDate, formatMinutes } from '../lib/format'
@@ -73,6 +74,7 @@ export default function Progress() {
           <span className="rs-chip"><ClockIcon /> {formatMinutes(s.practice_seconds_total)} recorded{s.last_practice_on ? ' · last ' + formatDate(s.last_practice_on, d.timezone) : ''}</span>
           <span className="rs-chip">{s.current_plan_completed_lessons} of {s.current_plan_total_lessons} sessions · {s.completed_lessons_all_time} all time</span>
         </div>
+        <StreakReminderToggle />
         <div className="rs-cols">
           <div className="rs-stack rs-gap-4">
             <div className="rs-card rs-stack" style={{ gap: 14, padding: 24 }}>

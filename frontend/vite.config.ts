@@ -26,6 +26,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ['push-sw.js'], // push + notificationclick handlers
         // App shell and explicit public examples only. Private API responses/audio stay uncached.
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}', 'practice-examples/**/*.wav', 'practice-examples/NOTICE.txt'],
         navigateFallbackDenylist: [/^\/api\//, /^\/health\//, /^\/docs/, /^\/openapi\.json/, /^\/practice-examples\//],

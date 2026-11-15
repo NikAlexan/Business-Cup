@@ -16,6 +16,17 @@ class Consent(Input):
     policy_version: Literal["2026-11-14"]
 
 
+class PushKeys(Input):
+    p256dh: str = Field(min_length=1, max_length=256)
+    auth: str = Field(min_length=1, max_length=256)
+
+
+class PushSubscriptionInput(BaseModel):
+    # Browsers add fields like expirationTime; keep only what sending needs.
+    endpoint: str = Field(pattern=r"^https://", max_length=2048)
+    keys: PushKeys
+
+
 class Preferences(Input):
     goal: Goal | None = None
     timezone: str | None = None

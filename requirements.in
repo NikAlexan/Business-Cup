@@ -13,3 +13,5 @@ soundfile>=0.12.1
 onnxruntime>=1.20.1
 sherpa-onnx>=2.0.1
 websockets>=15.0
+pywebpush>=2.0.0
+pywebpush>=2.0.0

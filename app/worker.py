@@ -3,10 +3,13 @@ import logging
 import signal
 import threading
 import time
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import numpy as np
 from sqlalchemy import and_, case, or_, select, text, update
 
+from app import push
 from app.audio import (
     QUALITY_RULES,
     AudioRejected,
@@ -579,6 +582,48 @@ class Worker:
                         task.pop("pending_recording_id", None)
                     s.put("assessment", a)
 
+    def remind_streaks(self, now=None):
+        """Evening streak reminders; returns how many pushes were sent."""
+        if not self.settings.push_enabled:
+            return 0
+        now = now or datetime.now(UTC)
+        due = []
+        with self.database.session() as db:
+            # ponytail: scans every guest; move push state to an indexed column/table if guests grow.
+            for g in db.scalars(select(Guest)).all():
+                state = g.data.get("push")
+                if not state:
+                    continue
+                svc = Service(db, self.settings)
+                svc.guest = g
+                local_now = now.astimezone(ZoneInfo(g.data["preferences"]["timezone"]))
+                streak = svc.streak()
+                if push.due(streak, local_now, state.get("last_sent_on")):
+                    due.append(
+                        (g.id, state["subscription"], streak["current_days"], local_now.date().isoformat())
+                    )
+        sent = 0
+        for gid, sub, days, today in due:
+            try:
+                delivered = push.send(self.settings, sub, push.message(days))  # network call, no lock held
+                with self.database.session() as db:
+                    serialize_sqlite(db)
+                    g = db.scalar(select(Guest).where(Guest.id == gid).with_for_update())
+                    state = g and g.data.get("push")
+                    # Guest may have unsubscribed or re-subscribed while the push was in flight.
+                    if state and state["subscription"]["endpoint"] == sub["endpoint"]:
+                        data = copy.deepcopy(g.data)
+                        if delivered:
+                            data["push"]["last_sent_on"] = today
+                        else:
+                            data.pop("push")
+                        g.data = data
+                        db.commit()
+                sent += delivered
+            except Exception as exc:
+                log.warning("Streak reminder failed guest_id=%s type=%s", gid, type(exc).__name__)
+        return sent
+
     def run_once(self):
         claim = self.claim()
         if not claim:
@@ -619,7 +664,14 @@ def main():
     stopped = threading.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, lambda *_: stopped.set())
+    next_push = 0.0
     while not stopped.is_set():
+        if time.monotonic() >= next_push:
+            next_push = time.monotonic() + worker.settings.push_check_seconds
+            try:
+                worker.remind_streaks()
+            except Exception as exc:
+                log.warning("Streak reminders failed type=%s", type(exc).__name__)
         if not worker.run_once():
             stopped.wait(worker.settings.worker_poll_seconds)
 

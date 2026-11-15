@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     job_max_attempts: int = Field(default=3, ge=1, le=5)
     job_max_retry_batches: int = Field(default=1, ge=0, le=3)
     worker_poll_seconds: float = Field(default=1, gt=0)
+    vapid_public_key: str = ""
+    vapid_private_key: SecretStr = SecretStr("")
+    vapid_subject: str = "mailto:admin@localhost"
+    push_check_seconds: float = Field(default=600, gt=0)
+
+    @property
+    def push_enabled(self) -> bool:
+        return bool(self.vapid_public_key and self.vapid_private_key.get_secret_value())
 
     @field_validator("database_url")
     @classmethod
