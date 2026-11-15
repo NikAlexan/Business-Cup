@@ -26,7 +26,7 @@ def test_confident_slow_pace_is_below_and_focus():
     assert r["speaking_rate_wpm"]["target"] == {"min": 150, "max": 190, "unit": "wpm"}
     assert r["speaking_rate_wpm"]["focus"] is True
     assert r["pause_ratio"]["band"] == "above"
-    assert TARGETS_VERSION == "targets-v1"
+    assert TARGETS_VERSION == "targets-v2"
 
 
 def test_clear_speech_targets():

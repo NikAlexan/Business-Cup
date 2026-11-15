@@ -199,3 +199,64 @@ def test_story_coaching_receives_the_frozen_focus_without_private_source_identif
         client.get("/api/v1/exercise-attempts/" + saved["id"]).json()["speech_review"]["status"]
         == "completed"
     )
+
+
+def test_story_repeat_coaching_uses_current_story_focus_over_previous_take_reflection(
+    client, app, worker, settings, speech_file
+):
+    from pydantic import SecretStr
+
+    from tests.test_speech_reviews import ReviewProvider
+
+    source, _, story = choose_focus(client, app, worker, speech_file)
+    first_recording = take(client, worker, speech_file, story)
+    first = post(
+        client, "/exercise-attempts", {"plan_item_id": story["id"], "recording_id": first_recording}
+    ).json()
+    assert (
+        client.put(
+            "/api/v1/exercise-attempts/" + first["id"] + "/reflection",
+            json={"note": "Use a longer pause."},
+        ).status_code
+        == 200
+    )
+    current = post(
+        client,
+        "/practice-focus",
+        {"source_attempt_id": source["id"], "note": "Keep word endings audible.", "skill": "word_endings"},
+    ).json()["focus"]
+    uploaded = upload(
+        client,
+        speech_file,
+        {
+            "purpose": "exercise",
+            "plan_item_id": story["id"],
+            "practice_only": "true",
+            "based_on_attempt_id": first["id"],
+            "training_focus_id": current["id"],
+        },
+    )
+    assert uploaded.status_code == 202 and worker.run_once()
+    contexts = []
+
+    class CurrentFocusProvider(ReviewProvider):
+        def exercise_review(self, signal, context):
+            contexts.append(context)
+            return super().exercise_review(signal, context)
+
+    settings.openai_api_key = SecretStr("test-not-a-real-key")
+    worker.provider_factory = CurrentFocusProvider
+    saved = post(
+        client,
+        "/exercise-attempts",
+        {
+            "plan_item_id": story["id"],
+            "recording_id": uploaded.json()["recording"]["id"],
+            "practice_only": True,
+        },
+    )
+    assert saved.status_code == 201
+    assert saved.json()["practice_focus"]["note"] == "Use a longer pause."
+    assert saved.json()["training_focus"] == current and worker.run_once()
+    assert contexts[0]["saved_focus"] == "Keep word endings audible."
+    assert contexts[0]["story_focus"]["skill_label"] == current["skill_label"]

@@ -301,13 +301,13 @@ test('a chosen change transfers from a drill to narration and remains on Today a
   const drill = lesson.items.find((item) => item.exercise_id !== 'E12' && item.task.verification.type === 'recording')!
   const story = lesson.items.find((item) => item.exercise_id === 'E12')!
   await page.goto('/exercise/' + drill.id)
-  const record = async () => {
+  const record = async (extra = false) => {
     await page.getByRole('button', { name: 'Start recording', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
     await page.waitForTimeout(4000)
     await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
     await page.getByRole('button', { name: 'Check my take' }).click()
-    await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: extra ? 'Extra practice saved' : 'Practice complete', exact: true })).toBeVisible()
   }
   await record()
   const focus = 'Leave room for the thought to land.'
@@ -320,6 +320,7 @@ test('a chosen change transfers from a drill to narration and remains on Today a
   await noOverflow(page)
   await record()
   await expect(page.getByRole('heading', { name: 'Focus used for this take' })).toBeVisible()
+  const firstStoryAudio = await page.getByLabel('Your completed take').getAttribute('src')
   const before = await (await page.request.get('/api/v1/me')).json()
   await page.getByRole('button', { name: 'Partly', exact: true }).click()
   await expect(page.getByText('Listening check saved with this take.')).toBeVisible()
@@ -331,6 +332,38 @@ test('a chosen change transfers from a drill to narration and remains on Today a
   await expect(page.getByText('Last story: you marked “Partly”.')).toBeVisible()
   await noOverflow(page)
   expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
+  await page.getByRole('link', { name: 'Open story practice', exact: true }).click()
+  await page.getByRole('button', { name: 'Practice again — no extra notes', exact: true }).click()
+  await record(true)
+  const extraStoryAudio = await page.getByLabel('Your completed take').getAttribute('src')
+  expect(extraStoryAudio).not.toBe(firstStoryAudio)
+  let release!: () => void
+  let ready!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  const saved = new Promise<void>((resolve) => { ready = resolve })
+  await page.route('**/api/v1/exercise-attempts/*/focus-check', async (route) => {
+    const response = await route.fetch()
+    ready()
+    await held
+    await route.fulfill({ response })
+  })
+  await page.getByRole('button', { name: 'Partly', exact: true }).click()
+  await saved
+  await page.getByRole('button', { name: /First completion attempt · saved/ }).click()
+  await expect(page.getByLabel('Your completed take')).toHaveAttribute('src', firstStoryAudio!)
+  const refreshedHistory = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return url.pathname === '/api/v1/exercise-attempts' && url.searchParams.get('plan_item_id') === story.id
+  })
+  release()
+  await refreshedHistory // The late save's callback has run and refreshed its history.
+  await page.unroute('**/api/v1/exercise-attempts/*/focus-check')
+  await expect(page.getByLabel('Your completed take')).toHaveAttribute('src', firstStoryAudio!)
+  await page.getByRole('button', { name: /Extra practice · saved/ }).click()
+  await expect(page.getByRole('button', { name: 'Partly', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByLabel('Your completed take')).toHaveAttribute('src', extraStoryAudio!)
+  expect((await (await page.request.get('/api/v1/me')).json()).progress.notes_total).toBe(before.progress.notes_total)
+  await noOverflow(page)
 })
 
 test('baseline and check-in recover failed analysis, expose limitations and compare saved private recordings', async ({ page }) => {

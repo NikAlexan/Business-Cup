@@ -68,11 +68,13 @@ export function MetricTile({
   const scale = spec.scale ?? 1
   const c = comparison?.metrics[spec.key]
   const i = interpretation
+  // Historical profiles may still store a label that inferred placement from time share.
+  const pauseLabel = i?.band ? ({ below: 'Lower pause share', within: 'Pause share in practice range', above: 'Higher pause share' }[i.band]) : undefined
   return (
     <div className="rs-metric" style={i?.focus ? { borderColor: 'var(--sun-edge)' } : undefined}>
       {head(!!i?.focus)}
       {i ? (
-        <span className="rs-metric__v" style={{ fontSize: 22, whiteSpace: 'normal' }}>{i.label}</span>
+        <span className="rs-metric__v" style={{ fontSize: 22, whiteSpace: 'normal' }}>{spec.key === 'pause_ratio' ? pauseLabel ?? i.label : i.label}</span>
       ) : (
         <span className="rs-metric__v">
           {Math.round(m.value * scale)}
@@ -80,6 +82,7 @@ export function MetricTile({
         </span>
       )}
       {i && <span className="rs-metric__n">{targetLine(spec, m, i, all)}</span>}
+      {spec.key === 'pause_ratio' && <span className="rs-metric__n">Time in pauses does not measure where they fall. Listen back to judge the phrasing.</span>}
       <span className="rs-metric__n">
         {c
           ? c.available && c.delta !== null

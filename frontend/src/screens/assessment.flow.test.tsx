@@ -107,3 +107,13 @@ test('completed job waits for a fresh report before redirecting a stale profile 
   await screen.findByText('Test listening observation.')
   expect(reads).toBe(2)
 })
+
+test('historical pause-share labels do not claim that pauses are well placed', async () => {
+  open('/profile/assessment', () => ({ ...profile,
+    measurements: { pause_ratio: { available: true, value: 0.2, unit: 'ratio', unavailable_reason: null } },
+    interpretation: { pause_ratio: { band: 'within', target: { min: 0.14, max: 0.22 }, label: 'Well-placed pauses', note: '', focus: false } },
+  }))
+  await screen.findByText('Pause share in practice range')
+  expect(screen.queryByText('Well-placed pauses')).toBeNull()
+  expect(screen.getByText('Time in pauses does not measure where they fall. Listen back to judge the phrasing.')).toBeTruthy()
+})

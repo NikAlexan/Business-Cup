@@ -127,7 +127,7 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
         "intonation_range_semitones",
         "f0_median_hz",
     }
-    assert a["analysis_metadata"]["targets_version"] == "targets-v1"
+    assert a["analysis_metadata"]["targets_version"] == "targets-v2"
     assert a["analysis_metadata"]["prompt_version"] == "assessment-coaching-v2"
     assert a["analysis_metadata"]["measurement_version"] == "voice-metrics-v3"
     scope = [t["id"] for t in a["tasks"][:2]]

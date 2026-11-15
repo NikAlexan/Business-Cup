@@ -149,6 +149,13 @@ export default function Exercise() {
   const selected = selectedId ? takes.find((take) => take.id === selectedId) : takes[0]
   const savedAttempt = useAttempt(found?.item.latest_attempt_id)
   const result = latestLocal ?? selected ?? savedAttempt.data ?? null
+  const viewedTake = useRef<{ itemId: string; attemptId: string | null }>({ itemId: planItemId, attemptId: null })
+  viewedTake.current = { itemId: planItemId, attemptId: practicingAgain ? null : result?.id ?? null }
+  const updateViewedTake = (updated: Attempt) => {
+    qc.setQueryData(['attempt', updated.id], updated)
+    if (viewedTake.current.itemId === updated.plan_item_id && viewedTake.current.attemptId === updated.id) setResult(updated)
+    void qc.invalidateQueries({ queryKey: ['attempt-history', updated.plan_item_id] })
+  }
   const savedRecording = useRecording(result?.recording_id)
   const dismiss = useMutation({ mutationFn: (id: string) => request('/recordings/' + id + '/dismiss', { method: 'PUT', body: {} }) })
   const cancelUpload = useMutation({ mutationFn: (value: { key: string; itemId: string }) => request<{ recording_id: string | null }>('/recording-uploads/' + encodeURIComponent(value.key) + '/cancellation', { method: 'PUT', body: { plan_item_id: value.itemId } }) })
@@ -286,18 +293,18 @@ export default function Exercise() {
                 </section>}
                 {result?.feedback.next_step && <p><strong>Try next:</strong> {result.feedback.next_step}</p>}
                 {result?.status === 'passed' && result.recording_id && <SpeechReview key={"speech-review-" + result.id} take={result} onHear={(seconds) => { const audio = audioRef.current; if (audio) { audio.currentTime = seconds; void audio.play().catch(() => {}) } }} />}
-                {result?.practice_focus?.note && <p><strong>Your focus for this take:</strong> {result.practice_focus.note}</p>}
+                {result?.practice_focus?.note && <p><strong>{result.training_focus ? 'Previous take’s reflection:' : 'Your focus for this take:'}</strong> {result.practice_focus.note}</p>}
                 {result?.practice_focus && <TakeComparison take={result} />}
                 {result?.training_focus && <StoryFocus focus={result.training_focus} completed />}
-                {result?.training_focus && result.status === 'passed' && <FocusCheck key={"focus-check-" + result.id} take={result} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }) }} />}
-                {result && <TakeReflection key={"reflection-" + result.id} attempt={result} exerciseId={item.exercise_id} storyId={lesson.items.find((entry) => entry.exercise_id === 'E12')?.id} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }); void qc.invalidateQueries({ queryKey: ['attempt', result.id] }) }} />}
+                {result?.training_focus && result.status === 'passed' && <FocusCheck key={"focus-check-" + result.id} take={result} onSaved={updateViewedTake} />}
+                {result && <TakeReflection key={"reflection-" + result.id} attempt={result} exerciseId={item.exercise_id} storyId={lesson.items.find((entry) => entry.exercise_id === 'E12')?.id} onSaved={updateViewedTake} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
                   </div>
                 ))}
-                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { canceling.current = false; uploadKey.current = null; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
+                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { viewedTake.current = { itemId: planItemId, attemptId: null }; canceling.current = false; uploadKey.current = null; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
                   Practice again — no extra notes
                 </button>
                 <button className="rs-btn rs-btn--wide" type="button" onClick={goNext} style={{ alignSelf: 'flex-start' }}>
@@ -306,7 +313,7 @@ export default function Exercise() {
               </div>
             ) : (
               <>
-                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.{(pendingTake?.practice_focus?.note || result?.reflection?.note) && <span> Your saved focus: {pendingTake?.practice_focus?.note || result?.reflection?.note}</span>}</span><button className="rs-link" type="button" disabled={attempt.isPending || dismiss.isPending || cancelUpload.isPending} onClick={cancelRepeat}>Cancel extra practice</button></div>}
+                {practicingAgain && <div className="rs-banner" role="status"><span>Extra practice. Your completion and notes are already saved.{(pendingTake?.practice_focus?.note || result?.reflection?.note) && <span> {item.exercise_id === 'E12' ? 'Previous take’s reflection:' : 'Your saved focus:'} {pendingTake?.practice_focus?.note || result?.reflection?.note}</span>}</span><button className="rs-link" type="button" disabled={attempt.isPending || dismiss.isPending || cancelUpload.isPending} onClick={cancelRepeat}>Cancel extra practice</button></div>}
                 {dismiss.error && <ErrorBanner error={dismiss.error} onRetry={cancelRepeat} />}
                 {cancelUpload.error && <ErrorBanner error={cancelUpload.error} onRetry={cancelRepeat} />}
                 {cancellation.intent && <p role="status">Cancellation pending. The saved take will not be submitted while cancellation is being confirmed.</p>}
@@ -334,7 +341,7 @@ export default function Exercise() {
               {history.isPending && <p>Loading your takes…</p>}
               {history.error && <ErrorBanner error={history.error} onRetry={() => history.refetch()} />}
               <ol className="rs-stack" style={{ paddingLeft: 22, gap: 10 }}>
-                {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending || practicingAgain} onClick={() => { setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
+                {takes.map((take) => <li key={take.id}><button className="rs-link" type="button" aria-pressed={result?.id === take.id} disabled={attempt.isPending || practicingAgain} onClick={() => { viewedTake.current = { itemId: planItemId, attemptId: take.id }; setSelectedId(take.id); setResult(null); setRepeatFor(null) }}>
                   {take.practice_only ? 'Extra practice' : 'First completion attempt'} · {take.status === 'passed' ? 'saved' : 'needs another try'}{take.created_at ? ' · ' + new Date(take.created_at).toLocaleString('en-US', { timeZone: me.data?.preferences?.timezone ?? 'UTC' }) : ''}
                 </button></li>)}
               </ol>

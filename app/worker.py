@@ -342,8 +342,9 @@ class Worker:
                         "goal": attempt["speech_review"]["goal"],
                         "title": item["title"],
                         "task": item["task"],
-                        "saved_focus": (attempt.get("practice_focus") or {}).get("note")
-                        or (attempt.get("training_focus") or {}).get("note", ""),
+                        "saved_focus": (
+                            attempt.get("training_focus") or attempt.get("practice_focus") or {}
+                        ).get("note", ""),
                         "story_focus": {
                             key: attempt["training_focus"][key]
                             for key in ("skill_label", "listening_question", "rubric_version")

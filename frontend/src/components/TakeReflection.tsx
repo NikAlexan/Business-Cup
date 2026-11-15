@@ -9,7 +9,7 @@ import { ErrorBanner } from './ui'
 export function TakeReflection({ attempt, onSaved, storyId, exerciseId }: { attempt: Attempt; onSaved: (updated: Attempt) => void; storyId?: string; exerciseId?: string }) {
   const [note, setNote] = useState(attempt.reflection?.note ?? '')
   const [savedNote, setSavedNote] = useState(attempt.reflection?.note ?? '')
-  const [skill, setSkill] = useState('')
+  const [skill, setSkill] = useState<string | null>(null)
   const qc = useQueryClient()
   const canCarry = attempt.status === 'passed' && !!attempt.recording_id
   const catalog = usePracticeFocus(canCarry)
@@ -17,7 +17,8 @@ export function TakeReflection({ attempt, onSaved, storyId, exerciseId }: { atte
   const suggestion = detail.data?.speech_review?.report?.next_step ?? attempt.feedback.next_step
   const defaultSkill = Object.entries(catalog.data?.skills ?? {}).find(([, entry]) => entry.exercise_ids.includes(exerciseId ?? attempt.exercise_id ?? ''))?.[0] ?? 'delivery'
   const active = catalog.data?.focus
-  const alreadyFocus = active?.source_attempt_id === attempt.id && active.note === note.trim() && active.skill === (skill || defaultSkill)
+  const chosenSkill = skill ?? (active?.source_attempt_id === attempt.id ? active.skill : '')
+  const alreadyFocus = active?.source_attempt_id === attempt.id && active.note === note.trim() && active.skill === (chosenSkill || defaultSkill)
   const updated = (take: Attempt) => { setNote(take.reflection?.note ?? ''); setSavedNote(take.reflection?.note ?? ''); qc.setQueryData(['attempt', take.id], take); onSaved(take) }
   const save = useMutation({
     mutationFn: () => request<Attempt>('/exercise-attempts/' + attempt.id + '/reflection', { method: 'PUT', body: { note } }),
@@ -36,13 +37,13 @@ export function TakeReflection({ attempt, onSaved, storyId, exerciseId }: { atte
     <button className="rs-btn rs-btn--secondary" type="button" disabled={save.isPending || carry.isPending || note === savedNote} onClick={() => save.mutate()} style={{ alignSelf: 'flex-start' }}>Save reflection</button>
     {canCarry && <div className="rs-stack" style={{ gap: 10 }}>
       <label className="rs-stack" style={{ gap: 6 }}>Focus for story practice
-        <select value={skill} disabled={carry.isPending || save.isPending} onChange={(event) => setSkill(event.target.value)} style={{ font: 'inherit', padding: 10, background: 'var(--ground)', color: 'var(--ink)', border: '2px solid var(--line)', borderRadius: 12 }}>
+        <select value={chosenSkill} disabled={carry.isPending || save.isPending} onChange={(event) => setSkill(event.target.value)} style={{ font: 'inherit', padding: 10, background: 'var(--ground)', color: 'var(--ink)', border: '2px solid var(--line)', borderRadius: 12 }}>
           <option value="">Suggested for this exercise</option>
           {Object.entries(catalog.data?.skills ?? {}).map(([key, entry]) => <option key={key} value={key}>{entry.label}</option>)}
         </select>
       </label>
       <span className="rs-label">Keep one change for a new story and your next session. This also saves the reflection with this take.</span>
-      <button className="rs-btn rs-btn--secondary" type="button" disabled={carry.isPending || save.isPending || !note.trim() || alreadyFocus} onClick={() => carry.mutate({ source_attempt_id: attempt.id, note, ...(skill ? { skill } : {}) }, { onSuccess: (data) => {
+      <button className="rs-btn rs-btn--secondary" type="button" disabled={carry.isPending || save.isPending || !note.trim() || alreadyFocus} onClick={() => carry.mutate({ source_attempt_id: attempt.id, note, ...(chosenSkill ? { skill: chosenSkill } : {}) }, { onSuccess: (data) => {
         updated(data.source_attempt)
         qc.setQueryData<PracticeFocusState>(['practice-focus'], (previous) => ({ focus: data.focus, skills: previous?.skills ?? {}, last_check: null }))
         void qc.invalidateQueries({ queryKey: ['practice-focus'] }); void qc.invalidateQueries({ queryKey: ['plan-item'] })
