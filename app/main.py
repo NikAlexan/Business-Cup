@@ -527,6 +527,8 @@ def create_app(settings=None):
         values = payload.model_dump(mode="json")
         if values["intent"] is None:
             values.pop("intent")  # Preserve fingerprints for pre-intent clients and same-key retries.
+        if values["expected_reflection_revision"] is None:
+            values.pop("expected_reflection_revision")  # Old idempotency receipts retain their fingerprint.
         return mutate(s, request, values, lambda: s.save_practice_focus(values))
 
     @app.delete("/api/v1/practice-focus/{focus_id}", status_code=204)

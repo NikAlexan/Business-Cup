@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { PlanItem, TrainingFocus } from '../api/types'
+import type { Attempt, PlanItem, TrainingFocus } from '../api/types'
 import * as recorder from '../lib/recorder'
 import { clearCancellationIntents } from '../lib/cancellationIntent'
 import Exercise from './Exercise'
@@ -46,7 +46,7 @@ const savedAttempt = {
   practice_seconds: 30, feedback: { summary: 'Recording received. Audio quality checked.', issues: [],
     coaching: [{ code: 'pace_outside_target', message: 'For future practice, explore a gentler pace.' }],
     metrics: { speaking_rate_wpm: { available: true, value: 165, unit: 'words/min', unavailable_reason: null } } },
-}
+} satisfies Attempt
 const storyFocus: TrainingFocus = {
   id: 'focus-a', note: 'Leave room between ideas.', skill: 'pauses', skill_label: 'Meaningful pauses',
   listening_question: 'Does the pause help the meaning?', steps: ['Choose one thought boundary.', 'Read once and listen back.'],
@@ -578,7 +578,7 @@ test('a reflection becomes a story focus, survives narration and saves a subject
     if (path === '/api/v1/plan-items/item') return Response.json({ item: baseItem, lesson, item_index: 0, plan_status: 'active', pending_take: null })
     if (path === '/api/v1/practice-focus') {
       if (init?.method === 'POST') {
-        expect(JSON.parse(String(init.body))).toEqual({ source_attempt_id: 'attempt', note: storyFocus.note, skill: 'pauses', intent: 'experiment' })
+        expect(JSON.parse(String(init.body))).toEqual({ source_attempt_id: 'attempt', note: storyFocus.note, skill: 'pauses', intent: 'experiment', expected_reflection_revision: 0 })
         active = storyFocus; original = { ...original, reflection: { note: storyFocus.note, updated_at: 'now' } }
         return Response.json({ focus: active, source_attempt: original }, { status: 201 })
       }
@@ -798,7 +798,7 @@ test('an undecided listening note can be empty and survives reload without repla
   let focusPosts = 0
   setup(baseItem, (path, init) => {
     if (path === '/api/v1/exercise-attempts/attempt/reflection') {
-      expect(JSON.parse(String(init?.body))).toEqual({ note: '', intent: 'undecided' })
+      expect(JSON.parse(String(init?.body))).toEqual({ note: '', intent: 'undecided', expected_revision: 0 })
       original = { ...original, reflection: { note: '', intent: 'undecided', updated_at: 'now' } }
       return Response.json(original)
     }
@@ -1115,4 +1115,199 @@ test('an explicit experiment restores the original optional model idea from an e
   expect(screen.getByText('What happened in this take?')).toBeTruthy()
   expect(screen.queryByText('Old keep policy action.')).toBeNull()
   expect(screen.getByText('Optional idea:')).toBeTruthy()
+})
+
+test('a fresh detail GET updates every listening block and note-only saving never resends an old intention', async () => {
+  const old = { ...savedAttempt, reflection: { note: 'Earlier note.', intent: 'experiment' as const, updated_at: '2026-11-15T10:00:00.000001Z' },
+    training_focus: { ...storyFocus, intent: 'experiment' as const }, feedback: { ...savedAttempt.feedback, next_step: 'OLD_LOCAL_CHANGE' },
+    speech_review: { status: 'completed', job_id: null, report: { summary: 'An impression.', observation: null, next_step: 'OLD_MODEL_CHANGE', listening_question: 'OLD_MODEL_QUESTION', limitations: [] } } }
+  let current = { ...old, reflection: { note: 'Listen first.', intent: 'undecided' as 'undecided' | 'experiment', updated_at: '2026-11-15T10:00:00.000002Z' } }
+  let release!: (response: Response) => void
+  const delayed = new Promise<Response>((resolve) => { release = resolve })
+  let sent: Record<string, unknown> | undefined
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return delayed
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [old], next_cursor: null })
+    if (path.endsWith('/reflection')) {
+      sent = JSON.parse(String(init?.body))
+      current = { ...current, reflection: { ...current.reflection, note: String(sent!.note) } }
+      return Response.json(current)
+    }
+  })
+  open('/exercise/item')
+  await screen.findByText('OLD_MODEL_CHANGE')
+  await act(async () => release(Response.json(current)))
+  await waitFor(() => expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true))
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('Listen first.')
+  expect(screen.queryByText('OLD_LOCAL_CHANGE')).toBeNull()
+  expect(screen.queryByText('OLD_MODEL_CHANGE')).toBeNull()
+  expect(screen.queryByText('For future practice, explore a gentler pace.')).toBeNull()
+  expect(screen.getByText(storyFocus.note)).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your listening note' }), { target: { value: 'Edited only my note.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  await screen.findByText('Reflection saved with this take.')
+  expect(sent).toEqual({ note: 'Edited only my note.', expected_revision: 0 })
+  expect(current.reflection.intent).toBe('undecided')
+})
+
+test.each(['disjoint', 'same_note', 'same_intent'] as const)('a %s update while editing preserves the draft and resolves only overlapping fields', async (scenario) => {
+  const original: Attempt = { ...savedAttempt, reflection: { note: 'Original note.', intent: 'experiment', revision: 1, updated_at: '2026-11-15T10:00:00Z' } }
+  const incoming: Attempt = { ...original, reflection: { note: scenario === 'same_note' ? 'Remote note.' : 'Original note.', intent: 'undecided', revision: 2, updated_at: '2026-11-15T10:00:01Z' } }
+  let current = original
+  const bodies: Record<string, unknown>[] = []
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(current)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+    if (path.endsWith('/reflection')) {
+      const body = JSON.parse(String(init?.body)); bodies.push(body)
+      current = { ...current, reflection: { ...current.reflection!, note: body.note, intent: body.intent ?? current.reflection!.intent, revision: 3 } }
+      return Response.json(current)
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  await screen.findByDisplayValue('Original note.')
+  if (scenario === 'same_intent') fireEvent.click(screen.getByRole('radio', { name: 'Keep a useful feature' }))
+  else fireEvent.change(screen.getByRole('textbox', { name: 'Your listening note' }), { target: { value: 'My draft note.' } })
+  current = incoming
+  act(() => client.setQueryData(['attempt', 'attempt'], incoming))
+  if (scenario === 'disjoint') {
+    expect(screen.queryByText('A saved reflection changed while you were editing. Your draft is kept.')).toBeNull()
+    await waitFor(() => expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true))
+  } else {
+    await screen.findByText('A saved reflection changed while you were editing. Your draft is kept.')
+    expect((screen.getByRole('button', { name: 'Save reflection' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep my draft for the next save' }))
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  await screen.findByText('Reflection saved with this take.')
+  expect(bodies).toEqual([{ note: scenario === 'same_intent' ? 'Original note.' : 'My draft note.', expected_revision: 2, ...(scenario === 'same_intent' ? { intent: 'keep' } : {}) }])
+  expect(current.reflection?.intent).toBe(scenario === 'same_intent' ? 'keep' : 'undecided')
+})
+
+test('a server version conflict returns the current reflection without losing a draft or retrying an old choice', async () => {
+  const original: Attempt = { ...savedAttempt, reflection: { note: 'Original note.', intent: 'experiment', revision: 0, updated_at: '2026-11-15T10:00:00Z' } }
+  let current: Attempt = { ...original, reflection: { note: 'Changed in another tab.', intent: 'undecided', revision: 1, updated_at: '2026-11-15T10:00:01Z' } }
+  const bodies: Record<string, unknown>[] = []
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+    if (path.endsWith('/reflection')) {
+      const body = JSON.parse(String(init?.body)); bodies.push(body)
+      if (bodies.length === 1) return Response.json({ error: { code: 'reflection_changed', message: 'The saved reflection changed.', details: { current_attempt: current } } }, { status: 409 })
+      current = { ...current, reflection: { ...current.reflection!, note: body.note, revision: 2 } }
+      return Response.json(current)
+    }
+  })
+  open('/exercise/item')
+  await screen.findByDisplayValue('Original note.')
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your listening note' }), { target: { value: 'My retained draft.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  await screen.findByText('A saved reflection changed while you were editing. Your draft is kept.')
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('My retained draft.')
+  expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Keep my draft for the next save' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  await screen.findByText('Reflection saved with this take.')
+  expect(bodies).toEqual([{ note: 'My retained draft.', expected_revision: 0 }, { note: 'My retained draft.', expected_revision: 1 }])
+})
+
+test('a retried old focus receipt refreshes the current pointer and retains a conflicting draft', async () => {
+  const original: Attempt = { ...savedAttempt, reflection: { note: 'Original note.', intent: 'experiment', revision: 0, updated_at: '2026-11-15T10:00:00Z' } }
+  let current = original
+  let active: TrainingFocus | null = null
+  let receipt: { focus: TrainingFocus; source_attempt: Attempt }
+  const keys: string[] = []
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(current)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+    if (path === '/api/v1/practice-focus') {
+      if (init?.method === 'POST') {
+        keys.push(String((init.headers as Record<string, string>)['Idempotency-Key']))
+        if (keys.length === 1) {
+          active = { ...storyFocus, id: 'focus-a', note: 'My focus draft.', intent: 'keep', skill: 'pace' }
+          current = { ...original, reflection: { note: 'My focus draft.', intent: 'keep', revision: 1, updated_at: '2026-11-15T10:00:01Z' } }
+          receipt = { focus: active, source_attempt: current }
+          return Response.json({ error: { message: 'Response lost after commit.' } }, { status: 503 })
+        }
+        return Response.json(receipt, { status: 201 })
+      }
+      return Response.json({ focus: active, skills: { pace: { label: 'Comfortable pace', exercise_ids: ['E06'] } }, last_check: null })
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  await screen.findByDisplayValue('Original note.')
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your listening note' }), { target: { value: 'My focus draft.' } })
+  fireEvent.click(screen.getByRole('radio', { name: 'Keep a useful feature' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
+  await screen.findByText('Response lost after commit.')
+  // A refetch first reveals our own committed revision, then the external edit happens before retry.
+  act(() => client.setQueryData(['attempt', 'attempt'], current))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Save reflection' }) as HTMLButtonElement).disabled).toBe(true))
+  active = { ...storyFocus, id: 'focus-b', source_attempt_id: 'another-source', note: 'A newer active focus.' }
+  current = { ...original, reflection: { note: 'A newer note.', intent: 'undecided', revision: 2, updated_at: '2026-11-15T10:00:02Z' } }
+  fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
+  await screen.findByText('A saved reflection changed while you were editing. Your draft is kept.')
+  await screen.findByRole('link', { name: 'Review the current focus before your next story.' })
+  expect(keys).toHaveLength(2)
+  expect(keys[1]).toBe(keys[0])
+  expect((client.getQueryData(['practice-focus']) as { focus: TrainingFocus }).focus.id).toBe('focus-b')
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('My focus draft.')
+  expect((screen.getByRole('radio', { name: 'Keep a useful feature' }) as HTMLInputElement).checked).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Use saved reflection' }))
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('A newer note.')
+  expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true)
+})
+
+
+test('a late successful save cannot replace a newer reflection or discard its conflicting local draft', async () => {
+  const original: Attempt = { ...savedAttempt, training_focus: storyFocus,
+    reflection: { note: 'Original note.', intent: 'experiment', revision: 1, updated_at: '2026-11-15T10:00:00Z' } }
+  const own: Attempt = { ...original, reflection: { note: 'My delayed save.', intent: 'experiment', revision: 2, updated_at: '2026-11-15T10:00:01Z' } }
+  const latest: Attempt = { ...original, reflection: { note: 'A newer saved note.', intent: 'undecided', revision: 3, updated_at: '2026-11-15T10:00:02Z' } }
+  let release!: (response: Response) => void
+  const pending = new Promise<Response>((resolve) => { release = resolve })
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+    if (path.endsWith('/reflection')) return pending
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  await screen.findByDisplayValue('Original note.')
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your listening note' }), { target: { value: 'My delayed save.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  act(() => client.setQueryData(['attempt', 'attempt'], latest))
+  await screen.findByText('A saved reflection changed while you were editing. Your draft is kept.')
+  await act(async () => release(Response.json(own)))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Use saved reflection' }) as HTMLButtonElement).disabled).toBe(false))
+  expect((client.getQueryData(['attempt', 'attempt']) as Attempt).reflection?.revision).toBe(3)
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('My delayed save.')
+  expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByText(storyFocus.note)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Use saved reflection' }))
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('A newer saved note.')
+})
+
+
+test('a delayed old detail GET cannot replace a newer cached reflection before any local save', async () => {
+  const original: Attempt = { ...savedAttempt, reflection: { note: 'Old note.', intent: 'experiment', revision: 1, updated_at: '2026-11-15T10:00:00Z' } }
+  const latest: Attempt = { ...original, reflection: { note: 'Current saved note.', intent: 'undecided', revision: 2, updated_at: '2026-11-15T10:00:01Z' } }
+  let release!: (response: Response) => void
+  const delayed = new Promise<Response>((resolve) => { release = resolve })
+  setup(baseItem, (path) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return delayed
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  await screen.findByDisplayValue('Old note.')
+  act(() => client.setQueryData(['attempt', 'attempt'], latest))
+  await screen.findByDisplayValue('Current saved note.')
+  await act(async () => release(Response.json(original)))
+  await waitFor(() => expect(client.getQueryState(['attempt', 'attempt'])?.fetchStatus).toBe('idle'))
+  expect((client.getQueryData(['attempt', 'attempt']) as Attempt).reflection?.revision).toBe(2)
+  expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('Current saved note.')
 })

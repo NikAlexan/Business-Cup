@@ -20,6 +20,7 @@ import { ErrorBanner, Skeleton } from '../components/ui'
 import { useRecorder } from '../lib/recorder'
 import { useRecordingCheck } from '../lib/recordingCheck'
 import { listeningDecision, nextListeningIntent } from '../lib/listeningDecision'
+import { reconcileAttempt } from '../lib/attemptView'
 import { forgetCancellation, rememberCancellation, useCancellationIntent, type CancellationIntent } from '../lib/cancellationIntent'
 
 import { formatEstimate } from '../lib/format'
@@ -164,13 +165,15 @@ export default function Exercise() {
   const history = useAttemptHistory(completed ? found?.item.id : undefined)
   const takes = history.data?.pages.flatMap((page) => page.items) ?? []
   const selected = selectedId ? takes.find((take) => take.id === selectedId) : takes[0]
-  const savedAttempt = useAttempt(found?.item.latest_attempt_id)
-  const result = latestLocal ?? selected ?? savedAttempt.data ?? null
+  const preferredTake = latestLocal ?? selected
+  const savedAttempt = useAttempt(preferredTake?.id ?? selectedId ?? found?.item.latest_attempt_id)
+  const result = reconcileAttempt(preferredTake, savedAttempt.data)
   const viewedTake = useRef<{ itemId: string; attemptId: string | null }>({ itemId: planItemId, attemptId: null })
   viewedTake.current = { itemId: planItemId, attemptId: practicingAgain ? null : result?.id ?? null }
   const updateViewedTake = (updated: Attempt) => {
-    qc.setQueryData(['attempt', updated.id], updated)
-    if (viewedTake.current.itemId === updated.plan_item_id && viewedTake.current.attemptId === updated.id) setResult(updated)
+    const current = reconcileAttempt(qc.getQueryData<Attempt>(['attempt', updated.id]), updated, true) ?? updated
+    qc.setQueryData(['attempt', updated.id], current)
+    if (viewedTake.current.itemId === updated.plan_item_id && viewedTake.current.attemptId === updated.id) setResult((shown) => reconcileAttempt(shown?.id === current.id ? shown : null, current, true))
     void qc.invalidateQueries({ queryKey: ['attempt-history', updated.plan_item_id] })
   }
   const timingDecision = result ? listeningDecision(nextListeningIntent(result)) : null

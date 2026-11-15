@@ -64,6 +64,7 @@ class PracticeFocusInput(Input):
     source_attempt_id: UUID
     intent: Literal["experiment", "keep"] | None = None
     note: str = Field(min_length=1, max_length=500)
+    expected_reflection_revision: int | None = Field(default=None, ge=0, strict=True)
     skill: (
         Literal[
             "word_endings", "consonants", "pace", "pauses", "intonation", "emphasis", "breath", "delivery"
@@ -122,6 +123,7 @@ class VoiceReport(Input):
 class ReflectionInput(Input):
     note: str = Field(max_length=500)
     intent: Literal["experiment", "keep", "undecided"] | None = None
+    expected_revision: int | None = Field(default=None, ge=0, strict=True)
 
 
 class SpeechObservation(Input):

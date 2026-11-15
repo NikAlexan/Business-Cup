@@ -674,8 +674,17 @@ class Service:
         if payload.get("intent") is not None:
             reflection["intent"] = payload["intent"]
         changed = reflection != previous
+        revision = previous.get("revision") or 0
+        expected = payload.get("expected_revision")
+        if expected is not None and expected != revision and changed:
+            fail(
+                409,
+                "reflection_changed",
+                "The saved reflection changed. Your draft has not overwritten it.",
+                {"current_attempt": attempt},
+            )
         if changed:
-            attempt["reflection"] = {**reflection, "updated_at": iso()}
+            attempt["reflection"] = {**reflection, "updated_at": iso(), "revision": revision + 1}
         review = attempt.get("speech_review")
         if review and review.get("report"):
             report = listening_intent_policy(review["report"], next_action_intent(attempt))
@@ -748,9 +757,20 @@ class Service:
             "source_plan_item_id": source["plan_item_id"],
             "source_recording_id": source["recording_id"],
         }
+        self.save_reflection(
+            source,
+            {
+                "note": note,
+                "intent": intent,
+                **(
+                    {"expected_revision": payload["expected_reflection_revision"]}
+                    if payload.get("expected_reflection_revision") is not None
+                    else {}
+                ),
+            },
+        )
         self.put("practice_focus", focus)
         self.guest.data = {**self.guest.data, "practice_focus_id": focus["id"]}
-        self.save_reflection(source, {"note": note, "intent": intent})
         return 201, {"focus": focus, "source_attempt": source}
 
     def clear_practice_focus(self, focus_id):

@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { request } from './api'
+import { reconcileAttempt } from '../lib/attemptView'
 import type { PracticeFocusState, Assessment, Attempt, Exercise, Job, Me, Plan, PlanItemState, Progress, Recording, Today } from './types'
 
 export const useMe = (enabled = true) => useQuery({ queryKey: ['me'], queryFn: () => request<Me>('/me'), enabled })
@@ -26,7 +27,9 @@ export const useJob = (id: string | null | undefined) =>
   })
 
 export const useAttempt = (id: string | null | undefined) =>
-  useQuery({ queryKey: ['attempt', id], queryFn: () => request<Attempt>('/exercise-attempts/' + id), enabled: !!id })
+  useQuery({ queryKey: ['attempt', id], queryFn: () => request<Attempt>('/exercise-attempts/' + id), enabled: !!id,
+    structuralSharing: (previous, incoming) => reconcileAttempt(previous as Attempt | undefined, incoming as Attempt) ?? incoming,
+  })
 
 export const useRecording = (id: string | null | undefined) =>
   useQuery({ queryKey: ['recording', id], queryFn: () => request<Recording>('/recordings/' + id), enabled: !!id })

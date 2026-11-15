@@ -603,3 +603,53 @@ test('a saved listening-first decision overrides legacy model advice and retains
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
 })
+
+
+test('a stale reflection save keeps its draft, refreshes the decision and requires an explicit conflict choice', async ({ page }) => {
+  const lesson = await seed(page)
+  const item = lesson.items.find((value) => value.task.verification.type === 'recording')!
+  await page.goto('/exercise/' + item.id)
+  await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+  await page.waitForTimeout(4000)
+  await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+  await page.getByRole('button', { name: 'Check my take' }).click()
+  await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  const state = await (await page.request.get('/api/v1/plan-items/' + item.id)).json()
+  const path = '/api/v1/exercise-attempts/' + state.item.latest_attempt_id + '/reflection'
+  const initial = await page.request.put(path, { data: { note: 'My original listening note.', intent: 'experiment', expected_revision: 0 } })
+  expect(initial.status()).toBe(200)
+  expect((await initial.json()).reflection.revision).toBe(1)
+  await page.reload()
+  const note = page.getByRole('textbox', { name: 'Your listening note' })
+  await expect(note).toHaveValue('My original listening note.')
+  await note.fill('My retained browser draft.')
+  const progress = (await (await page.request.get('/api/v1/me')).json()).progress
+  // Another tab/device writes to the actual API while this page still has revision 1.
+  const remote = await page.request.put(path, { data: { note: 'Listen once more before choosing.', intent: 'undecided', expected_revision: 1 } })
+  expect(remote.status()).toBe(200)
+  const bodies: Record<string, unknown>[] = []
+  page.on('request', (request) => { if (new URL(request.url()).pathname === path && request.method() === 'PUT') bodies.push(request.postDataJSON()) })
+  const conflict = page.waitForResponse((response) => new URL(response.url()).pathname === path && response.request().method() === 'PUT')
+  await page.getByRole('button', { name: 'Save reflection', exact: true }).click()
+  expect((await conflict).status()).toBe(409)
+  await expect(page.getByText('A saved reflection changed while you were editing. Your draft is kept.')).toBeVisible()
+  await expect(note).toHaveValue('My retained browser draft.')
+  await expect(page.getByRole('radio', { name: 'Listen again before deciding', exact: true })).toBeChecked()
+  await expect(page.getByRole('button', { name: 'Save reflection', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Keep my draft for the next save', exact: true }).click()
+  await page.getByRole('button', { name: 'Save reflection', exact: true }).click()
+  await expect(page.getByText('Reflection saved with this take.')).toBeVisible()
+  expect(bodies).toEqual([
+    { note: 'My retained browser draft.', expected_revision: 1 },
+    { note: 'My retained browser draft.', expected_revision: 2 },
+  ])
+  await page.reload()
+  await expect(note).toHaveValue('My retained browser draft.')
+  await expect(page.getByRole('radio', { name: 'Listen again before deciding', exact: true })).toBeChecked()
+  expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(progress)
+  const final = await (await page.request.get(path.replace('/reflection', ''))).json()
+  expect(final.reflection).toMatchObject({ note: 'My retained browser draft.', intent: 'undecided', revision: 3 })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+})

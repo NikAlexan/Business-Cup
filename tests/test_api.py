@@ -1,7 +1,8 @@
 import copy
 import time
-from datetime import timedelta
+from datetime import UTC, timedelta
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
@@ -166,11 +167,13 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
     assert client.get("/api/v1/progress").json()["summary"]["completed_lessons_all_time"] == 1
     assert assessment(client, "reassessment").status_code == 409
     assert assessment(client, "reassessment", demo=True).status_code == 403
-    # Move the completed assessment back 14 days to exercise the true date gate.
+    # Eligibility uses local calendar days; elapsed UTC days differ across DST transitions.
+    zone = ZoneInfo(a["timezone"])
+    completed_local = utcnow().astimezone(zone) - timedelta(days=14)
     with app.state.database.session.begin() as db:
         row = db.get(Resource, a["id"])
         value = copy.deepcopy(row.data)
-        value["completed_at"] = iso(utcnow() - timedelta(days=14))
+        value["completed_at"] = iso(completed_local.astimezone(UTC))
         row.data = value
     repeated = complete_assessment(client, worker, speech_file, "reassessment")
     assert repeated["comparison"]["baseline_assessment_id"] == a["id"]

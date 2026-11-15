@@ -5,6 +5,7 @@ import { useAttempt, useJob, useMe } from '../api/hooks'
 import type { Attempt } from '../api/types'
 import { ErrorBanner } from './ui'
 import { listeningDecision, nextListeningIntent } from '../lib/listeningDecision'
+import { reconcileAttempt } from '../lib/attemptView'
 
 export function SpeechReview({ take, onHear }: { take: Attempt; onHear: (seconds: number) => void }) {
   const qc = useQueryClient()
@@ -50,7 +51,7 @@ export function SpeechReview({ take, onHear }: { take: Attempt; onHear: (seconds
       : review?.reason?.includes('daily_limit')
         ? 'The daily speech-coaching limit has been reached. Your practice and audio are saved.'
         : 'Speech coaching is unavailable for this take. You can still listen and save a reflection.'}</p>}
-    {(!review || (review.status === 'unavailable' && review.reason !== 'transcription_unverified')) && me.data?.capabilities?.exercise_coaching && <button className="rs-btn rs-btn--secondary" type="button" disabled={requestReview.isPending} onClick={() => requestReview.mutate(null, { onSuccess: (updated) => { qc.setQueryData(['attempt', take.id], updated); refresh() } })}>Request speech coaching</button>}
+    {(!review || (review.status === 'unavailable' && review.reason !== 'transcription_unverified')) && me.data?.capabilities?.exercise_coaching && <button className="rs-btn rs-btn--secondary" type="button" disabled={requestReview.isPending} onClick={() => requestReview.mutate(null, { onSuccess: (updated) => { qc.setQueryData<Attempt>(['attempt', take.id], (previous) => reconcileAttempt(previous, updated, true) ?? updated); refresh() } })}>Request speech coaching</button>}
     {review?.status === 'failed' && job.data?.retryable && <button className="rs-btn rs-btn--secondary" type="button" disabled={retry.isPending} onClick={() => retry.mutate(review.job_id!, { onSuccess: () => { qc.setQueryData(['job', review.job_id], { status: 'queued', poll_after_ms: 2000 }); refresh(); void job.refetch() } })}>Retry speech coaching</button>}
     {requestReview.error && <ErrorBanner error={requestReview.error} />}
     {retry.error && <ErrorBanner error={retry.error} />}
