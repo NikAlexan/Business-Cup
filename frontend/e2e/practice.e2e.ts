@@ -139,7 +139,14 @@ test('reload after an accepted upload resumes its check and saves exactly one at
 test('a completed session keeps its exercises reachable for feedback and extra practice', async ({ page }) => {
   test.setTimeout(90_000)
   const lesson = await seed(page)
-  await page.goto('/today')
+  const plan = await (await page.request.get('/api/v1/plan')).json()
+  const future = plan.lessons.find((value: { status: string }) => value.status === 'locked').items.find((value: { task: { verification: { type: string } } }) => value.task.verification.type === 'recording')
+  await page.goto('/exercise/' + future.id)
+  await expect(page.getByRole('heading', { name: 'Session not open yet', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Start recording', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Check availability', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Session not open yet', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Back to today', exact: true }).click()
   for (const item of lesson.items) {
     await page.getByRole('link', { name: item.title, exact: true }).click()
     if (item.task.verification.type === 'self_confirmation') {

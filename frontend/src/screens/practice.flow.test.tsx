@@ -922,3 +922,42 @@ test('saved chosen-boundary timing and private evidence playback survive exercis
   expect((screen.getByLabelText('Your completed take') as HTMLAudioElement).currentTime).toBe(2)
   expect(play).toHaveBeenCalledOnce()
 })
+
+test('a locked task is a readable preview and only offers recording after availability is refreshed', async () => {
+  const item = { ...baseItem, status: 'pending' as const, latest_attempt_id: null }
+  let lessonStatus = 'locked'
+  const transport = setup(item, (path) => {
+    if (path === '/api/v1/plan-items/item') return Response.json({ item, lesson: { id: 'lesson', status: lessonStatus, items: [item] }, plan_status: 'active', item_index: 0, pending_take: null })
+  })
+  open('/exercise/item')
+  await screen.findByRole('heading', { name: 'Session not open yet' })
+  expect(screen.getByText(item.task.text)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Start recording' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Check my take' })).toBeNull()
+  expect(screen.getByRole('link', { name: 'Back to today' }).getAttribute('href')).toBe('/today')
+  lessonStatus = 'available'
+  fireEvent.click(screen.getByRole('button', { name: 'Check availability' }))
+  await screen.findByRole('button', { name: 'Start recording' })
+  expect(screen.queryByRole('heading', { name: 'Session not open yet' })).toBeNull()
+  expect(transport.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+})
+
+test('an unfinished archived task stays a preview while its completed neighbor retains extra practice', async () => {
+  const pending = { ...baseItem, status: 'pending' as const, latest_attempt_id: null }
+  let current = pending as PlanItem
+  setup(pending, (path) => {
+    if (path === '/api/v1/plan-items/item') return Response.json({ item: current, lesson: { id: 'lesson', status: 'locked', items: [current] }, plan_status: 'archived', item_index: 0, pending_take: null })
+  })
+  const view = open('/exercise/item')
+  await screen.findByRole('heading', { name: 'Saved task preview' })
+  expect(screen.queryByRole('button', { name: 'Check availability' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Start recording' })).toBeNull()
+  view.unmount()
+  current = baseItem
+  open('/exercise/item')
+  await screen.findByText('Recording received. Audio quality checked.')
+  fireEvent.click(screen.getByRole('button', { name: 'Practice again — no extra notes' }))
+  await screen.findByRole('button', { name: 'Start recording' })
+  expect(screen.queryByRole('heading', { name: 'Saved task preview' })).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'Session not open yet' })).toBeNull()
+})

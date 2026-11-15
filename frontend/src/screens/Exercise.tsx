@@ -198,7 +198,9 @@ export default function Exercise() {
   const { lesson, item, index } = found
   const nextItem = lesson.items.find((x, i) => i !== index && x.status !== 'completed')
   const closedLesson = lesson.status === 'completed' || itemState.data?.plan_status === 'archived'
-  const readOnlyTask = itemState.data?.plan_status === 'archived' && item.status !== 'completed'
+  const archivedTask = itemState.data?.plan_status === 'archived' && item.status !== 'completed'
+  const lockedTask = lesson.status === 'locked' && item.status !== 'completed'
+  const readOnlyTask = archivedTask || lockedTask
   const goNext = () => navigate(closedLesson ? '/today' : nextItem ? '/exercise/' + nextItem.id : '/done/' + lesson.id)
   const v = item.task.verification
   const submit = (b: Omit<Body, 'plan_item_id'>) =>
@@ -283,7 +285,10 @@ export default function Exercise() {
                 {item.task.steps?.length ? <ol>{item.task.steps.map((step, n) => <li key={n}>{step}</li>)}</ol> : <ScriptText text={item.task.text} />}
               </div>
             )}
-            {readOnlyTask ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}><p>This older task is saved for reference. Continue practice in your current plan.</p><Link className="rs-link" to="/today">Back to current plan</Link></div> : showOutcome ? (
+            {readOnlyTask ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
+              {archivedTask ? <><h2 className="rs-h" style={{ fontSize: 22 }}>Saved task preview</h2><p>This older task is saved for reference. Continue practice in your current plan.</p></> : <><h2 className="rs-h" style={{ fontSize: 22 }}>Session not open yet</h2><p>You can preview this task. New sessions open in order, with one session completed per local day. Check Today for your current session.</p><button className="rs-link" type="button" disabled={itemState.isFetching} onClick={() => { void itemState.refetch() }}>Check availability</button></>}
+              <Link className="rs-link" to="/today">{archivedTask ? 'Back to current plan' : 'Back to today'}</Link>
+            </div> : showOutcome ? (
               <div className="rs-card rs-stack" style={{ gap: 12, padding: 24, background: 'var(--success-tint)' }}>
                 <h2 className="rs-h" aria-live="polite" style={{ fontSize: 22 }}>{result?.status === 'needs_retry' ? 'Take needs another try' : result?.practice_only ? 'Extra practice saved' : result ? 'Practice complete' : 'Already done'}</h2>
                 {result && <p style={{ margin: 0 }}>{result.feedback.summary}</p>}
