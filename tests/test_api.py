@@ -1,7 +1,8 @@
 import copy
 import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
@@ -127,8 +128,9 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
         "intonation_range_semitones",
         "f0_median_hz",
     }
-    assert a["analysis_metadata"]["targets_version"] == "targets-v1"
-    assert a["analysis_metadata"]["measurement_version"] == "voice-metrics-v2"
+    assert a["analysis_metadata"]["targets_version"] == "targets-v2"
+    assert a["analysis_metadata"]["prompt_version"] == "assessment-coaching-v2"
+    assert a["analysis_metadata"]["measurement_version"] == "voice-metrics-v3"
     scope = [t["id"] for t in a["tasks"][:2]]
     assert a["measurement_scope"]["pace_and_pauses_task_ids"] == scope
     assert a["measurements"]["pause_count"]["value"] >= 8  # sentence ends in both reading passages
@@ -143,10 +145,12 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
     lid = lesson["id"]
     assert client.put("/api/v1/progress/" + lid, json={"status": "completed"}).status_code == 409
     warmup = lesson["items"][0]
-    short = post(client, "/exercise-attempts", {"plan_item_id": warmup["id"], "elapsed_seconds": 1})
+    short = post(client, "/exercise-attempts", {"plan_item_id": warmup["id"], "self_confirmed": False})
     assert short.json()["status"] == "needs_retry"
     for item in lesson["items"]:
-        if item["task"]["verification"]["type"] == "timer":
+        if item["task"]["verification"]["type"] == "self_confirmation":
+            payload = {"plan_item_id": item["id"], "self_confirmed": True}
+        elif item["task"]["verification"]["type"] == "timer":
             payload = {"plan_item_id": item["id"], "elapsed_seconds": 60}
         else:
             r = upload(client, speech_file, {"purpose": "exercise", "plan_item_id": item["id"]})
@@ -163,11 +167,13 @@ def test_full_flow_plan_attempts_streak_and_reassessment(client, worker, speech_
     assert client.get("/api/v1/progress").json()["summary"]["completed_lessons_all_time"] == 1
     assert assessment(client, "reassessment").status_code == 409
     assert assessment(client, "reassessment", demo=True).status_code == 403
-    # Move the completed assessment back 14 days to exercise the true date gate.
+    # Eligibility uses local calendar days; elapsed UTC days differ across DST transitions.
+    zone = ZoneInfo(a["timezone"])
+    completed_local = utcnow().astimezone(zone) - timedelta(days=14)
     with app.state.database.session.begin() as db:
         row = db.get(Resource, a["id"])
         value = copy.deepcopy(row.data)
-        value["completed_at"] = iso(utcnow() - timedelta(days=14))
+        value["completed_at"] = iso(completed_local.astimezone(UTC))
         row.data = value
     repeated = complete_assessment(client, worker, speech_file, "reassessment")
     assert repeated["comparison"]["baseline_assessment_id"] == a["id"]
@@ -368,7 +374,7 @@ def test_pace_exercise_uses_verified_transcription(client, worker, speech_file, 
     assert j["status"] == "completed", j
     metric = j["result"]["measurements"]["speaking_rate_wpm"]
     assert metric["available"] and metric["value"] > 0
-    # Verify both outcomes using narrow/wide target ranges, without another paid or audio operation.
+    # A measurable take completes even outside the recommended range; advice is explicit.
     with app.state.database.session.begin() as db:
         row = db.get(Resource, p["id"])
         value = copy.deepcopy(row.data)
@@ -377,14 +383,8 @@ def test_pace_exercise_uses_verified_transcription(client, worker, speech_file, 
         row.data = value
     payload = {"plan_item_id": item["id"], "recording_id": r.json()["recording"]["id"]}
     attempt = post(client, "/exercise-attempts", payload)
-    assert attempt.json()["status"] == "needs_retry"
-    with app.state.database.session.begin() as db:
-        row = db.get(Resource, p["id"])
-        value = copy.deepcopy(row.data)
-        target = next(i for i in value["lessons"][0]["items"] if i["id"] == item["id"])
-        target["task"]["verification"]["target_wpm"] = {"min": 1, "max": 1000}
-        row.data = value
-    assert post(client, "/exercise-attempts", payload).json()["status"] == "passed"
+    assert attempt.json()["status"] == "passed"
+    assert attempt.json()["feedback"]["coaching"][0]["code"] == "pace_outside_target"
 
 
 def test_invalid_audio_range_uses_json_error(client, speech_file):
@@ -429,13 +429,15 @@ def test_rewards_follow_completed_practice(client, worker, speech_file):
     assert client.get("/api/v1/plan").json()["lessons"][0]["items"][0]["notes_available"] == 2
 
     warmup = lesson["items"][0]
-    short = post(client, "/exercise-attempts", {"plan_item_id": warmup["id"], "elapsed_seconds": 1}).json()
+    short = post(client, "/exercise-attempts", {"plan_item_id": warmup["id"], "self_confirmed": False}).json()
     assert short["reward"] == {"notes": 0, "parts": []} and short["practice_seconds"] == 0
 
     results = {}
     for item in lesson["items"]:
         key = str(uuid4())
-        if item["task"]["verification"]["type"] == "timer":
+        if item["task"]["verification"]["type"] == "self_confirmation":
+            payload = {"plan_item_id": item["id"], "self_confirmed": True}
+        elif item["task"]["verification"]["type"] == "timer":
             payload = {"plan_item_id": item["id"], "elapsed_seconds": 60}
         else:
             r = upload(client, speech_file, {"purpose": "exercise", "plan_item_id": item["id"]})
@@ -477,7 +479,9 @@ def test_conflicts_carry_user_message(client, worker, speech_file):
     complete_assessment(client, worker, speech_file)
     lesson = client.get("/api/v1/today").json()["lesson"]
     for item in lesson["items"]:
-        if item["task"]["verification"]["type"] == "timer":
+        if item["task"]["verification"]["type"] == "self_confirmation":
+            payload = {"plan_item_id": item["id"], "self_confirmed": True}
+        elif item["task"]["verification"]["type"] == "timer":
             payload = {"plan_item_id": item["id"], "elapsed_seconds": 60}
         else:
             r = upload(client, speech_file, {"purpose": "exercise", "plan_item_id": item["id"]})
@@ -545,12 +549,16 @@ def test_interpretation_uses_assessment_goal(client, worker, speech_file):
     )  # clear_speech, the goal at creation
 
 
-def test_demo_seed(settings):
+def test_demo_seed(settings, monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.main import create_app
     from tests.conftest import guest
 
+    # Early New York morning: subtracting random UTC hours must not skip/duplicate local days.
+    clock = datetime(2026, 11, 15, 6, 30, tzinfo=UTC)
+    monkeypatch.setattr("app.demo.utcnow", lambda: clock)
+    monkeypatch.setattr("app.service.utcnow", lambda: clock)
     settings.demo_mode = True
     with TestClient(create_app(settings)) as c:
         guest(c)

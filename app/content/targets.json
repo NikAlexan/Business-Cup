@@ -1,5 +1,5 @@
 {
-  "version": "targets-v1",
+  "version": "targets-v2",
   "goals": {
     "clear_speech": {
       "focus": ["speaking_rate_wpm", "pause_ratio"],
@@ -22,7 +22,7 @@
   },
   "labels": {
     "speaking_rate_wpm": {"below": "Calm, unhurried", "within": "On target", "above": "Brisk"},
-    "pause_ratio": {"below": "Few pauses", "within": "Well-placed pauses", "above": "Long gaps"},
+    "pause_ratio": {"below": "Lower pause share", "within": "Pause share in practice range", "above": "Higher pause share"},
     "intonation_range_semitones": {
       "below": "Narrower than before",
       "within": "Holding your range",

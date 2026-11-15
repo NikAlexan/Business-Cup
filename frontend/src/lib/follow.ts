@@ -86,16 +86,23 @@ export function useSpeechFollow(text: string, active: boolean) {
     let offset = 0 // seconds between the take's start and the first sample sent to the server
     let stop = () => {}
     let cancelled = false
+    const controller = new AbortController()
     setRead(0)
+    setSupported(false)
     heard.current = []
     const id = ++take.current
     void (async () => {
       // Own mic stream: the recorder keeps its stream; browsers share one permission.
-      const stream = await getMic()
+      const stream = await getMic(10_000, controller.signal)
+      stop = () => stream.getTracks().forEach((track) => track.stop())
+      if (cancelled) return stop()
       // Native rate: Firefox can't resample a mic source; the server resamples.
       // ponytail: 48 kHz float32 is ~190 KB/s up; downsample in the worklet if mobile data matters.
       const ctx = new AudioContext()
+      let audioClosed = false
       stop = () => {
+        if (audioClosed) return
+        audioClosed = true
         void ctx.close()
         stream.getTracks().forEach((t) => t.stop())
       }
@@ -104,15 +111,18 @@ export function useSpeechFollow(text: string, active: boolean) {
       ws.binaryType = 'arraybuffer'
       const pending: ArrayBuffer[] = [] // audio captured before the socket opened
       ws.onopen = () => {
+        if (cancelled) { ws.close(); return }
         setSupported(true)
         pending.splice(0).forEach((b) => ws.send(b))
       }
       ws.onmessage = (e) => {
         if (id !== take.current) return
         heard.current = (JSON.parse(e.data).words as HeardWord[]).map(([w, t]) => [w, t + offset])
-        setRead(followWords(script, heard.current.flatMap(([w]) => tokenize(w))))
+        if (!cancelled) setRead(followWords(script, heard.current.flatMap(([w]) => tokenize(w))))
       }
       const closeAudio = stop
+      ws.onclose = () => { closeAudio(); if (!cancelled) setSupported(false) }
+      ws.onerror = () => { closeAudio(); ws.close(); if (!cancelled) setSupported(false) }
       stop = () => {
         closeAudio()
         if (ws.readyState !== WebSocket.OPEN) return ws.close()
@@ -122,16 +132,20 @@ export function useSpeechFollow(text: string, active: boolean) {
         ws.send(new Float32Array(Math.round(ctx.sampleRate * 0.6)).buffer)
       }
       const url = URL.createObjectURL(new Blob([TAP], { type: 'text/javascript' }))
-      await ctx.audioWorklet.addModule(url)
-      URL.revokeObjectURL(url)
+      try {
+        await ctx.audioWorklet.addModule(url)
+      } finally {
+        URL.revokeObjectURL(url)
+      }
       if (cancelled) return
       const tap = new AudioWorkletNode(ctx, 'tap')
       tap.port.onmessage = (e) => (ws.readyState === WebSocket.OPEN ? ws.send(e.data) : pending.push(e.data))
       ctx.createMediaStreamSource(stream).connect(tap)
       offset = (performance.now() - began) / 1000
-    })().catch(() => {}) // mic errors are shown by the recorder
+    })().catch(() => stop()) // optional highlighting must release resources on setup failure
     return () => {
       cancelled = true
+      controller.abort()
       stop()
     }
   }, [active, text])

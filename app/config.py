@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     max_assessments_per_day: int = Field(default=3, ge=1)
     max_total_uploads_per_day: int = Field(default=300, ge=1)
     max_total_assessments_per_day: int = Field(default=20, ge=1)
+    exercise_reviews_enabled: bool = True
+    max_exercise_reviews_per_day: int = Field(default=10, ge=1)
+    max_total_exercise_reviews_per_day: int = Field(default=100, ge=1)
     demo_mode: bool = False
     billing_provider: Literal["none", "stripe_test"] = "none"
     stripe_secret_key: SecretStr = SecretStr("")

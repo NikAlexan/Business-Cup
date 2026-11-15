@@ -158,10 +158,10 @@ export function PaySuccess() {
   const me = useQuery({
     queryKey: ['me'],
     queryFn: () => request<Me>('/me'),
-    refetchInterval: (q) => (q.state.data?.capabilities.daily_training ? false : 2000),
+    refetchInterval: (q) => (q.state.data?.capabilities?.daily_training ? false : 2000),
   })
   const plans = usePlans()
-  const ready = me.data?.capabilities.daily_training
+  const ready = me.data?.capabilities?.daily_training
   const s = me.data?.subscription
   const plan = plans.data?.plans.find((p) => p.interval === s?.plan)
   return (

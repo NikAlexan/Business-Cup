@@ -22,7 +22,8 @@ export type Subscription = {
 }
 export type Me = {
   guest_id: string
-  capabilities: { assessment: boolean; daily_training: boolean }
+  capabilities?: { exercise_coaching?: boolean; assessment?: boolean; daily_training?: boolean }
+  data_provenance?: { prepared_demo_history: boolean }
   subscription: Subscription | null // null when billing is disabled
   preferences: { goal: string; timezone: string; locale: string }
   demo_mode: boolean
@@ -51,6 +52,7 @@ export type PlanItem = {
   id: string
   exercise_id: string
   position: number
+  variant_label?: string
   difficulty?: string
   title: string
   reason: string
@@ -60,6 +62,10 @@ export type PlanItem = {
   notes_available: number
   task: {
     instruction: string
+    repetitions?: number
+    steps?: string[]
+    reflection_prompt?: string
+    timing?: { expected_recording_seconds: { min: number; max: number } | null; includes_listening: boolean }
     text: string
     example: { type: string; text: string; audio_url: string | null }
     verification: {
@@ -100,8 +106,10 @@ export type Today = {
 }
 export type Issue = { code: string; message: string }
 export type Recording = {
+  training_focus?: TrainingFocus | null
+  listening_plan?: ListeningPlan | null
   id: string
-  status: 'queued' | 'processing' | 'completed' | 'failed'
+  status: 'queued' | 'processing' | 'completed' | 'needs_rerecord' | 'failed'
   duration_seconds: number | null
   quality: { status: string; issues: Issue[] } | null
   audio_url: string
@@ -110,6 +118,7 @@ export type Recording = {
   plan_item_id: string | null
 }
 export type AssessmentTask = {
+  pending_take?: PendingTake | null
   id: string
   kind: string
   order: number
@@ -121,12 +130,14 @@ export type AssessmentTask = {
   quality_status: string | null
 }
 export type Comparison = {
+  audio_pairs?: { kind: string; before_audio_url: string; after_audio_url: string }[]
   comparable: boolean
   summary: string
   limitations: string[]
   metrics: Record<string, { available: boolean; before: unknown; after: unknown; delta: number | null; unit: string }>
 }
 export type Assessment = {
+  recording_conditions?: { device_label: string | null; distance_cm: number | null; environment: string; notes?: string | null }
   id: string
   kind: 'initial' | 'reassessment'
   status: string
@@ -134,7 +145,8 @@ export type Assessment = {
   job_id: string | null
   plan_id: string | null
   demo_override_used: boolean
-  analysis_metadata?: { demo?: { prepared_data?: boolean } }
+  analysis_metadata?: { measurement_version?: string; prompt_version?: string; demo?: { prepared_data?: boolean } }
+  measurement_scope?: { pace_and_pauses_task_ids: string[]; pitch_task_ids: string[]; intonation_task_ids: string[] }
   completed_at: string | null
   report: {
     summary: string
@@ -155,6 +167,7 @@ export type MetricInterpretation = {
   focus: boolean
 }
 export type Job = {
+  assessment_id?: string | null
   id: string
   type: string
   status: 'queued' | 'processing' | 'completed' | 'needs_rerecord' | 'failed'
@@ -166,12 +179,27 @@ export type Job = {
 }
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
+  exercise_id?: string
+  listening_plan?: ListeningPlan | null
+  training_focus?: TrainingFocus | null
+  focus_check?: { outcome: FocusOutcome; source: 'user_listening'; updated_at: string }
+  speech_review?: {
+    status: 'queued' | 'processing' | 'completed' | 'unavailable' | 'failed'
+    job_id: string | null
+    reason?: string | null
+    report: { summary: string; observation: { text: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; model_next_step?: string; model_listening_question?: string; action_intent?: PracticeIntent | null; action_source?: 'audio_model' | 'user_listening_decision'; intent_policy_version?: string; observation_status?: 'hypothesis' | 'unavailable'; limitations: string[] } | null
+  }
+  reflection?: { note: string; updated_at: string; revision?: number; intent?: PracticeIntent }
+  practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null
+  practice_only?: boolean
+  created_at?: string
+  recording_id?: string | null
   id: string
   plan_item_id: string
   status: 'passed' | 'needs_retry'
   reward: Reward
   practice_seconds: number
-  feedback: { summary: string; issues: Issue[] }
+  feedback: { planned_pause?: PlannedPauseFeedback; version?: string; scope?: string; insights?: { code: string; source: string; message: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } | null }[]; next_step?: string | null; summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
 }
 export type Completion = {
   lesson_id: string
@@ -206,4 +234,46 @@ export type Exercise = {
   instruction: string
   duration_seconds: number
   tags: string[]
+}
+
+export type PendingTake = { listening_plan?: ListeningPlan | null; training_focus?: TrainingFocus | null; based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
+export type PlanItemState = { listening_example?: ListeningExampleData | null; listening_boundaries?: ListeningBoundary[]; listening_plan?: ListeningPlan | null; training_focus?: TrainingFocus | null; plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }
+
+export type PracticeIntent = 'experiment' | 'keep' | 'undecided'
+export type FocusOutcome = 'heard' | 'partly' | 'not_yet' | 'unsure'
+export type TrainingFocus = {
+  intent?: Exclude<PracticeIntent, 'undecided'>
+  id: string; note: string; skill: string; skill_label: string; listening_question: string
+  steps: string[]; rubric_version: string; created_at: string
+  source_attempt_id: string; source_plan_item_id: string; source_recording_id: string
+}
+export type PracticeFocusState = {
+  focus: TrainingFocus | null
+  skills: Record<string, { label: string; question: string; exercise_ids: string[] }>
+  last_check: { outcome: FocusOutcome; source: 'user_listening'; attempt_id: string; updated_at: string } | null
+}
+
+
+export type ListeningExampleData = {
+  id: string; version: string; title: string; source: 'synthetic'; text: string; question: string
+  explanation: string; transfer_prompt: string; provenance_note: string; notice_url: string
+  choices: { id: 'a' | 'b'; label: string; audio_url: string; paused_text: string }[]
+}
+export type ListeningBoundary = { index: number; before: string; after: string; word_index: number }
+export type ListeningPlan = {
+  id: string; plan_item_id: string; created_at: string; example: ListeningExampleData
+  answer: 'a' | 'b' | 'unsure'; boundary_index: number; boundary_word_index: number; before: string; after: string
+}
+export type PlannedPauseFeedback = {
+  available: boolean; gap_seconds: number | null; unavailable_reason?: string | null
+  evidence: { quote: string; start_seconds: number; end_seconds: number } | null
+}
+
+
+export type TakeListeningChoice = 'a' | 'b' | 'no_clear_difference' | 'unsure'
+export type TakeListeningComparison = {
+  id: string; schema_version: 'take-listening-v1'; purpose: 'self_listening'; created_at: string
+  status: 'awaiting_choice' | 'revealed'; question: string; text: string; focus_note: string; focus_changed: boolean
+  clips: { label: 'a' | 'b'; audio_url: string; role?: 'previous' | 'current'; attempt_id?: string }[]
+  result: { choice: TakeListeningChoice; note: string; source: 'user_listening'; saved_at: string } | null
 }

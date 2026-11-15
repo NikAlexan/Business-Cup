@@ -1,17 +1,23 @@
 import copy
 import hashlib
 import json
+import secrets
 import shutil
 from datetime import date, datetime, timedelta
+from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 
 from app.billing import has_access, view
+from app.coaching import listening_intent_policy, next_action_intent
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
-from app.errors import fail
+from app.errors import ApiError, fail
+from app.focus import KEEP_STEPS, RUBRIC_VERSION, RUBRICS, STORY_STEPS, suggested_skill
+from app.listening import CATALOG as LISTENING_CATALOG
+from app.listening import boundaries, example_for, listening_words
 
 COOKIE = "guest_session"
 ACTIVE = {"draft", "queued", "processing", "needs_rerecord"}
@@ -176,8 +182,10 @@ class Service:
         )
         practiced = {}
         for a in self.all("attempt"):
-            if a["status"] == "passed":
-                practiced[a["plan_item_id"]] = practiced.get(a["plan_item_id"], 0) + a.get("practice_seconds", 0)
+            if a["status"] == "passed" and a.get("verification_type") != "self_confirmation":
+                practiced[a["plan_item_id"]] = practiced.get(a["plan_item_id"], 0) + a.get(
+                    "practice_seconds", 0
+                )
         for lesson in p["lessons"]:
             annotate_notes(lesson)
             lesson["practice_seconds"] = sum(practiced.get(i["id"], 0) for i in lesson["items"])
@@ -207,8 +215,12 @@ class Service:
         ]
         return {
             "notes_total": sum(a.get("reward", {}).get("notes", 0) for a in passed),
-            "practice_seconds_total": sum(a.get("practice_seconds", 0) for a in passed),
-            "rules_version": 1,
+            "practice_seconds_total": sum(
+                a.get("practice_seconds", 0)
+                for a in passed
+                if a.get("verification_type") != "self_confirmation"
+            ),
+            "rules_version": 2,
         }
 
     def me(self):
@@ -222,12 +234,23 @@ class Service:
             "onboarding_status": "assessment_in_progress"
             if active
             else ("ready" if previous else "needs_assessment"),
+            "data_provenance": {
+                "prepared_demo_history": any(
+                    a.get("analysis_metadata", {}).get("demo", {}).get("prepared_data", False)
+                    for a in self.assessments()
+                )
+            },
             "active_assessment_id": active["id"] if active else None,
             "latest_assessment_id": previous["id"] if previous else None,
             "current_plan_id": p["id"] if p else None,
             "reassessment": self.reassessment(),
             "capabilities": {
-                c: has_access(self.settings, self.guest, c) for c in ("assessment", "daily_training")
+                "exercise_coaching": bool(
+                    has_access(self.settings, self.guest, "daily_training")
+                    and self.settings.exercise_reviews_enabled
+                    and self.settings.openai_api_key.get_secret_value()
+                ),
+                **{c: has_access(self.settings, self.guest, c) for c in ("assessment", "daily_training")},
             },
             "subscription": view(self.settings, self.guest),
             "progress": {
@@ -307,7 +330,7 @@ class Service:
         }
         return 201, self.put("assessment", a)
 
-    def queue(self, kind, assessment_id=None, recording_id=None):
+    def queue(self, kind, assessment_id=None, recording_id=None, attempt_id=None):
         data = {
             "id": new_id(),
             "type": kind,
@@ -325,6 +348,8 @@ class Service:
             "retryable": False,
             "retry_batches": 0,
         }
+        if attempt_id:
+            data["attempt_id"] = attempt_id
         self.db.add(Job(id=data["id"], guest_id=self.guest.id, status="queued", data=data))
         self.db.flush()
         return data
@@ -439,19 +464,71 @@ class Service:
             rec["status"] = "queued"
             self.put("recording", rec)
         j.status, j.data, j.lease_until, j.lease_token = "queued", d, None, None
+        if d["type"] == "exercise_review":
+            a = self.get(d["attempt_id"], "attempt")
+            a["speech_review"].update(status="queued", error=None)
+            self.put("attempt", a)
         if d["assessment_id"] and d["type"] == "assessment_analysis":
             a = self.get(d["assessment_id"], "assessment")
             a["status"] = "queued"
             self.put("assessment", a)
         return 202, {"job_id": j.id, "status": "queued", "poll_after_ms": 2000}
 
-    def find_item(self, item_id, writable=False):
+    def start_speech_review(self, attempt):
+        """Coaching availability never changes audio acceptance or completion credit."""
+        unavailable = {"status": "unavailable", "job_id": None, "report": None}
+        if not self.settings.exercise_reviews_enabled or not self.settings.openai_api_key.get_secret_value():
+            return {**unavailable, "reason": "not_configured"}
+        if (
+            sum(
+                j.data["type"] == "exercise_review"
+                and self.local_date(j.data["created_at"]) == self.local_date()
+                for j in self.db.scalars(select(Job).where(Job.guest_id == self.guest.id))
+            )
+            >= self.settings.max_exercise_reviews_per_day
+        ):
+            return {**unavailable, "reason": "daily_limit"}
+        try:
+            self.consume_budget("exercise_reviews", self.settings.max_total_exercise_reviews_per_day)
+        except ApiError as exc:
+            if exc.status != 429:
+                raise
+            return {**unavailable, "reason": "service_daily_limit"}
+        job = self.queue("exercise_review", attempt_id=attempt["id"])
+        return {
+            "version": "exercise-review-v1",
+            "status": "queued",
+            "job_id": job["id"],
+            "report": None,
+            "goal": self.guest.data["preferences"]["goal"],
+            "requested_at": iso(),
+        }
+
+    def request_speech_review(self, attempt_id):
+        self.auth("daily_training")
+        attempt = self.get(attempt_id, "attempt")
+        if attempt["status"] != "passed" or not attempt.get("recording_id"):
+            fail(422, "review_not_available", "Speech coaching needs a saved, accepted recording.")
+        previous = attempt.get("speech_review")
+        if not previous or previous["status"] == "unavailable":
+            attempt["speech_review"] = self.start_speech_review(attempt)
+            self.put("attempt", attempt)
+        return 200, attempt
+
+    def find_item(self, item_id, writable=False, practice_only=False):
         for p in self.all("plan"):
             self.unlock(p)
             for lesson in p["lessons"]:
                 for item in lesson["items"]:
                     if item["id"] == str(item_id):
-                        if writable:
+                        if practice_only:
+                            if item["status"] != "completed":
+                                fail(
+                                    409,
+                                    "exercise_not_completed",
+                                    "Complete this exercise before extra practice.",
+                                )
+                        elif writable:
                             if p["status"] != "active":
                                 fail(409, "plan_inactive", "This plan is no longer active.")
                             if item["status"] == "completed":
@@ -466,11 +543,412 @@ class Service:
                         return p, lesson, item
         fail(404, "not_found", "Plan item not found.")
 
-    def upload(self, upload, fields, mime_type):
+    def recording_check_state(self, record):
+        job_id = record.get("check_job_id")
+        if not job_id:  # Legacy uploads did not persist the job pointer.
+            job_id = next(
+                (
+                    j.id
+                    for j in self.db.scalars(select(Job).where(Job.guest_id == self.guest.id))
+                    if j.data.get("recording_id") == record["id"] and j.data["type"] == "recording_check"
+                ),
+                None,
+            )
+        return (
+            {
+                "recording_id": record["id"],
+                "job_id": job_id,
+                "practice_only": bool(record.get("practice_only")),
+                "based_on_attempt_id": (record.get("practice_focus") or {}).get("attempt_id"),
+                "practice_focus": record.get("practice_focus"),
+                "training_focus": record.get("training_focus"),
+                "listening_plan": record.get("listening_plan"),
+                "status": record["status"],
+            }
+            if job_id
+            else None
+        )
+
+    def assessment_state(self, assessment_id):
+        assessment = self.get(assessment_id, "assessment")
+        records = {r["id"]: r for r in self.all("recording") if r.get("assessment_id") == assessment["id"]}
+        for task in assessment["tasks"]:
+            task["pending_take"] = None
+            record = records.get(task.get("pending_recording_id") or task.get("last_upload_id"))
+            if record and record["status"] in ("queued", "processing", "failed"):
+                if record["status"] != "failed" or task.get("quality_status") != "accepted":
+                    task["pending_take"] = self.recording_check_state(record)
+        return assessment
+
+    def item_state(self, item_id):
+        plan, lesson, item = self.find_item(item_id)
+        attempted = {a.get("recording_id") for a in self.all("attempt") if a["plan_item_id"] == item["id"]}
+        canceled = {c["result"].get("recording_id") for c in self.all("upload_cancellation")}
+        records = [
+            r
+            for r in self.all("recording")
+            if r["purpose"] == "exercise"
+            and r["plan_item_id"] == item["id"]
+            and r["id"] not in attempted
+            and r["id"] not in canceled
+            and not r.get("dismissed_at")
+            and bool(r.get("practice_only")) == (item["status"] == "completed")
+        ]
+        pending = None
+        if records:
+            record = max(records, key=lambda r: (r["created_at"], r["id"]))
+            pending = self.recording_check_state(record)
+        return {
+            "plan_id": plan["id"],
+            "plan_status": plan["status"],
+            "lesson": lesson,
+            "item": item,
+            "item_index": next(n for n, value in enumerate(lesson["items"]) if value["id"] == item["id"]),
+            "pending_take": pending,
+            "training_focus": self.active_practice_focus() if item["exercise_id"] == "E12" else None,
+            "listening_example": example_for(item["exercise_id"]),
+            "listening_boundaries": boundaries(item["task"]) if item["exercise_id"] == "E08" else [],
+            "listening_plan": max(
+                (p for p in self.all("listening_plan") if p["plan_item_id"] == item["id"]),
+                key=lambda p: (p["created_at"], p["id"]),
+                default=None,
+            ),
+        }
+
+    def dismiss_recording(self, recording_id):
+        record = self.get(recording_id, "recording")
+        if record["purpose"] != "exercise":
+            fail(422, "validation_error", "Only an unfinished exercise take can be dismissed.")
+        if any(a.get("recording_id") == record["id"] for a in self.all("attempt")):
+            fail(409, "recording_already_used", "This take is already part of your history.")
+        if not record.get("dismissed_at"):
+            record["dismissed_at"] = iso()
+            self.put("recording", record)
+        return {"recording_id": record["id"], "dismissed_at": record["dismissed_at"]}
+
+    def practice_source(self, source_id, item_id, practice_only):
+        if not source_id:
+            return None
+        if not practice_only:
+            fail(422, "validation_error", "A previous-take focus applies only to extra practice.")
+        source = self.get(source_id, "attempt")
+        if source["plan_item_id"] != item_id:
+            fail(404, "not_found", "The source take does not belong to this exercise.")
+        reflection = source.get("reflection") or {}
+        return {
+            "attempt_id": source["id"],
+            "note": reflection.get("note", ""),
+            **({"intent": reflection["intent"]} if reflection.get("intent") else {}),
+        }
+
+    def save_listening_plan(self, item_id, payload):
+        self.auth("daily_training")
+        _, _, item = self.find_item(item_id)
+        example = LISTENING_CATALOG["examples"].get(payload["example_id"])
+        options = boundaries(item["task"]) if item["exercise_id"] == "E08" else []
+        if not example or example["exercise_id"] != item["exercise_id"] or not options:
+            fail(422, "listening_example_unavailable", "This example does not apply to the saved exercise.")
+        if payload["boundary_index"] >= len(options):
+            fail(422, "invalid_listening_boundary", "Choose a marked boundary in your assigned text.")
+        if (
+            sum(self.local_date(p["created_at"]) == self.local_date() for p in self.all("listening_plan"))
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily listening-plan limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        boundary = options[payload["boundary_index"]]
+        plan = {
+            "id": new_id(),
+            "plan_item_id": item["id"],
+            "created_at": iso(),
+            "example": copy.deepcopy(example),
+            "answer": payload["answer"],
+            "source": "user_listening",
+            "boundary_index": boundary["index"],
+            "boundary_word_index": boundary["word_index"],
+            "before": boundary["before"],
+            "after": boundary["after"],
+            "expected_words": listening_words(item["task"]["text"]),
+        }
+        return 201, self.put("listening_plan", plan)
+
+    def comparison_view(self, comparison):
+        result = comparison.get("result")
+        return {
+            "id": comparison["id"],
+            "schema_version": comparison["schema_version"],
+            "created_at": comparison["created_at"],
+            "purpose": "self_listening",
+            "status": "revealed" if result else "awaiting_choice",
+            "question": comparison["question"],
+            "text": comparison["text"],
+            "focus_note": comparison["focus_note"],
+            "focus_changed": comparison["focus_changed"],
+            "clips": [
+                {
+                    "label": label,
+                    "audio_url": f"/api/v1/listening-comparisons/{comparison['id']}/audio/{label}",
+                    **({"role": slot["role"], "attempt_id": slot["attempt_id"]} if result else {}),
+                }
+                for label, slot in comparison["slots"].items()
+            ],
+            "result": result,
+        }
+
+    def create_take_comparison(self, attempt_id):
+        self.auth()
+        current = self.get(attempt_id, "attempt")
+        source_id = (current.get("practice_focus") or {}).get("attempt_id")
+        if current["status"] != "passed" or not current.get("recording_id") or not source_id:
+            fail(422, "comparison_not_available", "Choose a saved extra take with a previous recording.")
+        previous = self.get(source_id, "attempt")
+        if (
+            previous["id"] == current["id"]
+            or previous["plan_item_id"] != current["plan_item_id"]
+            or previous["status"] != "passed"
+            or not previous.get("recording_id")
+            or previous["recording_id"] == current["recording_id"]
+        ):
+            fail(
+                422,
+                "comparison_not_available",
+                "This pair needs two accepted recordings of the same exercise.",
+            )
+        comparison_id = str(uuid5(UUID(self.guest.id), f"take-listening-v1:{source_id}:{current['id']}"))
+        if self.db.get(Resource, comparison_id):
+            return 200, self.comparison_view(self.get(comparison_id, "take_comparison"))
+        self.auth("daily_training")
+        if (
+            sum(self.local_date(c["created_at"]) == self.local_date() for c in self.all("take_comparison"))
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily listening-comparison limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        for take in (previous, current):
+            record = self.get(take["recording_id"], "recording")
+            if record["status"] != "completed" or record.get("dismissed_at"):
+                fail(
+                    422, "comparison_not_available", "Both saved recordings must be available for listening."
+                )
+        _, _, item = self.find_item(current["plan_item_id"])
+        focus = current.get("training_focus") or current["practice_focus"]
+        ordered = [("previous", previous), ("current", current)]
+        if secrets.randbelow(2):
+            ordered.reverse()
+        comparison = {
+            "id": comparison_id,
+            "schema_version": "take-listening-v1",
+            "created_at": iso(),
+            "question": (current.get("training_focus") or {}).get("listening_question")
+            or item["task"].get("reflection_prompt")
+            or "Which delivery supports the meaning?",
+            "text": item["task"].get("text", ""),
+            "focus_note": focus.get("note", ""),
+            "focus_changed": (previous.get("training_focus") or {}).get("id")
+            != (current.get("training_focus") or {}).get("id"),
+            "slots": {
+                label: {"attempt_id": take["id"], "recording_id": take["recording_id"], "role": role}
+                for label, (role, take) in zip(("a", "b"), ordered, strict=True)
+            },
+            "result": None,
+        }
+        self.put("take_comparison", comparison)
+        return 201, self.comparison_view(comparison)
+
+    def comparison_recording(self, comparison_id, label):
+        comparison = self.get(comparison_id, "take_comparison")
+        return comparison["slots"][label]["recording_id"]
+
+    def save_comparison_result(self, comparison_id, payload):
+        comparison = self.get(comparison_id, "take_comparison")
+        answer = {"choice": payload["choice"], "note": payload["note"].strip()}
+        previous = comparison.get("result")
+        if previous:
+            if any(previous[key] != value for key, value in answer.items()):
+                fail(
+                    409,
+                    "comparison_already_answered",
+                    "The first listening answer is saved. Add further thoughts to your take's reflection.",
+                )
+        else:
+            comparison["result"] = {**answer, "source": "user_listening", "saved_at": iso()}
+            self.put("take_comparison", comparison)
+        return self.comparison_view(comparison)
+
+    def save_reflection(self, attempt, payload):
+        previous = attempt.get("reflection") or {}
+        reflection = {**previous, "note": payload["note"].strip()}
+        if payload.get("intent") is not None:
+            reflection["intent"] = payload["intent"]
+        changed = reflection != previous
+        revision = previous.get("revision") or 0
+        expected = payload.get("expected_revision")
+        if expected is not None and expected != revision and changed:
+            fail(
+                409,
+                "reflection_changed",
+                "The saved reflection changed. Your draft has not overwritten it.",
+                {"current_attempt": attempt},
+            )
+        if changed:
+            attempt["reflection"] = {**reflection, "updated_at": iso(), "revision": revision + 1}
+        review = attempt.get("speech_review")
+        if review and review.get("report"):
+            report = listening_intent_policy(review["report"], next_action_intent(attempt))
+            if report != review["report"]:
+                review["report"] = report
+                changed = True
+        if changed:
+            self.put("attempt", attempt)
+        return attempt
+
+    def active_practice_focus(self):
+        self.auth()
+        focus_id = self.guest.data.get("practice_focus_id")
+        return self.get(focus_id, "practice_focus") if focus_id else None
+
+    def practice_focus_view(self):
+        focus = self.active_practice_focus()
+        checks = (
+            [
+                a
+                for a in self.all("attempt")
+                if (a.get("training_focus") or {}).get("id") == focus["id"] and a.get("focus_check")
+            ]
+            if focus
+            else []
+        )
+        latest = max(checks, key=lambda a: a["focus_check"]["updated_at"]) if checks else None
+        return {
+            "focus": focus,
+            "skills": RUBRICS,
+            "last_check": {"attempt_id": latest["id"], **latest["focus_check"]} if latest else None,
+        }
+
+    def save_practice_focus(self, payload):
+        self.auth("daily_training")
+        source = self.get(payload["source_attempt_id"], "attempt")
+        if source["status"] != "passed" or not source.get("recording_id"):
+            fail(
+                422, "focus_source_not_available", "Choose a saved, accepted recording for your story focus."
+            )
+        note = payload["note"].strip()
+        if not note:
+            fail(422, "validation_error", "Describe one experiment or a feature to keep in the story.")
+        if (
+            sum(self.local_date(f["created_at"]) == self.local_date() for f in self.all("practice_focus"))
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429, "rate_limit_exceeded", "Daily focus-change limit reached.", {"retry_after_seconds": 3600}
+            )
+        intent = payload.get("intent") or source.get("reflection", {}).get("intent") or "experiment"
+        if intent == "undecided":
+            fail(
+                422,
+                "focus_intent_required",
+                "Choose an experiment or a feature to keep before saving a story focus.",
+            )
+        skill = payload.get("skill") or suggested_skill(source["exercise_id"])
+        focus = {
+            "id": new_id(),
+            "created_at": iso(),
+            "note": note,
+            "skill": skill,
+            "skill_label": RUBRICS[skill]["label"],
+            "listening_question": RUBRICS[skill]["question"],
+            "steps": list(KEEP_STEPS if intent == "keep" else STORY_STEPS),
+            "intent": intent,
+            "rubric_version": RUBRIC_VERSION,
+            "source_attempt_id": source["id"],
+            "source_plan_item_id": source["plan_item_id"],
+            "source_recording_id": source["recording_id"],
+        }
+        self.save_reflection(
+            source,
+            {
+                "note": note,
+                "intent": intent,
+                **(
+                    {"expected_revision": payload["expected_reflection_revision"]}
+                    if payload.get("expected_reflection_revision") is not None
+                    else {}
+                ),
+            },
+        )
+        self.put("practice_focus", focus)
+        self.guest.data = {**self.guest.data, "practice_focus_id": focus["id"]}
+        return 201, {"focus": focus, "source_attempt": source}
+
+    def clear_practice_focus(self, focus_id):
+        self.get(focus_id, "practice_focus")
+        if self.guest.data.get("practice_focus_id") == str(focus_id):
+            self.guest.data = {**self.guest.data, "practice_focus_id": None}
+
+    def save_focus_check(self, attempt_id, outcome):
+        attempt = self.get(attempt_id, "attempt")
+        if attempt["status"] != "passed" or not attempt.get("training_focus"):
+            fail(422, "focus_check_not_available", "This take does not have a saved story focus.")
+        if attempt.get("focus_check", {}).get("outcome") != outcome:
+            attempt["focus_check"] = {"outcome": outcome, "source": "user_listening", "updated_at": iso()}
+            self.put("attempt", attempt)
+        return attempt
+
+    def cancel_upload(self, upload_key, item_id):
+        self.auth("daily_training")
+        self.find_item(item_id, practice_only=True)
+        cancel_id = str(uuid5(UUID(self.guest.id), "cancel-upload:" + upload_key))
+        existing = self.db.get(Resource, cancel_id)
+        if existing:
+            if existing.data["plan_item_id"] != str(item_id):
+                fail(409, "upload_cancellation_conflict", "This upload key belongs to another exercise.")
+            return existing.data["result"]
+        prior = self.db.get(Idempotency, digest(self.guest.id + "POST/api/v1/recordings" + upload_key))
+        recording_id = None
+        if prior:
+            recording_id = prior.data.get("recording", {}).get("id")
+            record = self.get(recording_id, "recording")
+            if record.get("plan_item_id") != str(item_id) or not record.get("practice_only"):
+                fail(404, "not_found", "Extra-practice upload not found for this exercise.")
+            self.dismiss_recording(recording_id)
+        elif (
+            sum(
+                self.local_date(c["created_at"]) == self.local_date() for c in self.all("upload_cancellation")
+            )
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily upload cancellation limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        result = {"upload_key": upload_key, "status": "canceled", "recording_id": recording_id}
+        self.put(
+            "upload_cancellation",
+            {"id": cancel_id, "plan_item_id": str(item_id), "created_at": iso(), "result": result},
+        )
+        return result
+
+    def upload(self, upload, fields, mime_type, upload_key=None):
         self.auth("daily_training" if fields["purpose"] == "exercise" else "assessment")
+        if upload_key and self.db.get(
+            Resource, str(uuid5(UUID(self.guest.id), "cancel-upload:" + upload_key))
+        ):
+            fail(409, "upload_canceled", "This upload was canceled. Record a new take to practice again.")
         purpose = fields["purpose"]
         a = task = item = None
         if purpose == "assessment":
+            if fields.get("practice_only") or fields.get("based_on_attempt_id"):
+                fail(422, "validation_error", "Extra practice applies only to completed exercises.")
             if not fields["assessment_id"] or not fields["task_id"] or fields["plan_item_id"]:
                 fail(422, "validation_error", "Assessment upload requires only assessment_id and task_id.")
             a = self.get(fields["assessment_id"], "assessment")
@@ -484,9 +962,26 @@ class Service:
         else:
             if not fields["plan_item_id"] or fields["assessment_id"] or fields["task_id"]:
                 fail(422, "validation_error", "Exercise upload requires only plan_item_id.")
-            _, _, item = self.find_item(fields["plan_item_id"], writable=True)
+            _, _, item = self.find_item(
+                fields["plan_item_id"], writable=True, practice_only=fields.get("practice_only", False)
+            )
             if item["task"]["verification"]["type"] != "recording":
                 fail(422, "validation_error", "This exercise does not accept recordings.")
+        practice_focus = self.practice_source(
+            fields.get("based_on_attempt_id"),
+            item["id"] if item else None,
+            fields.get("practice_only", False),
+        )
+        training_focus = None
+        if fields.get("training_focus_id"):
+            if not item or item["exercise_id"] != "E12":
+                fail(422, "validation_error", "A saved story focus applies only to a narration task.")
+            training_focus = self.get(fields["training_focus_id"], "practice_focus")
+        listening_plan = None
+        if fields.get("listening_plan_id"):
+            listening_plan = self.get(fields["listening_plan_id"], "listening_plan")
+            if not item or item["exercise_id"] != "E08" or listening_plan["plan_item_id"] != item["id"]:
+                fail(404, "not_found", "Listening plan not found for this exercise.")
         used = sum(self.local_date(r["created_at"]) == self.local_date() for r in self.all("recording"))
         if used >= self.settings.max_uploads_per_day:
             fail(429, "rate_limit_exceeded", "Daily recording limit reached.", {"retry_after_seconds": 3600})
@@ -504,6 +999,9 @@ class Service:
             data = {
                 "id": rid,
                 **fields,
+                "practice_focus": practice_focus,
+                "training_focus": training_focus,
+                "listening_plan": listening_plan,
                 "status": "queued",
                 "mime_type": mime_type,
                 "bytes": path.stat().st_size,
@@ -518,6 +1016,8 @@ class Service:
                 task["last_upload_id"] = rid
                 self.put("assessment", a)
             j = self.queue("recording_check", assessment_id=fields["assessment_id"], recording_id=rid)
+            data["check_job_id"] = j["id"]
+            self.put("recording", data)
             return 202, {"recording": data, "job_id": j["id"], "poll_after_ms": 2000}
         except BaseException:
             path.unlink(missing_ok=True)
@@ -525,7 +1025,24 @@ class Service:
 
     def attempt(self, payload):
         self.auth("daily_training")
-        p, lesson, item = self.find_item(payload["plan_item_id"], writable=True)
+        practice_only = payload.get("practice_only", False)
+        p, lesson, item = self.find_item(payload["plan_item_id"], writable=True, practice_only=practice_only)
+        if (
+            practice_only
+            and sum(
+                self.local_date(a["created_at"]) == self.local_date()
+                for a in self.all("attempt")
+                if a.get("practice_only")
+            )
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429,
+                "rate_limit_exceeded",
+                "Daily extra-practice limit reached.",
+                {"retry_after_seconds": 3600},
+            )
+        practice_focus = self.practice_source(payload.get("based_on_attempt_id"), item["id"], practice_only)
         v = item["task"]["verification"]
         kind = v["type"]
         fields = {
@@ -538,75 +1055,126 @@ class Service:
         }[kind]
         if fields != {required}:
             fail(422, "validation_error", "Fields do not match the assigned verification type.")
-        issues, metrics = [], None
-        if kind == "timer" and payload["elapsed_seconds"] < v["min_elapsed_seconds"]:
-            issues = [{"code": "timer_too_short", "message": "Continue practicing for the minimum duration."}]
-        elif kind == "self_confirmation" and payload["self_confirmed"] is not True:
+        issues, metrics, coaching = [], None, []
+        speech_feedback = {
+            "scope": {
+                "self_confirmation": "self_confirmed",
+                "timer": "reported_time",
+                "recording": "audio_quality_only",
+            }[kind],
+            "insights": [],
+            "next_step": None,
+        }
+        if kind == "self_confirmation" and payload["self_confirmed"] is not True:
             issues = [{"code": "not_confirmed", "message": "Confirm completion after practicing."}]
         elif kind == "recording":
             rec = self.get(payload["recording_id"], "recording")
-            if rec["purpose"] != "exercise" or rec["plan_item_id"] != item["id"]:
+            canceled = any(
+                c["result"].get("recording_id") == rec["id"] for c in self.all("upload_cancellation")
+            )
+            if (
+                rec["purpose"] != "exercise"
+                or rec["plan_item_id"] != item["id"]
+                or rec.get("dismissed_at")
+                or canceled
+            ):
                 fail(404, "not_found", "Recording not found for this plan item.")
+            if bool(rec.get("practice_only")) != practice_only:
+                fail(422, "practice_mode_mismatch", "Use a recording made for this practice mode.")
+            if any(
+                a.get("recording_id") == rec["id"] and a["status"] == "passed" for a in self.all("attempt")
+            ):
+                fail(
+                    409,
+                    "recording_already_used",
+                    "This take is already saved. Record a new take for extra practice.",
+                )
             if rec["status"] in ("queued", "processing"):
                 fail(409, "recording_not_ready", "Wait for the recording check to finish.")
             if rec["status"] == "failed":
                 fail(409, "recording_not_ready", "Retry the failed recording check first.")
+            if rec.get("practice_focus"):
+                if practice_focus and practice_focus["attempt_id"] != rec["practice_focus"]["attempt_id"]:
+                    fail(422, "practice_focus_mismatch", "This take was made with a different saved focus.")
+                practice_focus = rec["practice_focus"]
             issues = rec["quality"]["issues"]
             metrics = rec.get("measurements")
+            speech_feedback = rec.get("speech_feedback") or speech_feedback
             target = v.get("target_wpm")
-            if target and not issues:
+            if (target or v.get("required_metrics")) and not issues:
                 rate = (metrics or {}).get("speaking_rate_wpm", {})
                 if not rate.get("available"):
-                    issues = [
+                    coaching = [
                         {
                             "code": "measurement_unavailable",
-                            "message": "Read the assigned passage again so the pace can be measured.",
+                            "message": "Timing could not be measured reliably. Your take is saved; use the listening prompt to reflect on it.",
                         }
                     ]
-                elif not target["min"] <= rate["value"] <= target["max"]:
-                    issues = [
+                elif target and not target["min"] <= rate["value"] <= target["max"]:
+                    coaching = [
                         {
                             "code": "pace_outside_target",
-                            "message": "Try reading within the target pace range.",
+                            "message": "For future practice, explore the suggested pace band without sacrificing clarity. This take counts.",
                         }
                     ]
         passed = not issues
         a = {
             "id": new_id(),
             "plan_item_id": item["id"],
+            "practice_only": practice_only,
+            "practice_focus": practice_focus,
+            "training_focus": rec.get("training_focus") if kind == "recording" else None,
+            "listening_plan": rec.get("listening_plan") if kind == "recording" else None,
             "reward": {"notes": 0, "parts": []},
             "practice_seconds": 0,
+            "practice_seconds_source": {
+                "recording": "audio_duration",
+                "timer": "self_reported",
+                "self_confirmation": "unknown",
+            }[kind],
             "exercise_id": item["exercise_id"],
             "status": "passed" if passed else "needs_retry",
             "verification_type": kind,
             "elapsed_seconds": payload.get("elapsed_seconds"),
             "recording_id": payload.get("recording_id"),
             "feedback": {
-                "summary": "Practice completed." if passed else "Please try this exercise again.",
+                "summary": (
+                    "Recording received. Audio quality checked; pronunciation and expression have not been scored."
+                    if passed and kind == "recording"
+                    else "Practice completed."
+                    if passed
+                    else "Please try this exercise again."
+                ),
+                **speech_feedback,
+                "coaching": coaching,
                 "metrics": metrics,
                 "issues": issues,
             },
             "created_at": iso(),
             "completed_at": iso() if passed else None,
-            "plan_item_status": "completed" if passed else "pending",
+            "plan_item_status": "completed" if practice_only or passed else "pending",
         }
-        if passed:
+        if passed and not practice_only:
             parts = [{"notes": 2 if item["exercise_id"] == "E01" else 3, "reason": "exercise_completed"}]
             if kind == "recording":
                 parts.append({"notes": 1, "reason": "quality_bonus"})
             a["reward"] = {"notes": sum(x["notes"] for x in parts), "parts": parts}
+        if passed:
             a["practice_seconds"] = {
                 "timer": lambda: payload["elapsed_seconds"],
                 "recording": lambda: round(rec["duration_seconds"]),
-                "self_confirmation": lambda: item["estimated_duration_seconds"],
+                "self_confirmation": lambda: 0,
             }[kind]()
         if kind == "self_confirmation":
             a["self_confirmed"] = payload["self_confirmed"]
-        item["latest_attempt_id"] = a["id"]
-        if passed:
-            item.update(status="completed", completed_at=a["completed_at"])
-        lesson["status"] = "in_progress"
-        self.put("plan", p)
+        if passed and kind == "recording":
+            a["speech_review"] = self.start_speech_review(a)
+        if not practice_only:
+            item["latest_attempt_id"] = a["id"]
+            if passed:
+                item.update(status="completed", completed_at=a["completed_at"])
+            lesson["status"] = "in_progress"
+            self.put("plan", p)
         return 201, self.put("attempt", a)
 
     def today(self):

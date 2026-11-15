@@ -15,6 +15,62 @@ REPORT = {
     "recommended_exercise_ids": ["E03"],
 }
 
+DAILY_REPORT = {
+    "summary": "Listen to the phrase ending.",
+    "observation": {
+        "text": "Check whether the final word is distinct.",
+        "evidence_quote": "clear voice",
+        "occurrence": 1,
+    },
+    "next_step": "Let the final word land comfortably.",
+    "listening_question": "Can you hear the final sound?",
+    "limitations": ["This is an observation about one take."],
+}
+
+
+def test_daily_review_sends_actual_audio_and_validates_the_small_coaching_contract():
+    def handler(request):
+        body = json.loads(request.content)
+        assert body["store"] is False and body["modalities"] == ["text"]
+        assert body["messages"][0]["role"] == "system"
+        content = body["messages"][1]["content"]
+        assert content[1]["input_audio"]["format"] == "wav"
+        assert len(content[1]["input_audio"]["data"]) > 1000
+        assert '"saved_focus": "Keep endings audible"' in content[0]["text"]
+        assert "untrusted" in body["messages"][0]["content"]
+        assert "Do not invent measurements" in body["messages"][0]["content"]
+        assert "retain that useful feature" in body["messages"][0]["content"]
+        assert "undecided means listen first" in body["messages"][0]["content"]
+        assert '"practice_intent": "keep"' in content[0]["text"]
+        assert "unavailable timing does not mean audio is absent" in body["messages"][0]["content"]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(DAILY_REPORT)}}]})
+
+    p = provider(handler)
+    try:
+        assert (
+            p.exercise_review(
+                np.zeros(16000), {"saved_focus": "Keep endings audible", "practice_intent": "keep"}
+            )
+            == DAILY_REPORT
+        )
+    finally:
+        p.close()
+
+
+@pytest.mark.parametrize(
+    "report",
+    ["not JSON", {**DAILY_REPORT, "score": 9.5}, {**DAILY_REPORT, "observation": {"text": "unsupported"}}],
+)
+def test_daily_review_rejects_malformed_or_uncontracted_claims(report):
+    p = provider(
+        lambda _: httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(report)}}]})
+    )
+    try:
+        with pytest.raises(ProviderFailure, match="analysis_invalid_response"):
+            p.exercise_review(np.zeros(16000), {})
+    finally:
+        p.close()
+
 
 def provider(handler):
     return OpenAIAudioProvider(
@@ -38,13 +94,17 @@ def test_audio_payload_and_transcription_alignment():
             return httpx.Response(200, json={"text": "Read each word clearly.", "words": words})
         body = json.loads(request.content)
         assert body["model"] == "gpt-audio-1.5"
-        prompt = body["messages"][0]["content"][0]["text"]
-        assert '"interpretation": {"pause_ratio": {"target"' in prompt
+        assert body["messages"][0]["role"] == "system"
+        prompt = body["messages"][0]["content"]
+        context = body["messages"][1]["content"][0]["text"]
+        assert '"interpretation": {"pause_ratio": {"target"' in context
+        assert "user-facing uncertainty" in prompt and "untrusted data" in prompt
+        assert "only for descriptive numerical changes" in prompt
         assert "fairly clear" in prompt and "cite a measured number" in prompt
         assert "as a percentage" in prompt
         assert body["modalities"] == ["text"]
         assert "response_format" not in body
-        assert body["messages"][0]["content"][1]["input_audio"]["format"] == "wav"
+        assert body["messages"][1]["content"][1]["input_audio"]["format"] == "wav"
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(REPORT)}}]})
 
     p = provider(handler)
@@ -106,5 +166,45 @@ def test_provider_failures_do_not_expose_secrets(status, retryable):
             p.transcribe(np.zeros(16000), "A clear voice.")
         assert caught.value.retryable is retryable
         assert "do-not-leak" not in str(caught.value)
+    finally:
+        p.close()
+
+
+@pytest.mark.parametrize(
+    "timestamps",
+    [
+        [{"start": 0}, {"start": 1, "end": 2}],
+        [None, "invalid"],
+        {"unexpected": "object"},
+    ],
+)
+def test_transcription_with_malformed_timestamps_stays_unavailable(timestamps):
+    from app.audio import timing_metrics
+
+    p = provider(lambda _: httpx.Response(200, json={"text": "Read each word clearly.", "words": timestamps}))
+    try:
+        transcript = p.transcribe(np.zeros(16000), "Read each word clearly.")
+        measured = timing_metrics(np.zeros(16000), [], transcript["word_count"], transcript["words"])
+        assert all(not value["available"] and value["value"] is None for value in measured.values())
+    finally:
+        p.close()
+
+
+def test_numeric_words_count_consistently_with_their_timestamp_intervals():
+    p = provider(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "text": "We met in 2026.",
+                "words": [
+                    {"word": word, "start": i, "end": i + 0.5}
+                    for i, word in enumerate(["We", "met", "in", "2026"])
+                ],
+            },
+        )
+    )
+    try:
+        transcript = p.transcribe(np.zeros(16000 * 5), "We met in 2026.")
+        assert transcript["word_count"] == len(transcript["words"]) == 4
     finally:
         p.close()

@@ -5,23 +5,24 @@ import type { PlanItem } from '../api/types'
 import { AppShell, useRedirectOn401 } from '../components/AppShell'
 import { Check } from '../components/Icons'
 import { PlanWave } from '../components/PlanWave'
+import { PracticeFocusCard } from '../components/PracticeFocusCard'
 import { ErrorBanner, Skeleton } from '../components/ui'
-import { formatDate } from '../lib/format'
+import { formatDate, formatEstimate } from '../lib/format'
 
 const VERIFY: Record<string, string> = { timer: 'timer', self_confirmation: 'self-check', recording: 'recording' }
-const mins = (s: number) => `${Math.max(1, Math.round(s / 60))} min`
+const mins = formatEstimate
 
 export function ItemRow({ item }: { item: PlanItem }) {
   const done = item.status === 'completed'
   return (
     <Link className="rs-opt" to={'/exercise/' + item.id} aria-label={`${item.title}${done ? ', done' : ''}`}>
       <span className="rs-opt__icon" style={done ? { background: 'var(--success-tint)', color: 'var(--success)' } : undefined}>
-        {done ? <Check /> : item.exercise_id}
+        {done ? <Check /> : item.position}
       </span>
       <span>
         <span className="rs-opt__title">{item.title}</span>
         <span className="rs-opt__meta">
-          {mins(item.estimated_duration_seconds)} · {VERIFY[item.task.verification.type]} · {done ? 'done' : `+${item.notes_available} notes`}
+          About {mins(item.estimated_duration_seconds)} · {VERIFY[item.task.verification.type]} · {done ? 'done' : `+${item.notes_available} notes`}
         </span>
       </span>
     </Link>
@@ -56,7 +57,7 @@ export default function Home() {
   const navigate = useNavigate()
   useRedirectOn401(today.error)
   const t = today.data
-  const locked = me.data?.capabilities.daily_training === false
+  const locked = me.data?.capabilities?.daily_training === false
   useEffect(() => {
     if (t?.daily_status === 'needs_assessment') navigate('/', { replace: true })
     else if (t && locked) navigate('/paywall', { replace: true })
@@ -70,11 +71,13 @@ export default function Home() {
   const checkIn = t.reassessment.next_available_on
   const total = plan.data?.total_lessons ?? 14
   const open = t.daily_status === 'available' || t.daily_status === 'in_progress'
+  const story = lesson?.items.find((item) => item.exercise_id === 'E12') ?? [...(plan.data?.lessons ?? [])].reverse().flatMap((day) => day.items).find((item) => item.exercise_id === 'E12' && item.status === 'completed')
 
   return (
     <AppShell>
       <div className="rs-cols rs-cols--side">
         <div className="rs-stack" style={{ gap: 24 }}>
+          <PracticeFocusCard storyId={story?.id} />
           <div className="rs-card rs-stack" style={{ gap: 16, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px 12px', flexWrap: 'wrap' }}>
               <h1 className="rs-h" style={{ fontSize: 26 }}>
@@ -87,16 +90,16 @@ export default function Home() {
             {checkIn && <span className="rs-label">Check-in on {formatDate(checkIn, t.timezone)} · 14 days after your baseline</span>}
           </div>
 
-          {open && lesson && (
+          {(open || t.daily_status === 'completed') && lesson && (
             <div className="rs-stack" style={{ gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <h2 className="rs-h" style={{ fontSize: 22 }}>Today's session</h2>
+                <h2 className="rs-h" style={{ fontSize: 22 }}>{open ? "Today's session" : 'Review or practice again'}</h2>
                 <span className="rs-label">About {mins(lesson.estimated_duration_seconds)}</span>
               </div>
               {lesson.items.map((i) => (
                 <ItemRow key={i.id} item={i} />
               ))}
-              {next ? (
+              {open && (next ? (
                 <Link className="rs-btn rs-btn--wide" to={'/exercise/' + next.id} style={{ alignSelf: 'flex-start', marginTop: 6 }}>
                   {t.daily_status === 'in_progress' ? 'Continue' : 'Start'} session {lesson.day_index}
                 </Link>
@@ -104,7 +107,7 @@ export default function Home() {
                 <Link className="rs-btn rs-btn--wide" to={'/done/' + lesson.id} style={{ alignSelf: 'flex-start', marginTop: 6 }}>
                   Finish session {lesson.day_index}
                 </Link>
-              )}
+              ))}
             </div>
           )}
           {t.daily_status === 'completed' && (
@@ -127,7 +130,7 @@ export default function Home() {
           {checkIn && (
             <div className="rs-card rs-stack" style={{ gap: 8, padding: 24, background: 'var(--sky-tint)' }}>
               <h2 className="rs-h" style={{ fontSize: 22 }}>Check-in on {formatDate(checkIn, t.timezone)}</h2>
-              <p style={{ margin: 0, fontSize: 15 }}>Same 3 tasks as your baseline. Then a new plan.</p>
+              <p style={{ margin: 0, fontSize: 15 }}>Repeat the control and expression tasks, plus a fresh unfamiliar passage. Then a new plan.</p>
               {(t.reassessment.available || t.reassessment.demo_override_available) && (
                 <Link className="rs-link" to="/check-in" style={{ fontSize: 15 }}>Open check-in</Link>
               )}

@@ -56,8 +56,42 @@ class Empty(Input):
     pass
 
 
+class CancelUploadInput(Input):
+    plan_item_id: UUID
+
+
+class PracticeFocusInput(Input):
+    source_attempt_id: UUID
+    intent: Literal["experiment", "keep"] | None = None
+    note: str = Field(min_length=1, max_length=500)
+    expected_reflection_revision: int | None = Field(default=None, ge=0, strict=True)
+    skill: (
+        Literal[
+            "word_endings", "consonants", "pace", "pauses", "intonation", "emphasis", "breath", "delivery"
+        ]
+        | None
+    ) = None
+
+
+class ListeningPlanInput(Input):
+    example_id: str = Field(min_length=1, max_length=100)
+    answer: Literal["a", "b", "unsure"]
+    boundary_index: int = Field(ge=0, le=100, strict=True)
+
+
+class TakeComparisonResultInput(Input):
+    choice: Literal["a", "b", "no_clear_difference", "unsure"]
+    note: str = Field(default="", max_length=500)
+
+
+class FocusCheckInput(Input):
+    outcome: Literal["heard", "partly", "not_yet", "unsure"]
+
+
 class AttemptInput(Input):
     plan_item_id: UUID
+    practice_only: bool = False
+    based_on_attempt_id: UUID | None = None
     elapsed_seconds: float | None = Field(default=None, ge=0, le=3600, allow_inf_nan=False)
     self_confirmed: bool | None = None
     recording_id: UUID | None = None
@@ -89,6 +123,26 @@ class VoiceReport(Input):
     limitations: list[str] = Field(min_length=1, max_length=8)
     priorities: list[Priority] = Field(min_length=1, max_length=2)
     recommended_exercise_ids: list[str] = Field(min_length=1, max_length=12)
+
+
+class ReflectionInput(Input):
+    note: str = Field(max_length=500)
+    intent: Literal["experiment", "keep", "undecided"] | None = None
+    expected_revision: int | None = Field(default=None, ge=0, strict=True)
+
+
+class SpeechObservation(Input):
+    text: str = Field(min_length=1, max_length=500)
+    evidence_quote: str = Field(min_length=1, max_length=180)
+    occurrence: int = Field(default=1, ge=1, le=20)
+
+
+class ExerciseReview(Input):
+    summary: str = Field(min_length=1, max_length=350)
+    observation: SpeechObservation | None
+    next_step: str = Field(min_length=1, max_length=350)
+    listening_question: str = Field(min_length=1, max_length=200)
+    limitations: list[str] = Field(min_length=1, max_length=3)
 
 
 class CheckoutInput(Input):

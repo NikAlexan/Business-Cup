@@ -25,11 +25,17 @@ from app.errors import ApiError, fail
 from app.schemas import (
     AssessmentInput,
     AttemptInput,
+    CancelUploadInput,
     CheckoutInput,
     CompleteInput,
     Empty,
+    FocusCheckInput,
     GuestInput,
+    ListeningPlanInput,
+    PracticeFocusInput,
     Preferences,
+    ReflectionInput,
+    TakeComparisonResultInput,
 )
 from app.service import COOKIE, Service, digest
 
@@ -300,6 +306,8 @@ def create_app(settings=None):
 
         def store():
             with database.session() as db:
+                if settings.database_url.startswith("sqlite"):
+                    db.execute(text("BEGIN IMMEDIATE"))
                 billing.apply_event(db, event)
                 db.commit()
 
@@ -333,7 +341,7 @@ def create_app(settings=None):
 
     @app.get("/api/v1/assessments/{assessment_id}")
     def assessment(assessment_id: UUID, s: S):
-        return s.get(assessment_id, "assessment")
+        return s.assessment_state(assessment_id)
 
     @app.post("/api/v1/assessments/{assessment_id}/submit")
     def submit(assessment_id: UUID, payload: Empty, request: Request, s: S):
@@ -349,6 +357,10 @@ def create_app(settings=None):
         assessment_id: Annotated[UUID | None, Form()] = None,
         task_id: Annotated[UUID | None, Form()] = None,
         plan_item_id: Annotated[UUID | None, Form()] = None,
+        practice_only: Annotated[bool, Form()] = False,
+        based_on_attempt_id: Annotated[UUID | None, Form()] = None,
+        training_focus_id: Annotated[UUID | None, Form()] = None,
+        listening_plan_id: Annotated[UUID | None, Form()] = None,
     ):
         s.auth()
         fields = {
@@ -357,6 +369,14 @@ def create_app(settings=None):
             "task_id": str(task_id) if task_id else None,
             "plan_item_id": str(plan_item_id) if plan_item_id else None,
         }
+        if practice_only:
+            fields["practice_only"] = True
+        if based_on_attempt_id:
+            fields["based_on_attempt_id"] = str(based_on_attempt_id)
+        if training_focus_id:
+            fields["training_focus_id"] = str(training_focus_id)
+        if listening_plan_id:
+            fields["listening_plan_id"] = str(listening_plan_id)
         fingerprint, size = hashlib.sha256(), 0
         while chunk := file.file.read(1024 * 1024):
             size += len(chunk)
@@ -390,8 +410,12 @@ def create_app(settings=None):
             s,
             request,
             {**fields, "sha256": fingerprint.hexdigest(), "mime_type": mime_type},
-            lambda: s.upload(file, fields, mime_type),
+            lambda: s.upload(file, fields, mime_type, upload_key=key(request)),
         )
+
+    @app.put("/api/v1/recording-uploads/{upload_key}/cancellation")
+    def cancel_upload(upload_key: UUID, payload: CancelUploadInput, s: S):
+        return s.cancel_upload(str(upload_key), payload.plan_item_id)
 
     @app.get("/api/v1/jobs/{job_id}")
     def job(job_id: UUID, s: S):
@@ -404,6 +428,10 @@ def create_app(settings=None):
     @app.get("/api/v1/recordings/{recording_id}")
     def recording(recording_id: UUID, s: S):
         return s.get(recording_id, "recording")
+
+    @app.put("/api/v1/recordings/{recording_id}/dismiss")
+    def dismiss_recording(recording_id: UUID, payload: Empty, s: S):
+        return s.dismiss_recording(recording_id)
 
     @app.get("/api/v1/recordings/{recording_id}/audio")
     def audio(recording_id: UUID, request: Request, s: S):
@@ -491,10 +519,86 @@ def create_app(settings=None):
     def today(s: S):
         return s.today()
 
+    @app.get("/api/v1/plan-items/{item_id}")
+    def plan_item(item_id: UUID, s: S):
+        return s.item_state(item_id)
+
     @app.post("/api/v1/exercise-attempts")
     def attempt(payload: AttemptInput, request: Request, s: S):
         values = payload.model_dump(mode="json")
+        if values["based_on_attempt_id"] is None:
+            values.pop("based_on_attempt_id")
+        if not values["practice_only"]:
+            values.pop("practice_only")  # Preserve legacy request fingerprints for retries across deploys.
         return mutate(s, request, values, lambda: s.attempt(values))
+
+    @app.post("/api/v1/exercise-attempts/{attempt_id}/comparison")
+    def create_comparison(attempt_id: UUID, payload: Empty, request: Request, s: S):
+        return mutate(s, request, {}, lambda: s.create_take_comparison(attempt_id))
+
+    @app.get("/api/v1/listening-comparisons/{comparison_id}")
+    def take_comparison(comparison_id: UUID, s: S):
+        return s.comparison_view(s.get(comparison_id, "take_comparison"))
+
+    @app.put("/api/v1/listening-comparisons/{comparison_id}/result")
+    def take_comparison_result(comparison_id: UUID, payload: TakeComparisonResultInput, s: S):
+        return s.save_comparison_result(comparison_id, payload.model_dump())
+
+    @app.get("/api/v1/listening-comparisons/{comparison_id}/audio/{label}")
+    def take_comparison_audio(comparison_id: UUID, label: Literal["a", "b"], request: Request, s: S):
+        return audio(UUID(s.comparison_recording(comparison_id, label)), request, s)
+
+    @app.get("/api/v1/exercise-attempts")
+    def attempt_history(
+        plan_item_id: UUID,
+        s: S,
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+    ):
+        s.find_item(plan_item_id)
+        page, next_cursor = s.paginate(
+            [a for a in s.all("attempt") if a["plan_item_id"] == str(plan_item_id)],
+            limit,
+            cursor,
+        )
+        return {"items": page, "next_cursor": next_cursor}
+
+    @app.put("/api/v1/exercise-attempts/{attempt_id}/reflection")
+    def reflection(attempt_id: UUID, payload: ReflectionInput, s: S):
+        attempt = s.get(attempt_id, "attempt")
+        values = payload.model_dump(exclude_unset=True)
+        return s.save_reflection(attempt, values)
+
+    @app.post("/api/v1/plan-items/{item_id}/listening-plan")
+    def listening_plan(item_id: UUID, payload: ListeningPlanInput, request: Request, s: S):
+        values = payload.model_dump()
+        return mutate(s, request, values, lambda: s.save_listening_plan(item_id, values))
+
+    @app.get("/api/v1/practice-focus")
+    def practice_focus(s: S):
+        return s.practice_focus_view()
+
+    @app.post("/api/v1/practice-focus")
+    def save_practice_focus(payload: PracticeFocusInput, request: Request, s: S):
+        values = payload.model_dump(mode="json")
+        if values["intent"] is None:
+            values.pop("intent")  # Preserve fingerprints for pre-intent clients and same-key retries.
+        if values["expected_reflection_revision"] is None:
+            values.pop("expected_reflection_revision")  # Old idempotency receipts retain their fingerprint.
+        return mutate(s, request, values, lambda: s.save_practice_focus(values))
+
+    @app.delete("/api/v1/practice-focus/{focus_id}", status_code=204)
+    def clear_practice_focus(focus_id: UUID, s: S):
+        s.clear_practice_focus(focus_id)
+        return Response(status_code=204)
+
+    @app.put("/api/v1/exercise-attempts/{attempt_id}/focus-check")
+    def focus_check(attempt_id: UUID, payload: FocusCheckInput, s: S):
+        return s.save_focus_check(attempt_id, payload.outcome)
+
+    @app.post("/api/v1/exercise-attempts/{attempt_id}/review")
+    def speech_review(attempt_id: UUID, payload: Empty, request: Request, s: S):
+        return mutate(s, request, {}, lambda: s.request_speech_review(attempt_id))
 
     @app.get("/api/v1/exercise-attempts/{attempt_id}")
     def attempt_by_id(attempt_id: UUID, s: S):

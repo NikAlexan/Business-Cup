@@ -1,7 +1,7 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { jobPollInterval } from '../api/hooks'
 import type { Job } from '../api/types'
-import { extensionFor, limitFor, micErrorKind, pickMimeType } from './recorder'
+import { extensionFor, getMic, limitFor, micErrorKind, pickMimeType } from './recorder'
 
 test('pickMimeType', () => {
   expect(pickMimeType(['audio/webm', 'audio/mp4'], (t) => t !== 'audio/webm;codecs=opus' && t !== 'audio/webm')).toBe('audio/mp4')
@@ -32,4 +32,39 @@ test('level judge ignores the opening click and pauses between words', async () 
   expect(j(0.01, 0.02, 3200)).toBe('waiting') // silence for > 2 s
   for (const t of [3300, 3400, 3500]) j(0.4, 1, t)
   expect(j(0.4, 1, 3600)).toBe('loud') // sustained clipping
+})
+
+
+test('a late microphone permission grant releases its tracks after timeout', async () => {
+  vi.useFakeTimers()
+  let resolveMic!: (stream: MediaStream) => void
+  const stop = vi.fn()
+  const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream
+  vi.stubGlobal('window', { isSecureContext: true, setTimeout, clearTimeout })
+  vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: () => new Promise<MediaStream>((resolve) => { resolveMic = resolve }) } })
+  try {
+    const result = getMic(100)
+    const rejected = expect(result).rejects.toMatchObject({ name: 'TimeoutError' })
+    await vi.advanceTimersByTimeAsync(100)
+    await rejected
+    resolveMic(stream)
+    await Promise.resolve()
+    expect(stop).toHaveBeenCalledOnce()
+  } finally {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  }
+})
+
+test('an accepted microphone remains active for recording', async () => {
+  const stop = vi.fn()
+  const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream
+  vi.stubGlobal('window', { isSecureContext: true, setTimeout, clearTimeout })
+  vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } })
+  try {
+    expect(await getMic()).toBe(stream)
+    expect(stop).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
