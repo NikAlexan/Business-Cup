@@ -747,3 +747,40 @@ test('A/B self-listening survives lost replies, preserves the first answer and r
   expect(writes).toBe(2)
   await noOverflow(page)
 })
+
+
+test('Stripe test UI waits for subscription confirmation before opening the existing practice flow', async ({ page }) => {
+  const lesson = await seed(page)
+  let paid = false
+  let checkoutInterval = ''
+  // The Stripe transport and /me subscription are explicit fixtures; practice/guest data use the real API.
+  await page.route('**/api/v1/me', async (route) => {
+    const response = await route.fetch()
+    const body = await response.json()
+    body.capabilities = { ...body.capabilities, daily_training: paid, exercise_coaching: false }
+    body.subscription = { status: paid ? 'trialing' : null, plan: paid ? 'year' : null, current_period_end: 1800000000, cancel_at_period_end: false, test_mode: true }
+    await route.fulfill({ response, json: body })
+  })
+  await page.route('**/api/v1/billing/plans', (route) => route.fulfill({ json: { plans: [{ interval: 'month', amount: 900, currency: 'usd' }, { interval: 'year', amount: 7900, currency: 'usd' }], trial_days: 7, test_mode: true } }))
+  await page.route('**/api/v1/billing/checkout-session', async (route) => {
+    checkoutInterval = route.request().postDataJSON().interval
+    await route.fulfill({ json: { url: 'http://127.0.0.1:4173/pay/success' } })
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/today')
+  await expect(page.getByRole('heading', { name: /Unlock your 14/ })).toBeVisible()
+  await expect(page.getByText(/no real charges/)).toBeVisible()
+  await page.getByRole('radio', { name: /Yearly/ }).click()
+  await page.getByRole('button', { name: /Start.*trial/ }).click()
+  expect(checkoutInterval).toBe('year')
+  await expect(page.getByRole('heading', { name: 'Confirming your payment…', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Go to today', exact: true })).toHaveCount(0)
+  paid = true // Represents a subsequently confirmed webhook; actual signature/access handling is covered by backend tests.
+  await expect(page.getByRole('heading', { name: "You're in. Your plan is unlocked.", exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Go to today', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Your plan', exact: true })).toBeVisible()
+  const item = lesson.items.find((value) => value.task.verification.type === 'recording')!
+  await page.getByRole('link', { name: item.title, exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Start recording', exact: true })).toBeVisible()
+  await noOverflow(page)
+})

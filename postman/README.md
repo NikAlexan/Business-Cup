@@ -179,7 +179,7 @@ Cookie авторизации браузерного фронта на мока�
 
 `GET /me` отдаёт `demo_mode` и `reassessment.demo_override_available`. Только при DEMO_MODE сервер принимает `demo_override=true` для повторной оценки. Отчёт всегда содержит `analysis_metadata.demo` с признаками обхода даты и подготовленных данных. UI явно помечает демонстрацию. Это не доказательство улучшения за две недели. Импорт подготовленной истории в текущий публичный API не добавлен; для демонстрации выбран обход даты.
 
-Stripe API, checkout и webhook отсутствуют. `subject_id` выдаётся в `/me` для будущей интеграции, `capabilities` показывает права. Бэкенд проверяет внутренний `AccessPolicy.check_access(subject_id, capability)`, в MVP `NoBillingAccessPolicy` разрешает доступ. Это внутренняя точка расширения, не публичный endpoint изменения прав.
+Stripe test mode интегрирован из main: checkout, подписанный webhook и Customer Portal. При `BILLING_PROVIDER=none` MVP доступен без оплаты; при `stripe_test` права ежедневной практики определяются сохранённым статусом подписки в `/me`. `exercise_coaching` также учитывает доступ и наличие AI-конфигурации. Billing-запросы описаны отдельно в [контракте Stripe](../design/stripe-test-mode.md); текущая Postman-коллекция содержит упражнения и основной assessment-поток.
 
 ## Проверка артефактов
 

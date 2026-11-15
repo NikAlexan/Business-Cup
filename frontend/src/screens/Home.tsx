@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { usePlan, useProgress, useToday } from '../api/hooks'
+import { useMe, usePlan, useProgress, useToday } from '../api/hooks'
 import type { PlanItem } from '../api/types'
-import { AppShell, Chips, useRedirectOn401 } from '../components/AppShell'
+import { AppShell, useRedirectOn401 } from '../components/AppShell'
 import { Check } from '../components/Icons'
 import { PlanWave } from '../components/PlanWave'
 import { PracticeFocusCard } from '../components/PracticeFocusCard'
@@ -53,12 +53,15 @@ function Week() {
 export default function Home() {
   const today = useToday()
   const plan = usePlan()
+  const me = useMe()
   const navigate = useNavigate()
   useRedirectOn401(today.error)
   const t = today.data
+  const locked = me.data?.capabilities?.daily_training === false
   useEffect(() => {
     if (t?.daily_status === 'needs_assessment') navigate('/', { replace: true })
-  }, [t?.daily_status, navigate])
+    else if (t && locked) navigate('/paywall', { replace: true })
+  }, [t, locked, navigate])
 
   if (today.isPending) return <AppShell><Skeleton height={360} /></AppShell>
   if (today.error || !t) return <AppShell><ErrorBanner error={today.error} onRetry={() => today.refetch()} /></AppShell>
@@ -72,20 +75,18 @@ export default function Home() {
 
   return (
     <AppShell>
-      <div className="m-only" style={{ marginBottom: 16 }}>
-        <Chips />
-      </div>
       <div className="rs-cols rs-cols--side">
         <div className="rs-stack" style={{ gap: 24 }}>
           <PracticeFocusCard storyId={story?.id} />
           <div className="rs-card rs-stack" style={{ gap: 16, padding: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px 12px', flexWrap: 'wrap' }}>
               <h1 className="rs-h" style={{ fontSize: 26 }}>
                 {t.daily_status === 'plan_completed' ? 'Plan complete' : t.daily_status === 'completed' ? 'Done for today' : lesson?.items[0] ? 'Your plan' : 'Today'}
               </h1>
-              {lesson && <span className="rs-label">Session {lesson.day_index} of {total}</span>}
+              {lesson && <span className="rs-label" style={{ whiteSpace: 'nowrap' }}>Session {lesson.day_index} of {total}</span>}
             </div>
             {plan.data ? <PlanWave lessons={plan.data.lessons} todayId={open ? lesson?.id : undefined} /> : <Skeleton height={150} />}
+            <span className="rs-label">Bar height: minutes practiced in each session.</span>
             {checkIn && <span className="rs-label">Check-in on {formatDate(checkIn, t.timezone)} · 14 days after your baseline</span>}
           </div>
 

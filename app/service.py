@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 
-from app.access import NoBillingAccessPolicy
+from app.billing import has_access, view
 from app.coaching import listening_intent_policy, next_action_intent
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
@@ -43,7 +43,6 @@ class Service:
         self.db, self.settings = db, settings
         self.signer = URLSafeTimedSerializer(settings.app_secret.get_secret_value(), salt="voice-guest-v1")
         self.guest = None
-        self.policy = NoBillingAccessPolicy()
         if cookie:
             try:
                 gid = self.signer.loads(cookie, max_age=31536000)
@@ -59,7 +58,7 @@ class Service:
     def auth(self, capability=None):
         if not self.guest:
             fail(401, "session_required", "Create a guest session first.")
-        if capability and not self.policy.check_access(self.guest.subject_id, capability):
+        if capability and not has_access(self.settings, self.guest, capability):
             fail(403, "access_denied", "This capability is not available.")
         return self.guest
 
@@ -181,8 +180,15 @@ class Service:
             for plan in self.all("plan")
             for lesson in plan["lessons"]
         )
+        practiced = {}
+        for a in self.all("attempt"):
+            if a["status"] == "passed" and a.get("verification_type") != "self_confirmation":
+                practiced[a["plan_item_id"]] = practiced.get(a["plan_item_id"], 0) + a.get(
+                    "practice_seconds", 0
+                )
         for lesson in p["lessons"]:
             annotate_notes(lesson)
+            lesson["practice_seconds"] = sum(practiced.get(i["id"], 0) for i in lesson["items"])
         for i, lesson in enumerate(p["lessons"]):
             if lesson["status"] == "completed":
                 continue
@@ -240,13 +246,13 @@ class Service:
             "reassessment": self.reassessment(),
             "capabilities": {
                 "exercise_coaching": bool(
-                    self.settings.exercise_reviews_enabled and self.settings.openai_api_key.get_secret_value()
+                    has_access(self.settings, self.guest, "daily_training")
+                    and self.settings.exercise_reviews_enabled
+                    and self.settings.openai_api_key.get_secret_value()
                 ),
-                **{
-                    c: self.policy.check_access(self.guest.subject_id, c)
-                    for c in ("assessment", "daily_training")
-                },
+                **{c: has_access(self.settings, self.guest, c) for c in ("assessment", "daily_training")},
             },
+            "subscription": view(self.settings, self.guest),
             "progress": {
                 "completed_lessons": p["completed_lessons"] if p else 0,
                 "total_lessons": p["total_lessons"] if p else 0,
@@ -279,7 +285,8 @@ class Service:
         return status, data
 
     def create_assessment(self, payload):
-        self.auth("assessment")
+        # Baseline is free; the 14-day check-in is part of the subscription.
+        self.auth("daily_training" if payload["kind"] == "reassessment" else "assessment")
         active = next((a for a in self.assessments() if a["status"] in ACTIVE), None)
         if active:
             fail(
@@ -693,7 +700,7 @@ class Service:
         }
 
     def create_take_comparison(self, attempt_id):
-        self.auth("daily_training")
+        self.auth()
         current = self.get(attempt_id, "attempt")
         source_id = (current.get("practice_focus") or {}).get("attempt_id")
         if current["status"] != "passed" or not current.get("recording_id") or not source_id:
@@ -714,6 +721,7 @@ class Service:
         comparison_id = str(uuid5(UUID(self.guest.id), f"take-listening-v1:{source_id}:{current['id']}"))
         if self.db.get(Resource, comparison_id):
             return 200, self.comparison_view(self.get(comparison_id, "take_comparison"))
+        self.auth("daily_training")
         if (
             sum(self.local_date(c["created_at"]) == self.local_date() for c in self.all("take_comparison"))
             >= self.settings.max_uploads_per_day

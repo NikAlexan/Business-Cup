@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { request } from '../api/api'
+import { post, request, useMutationWithKey } from '../api/api'
+import { renewDate } from './Billing'
+import { Link } from 'react-router-dom'
 import { useMe } from '../api/hooks'
 import { AppShell } from '../components/AppShell'
 import { ErrorBanner, Skeleton } from '../components/ui'
@@ -39,6 +41,9 @@ export default function Settings() {
     mutationFn: () => request('/demo/seed', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries(),
   })
+  const portal = useMutationWithKey((_: null, key) => post<{ url: string }>('/billing/portal-session', {}, key))
+  const sub = me.data?.subscription
+  const paid = me.data?.capabilities?.daily_training
   const pref = me.data?.preferences
   const zones = pref && !ZONES.includes(pref.timezone) ? [pref.timezone, ...ZONES] : ZONES
 
@@ -91,6 +96,37 @@ export default function Settings() {
             {seed.isSuccess && <span className="rs-label" role="status" style={{ color: 'var(--success)' }}>Filled</span>}
           </div>
         )}
+        {sub && (
+          <div className="rs-card rs-stack" style={{ gap: 14, padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <h2 className="rs-h" style={{ fontSize: 20 }}>Subscription</h2>
+              <span className="rs-badge" style={paid ? { background: 'var(--success-tint)', color: 'var(--success)' } : undefined}>
+                {sub.status === 'trialing' ? 'Trial' : paid ? 'Active' : 'Not active'} · test mode
+              </span>
+            </div>
+            {sub.plan && (
+              <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', gap: '8px 20px' }}>
+                <dt className="rs-label">Plan</dt>
+                <dd style={{ margin: 0 }}>{sub.plan === 'year' ? 'Yearly' : 'Monthly'}</dd>
+                <dt className="rs-label">{sub.cancel_at_period_end || !paid ? 'Access until' : 'Renews on'}</dt>
+                <dd style={{ margin: 0 }}>{renewDate(sub)}</dd>
+              </dl>
+            )}
+            {portal.error && <ErrorBanner error={portal.error} />}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              {sub.plan ? (
+                <button className="rs-btn rs-btn--secondary rs-btn--wide" type="button" disabled={portal.isPending}
+                  onClick={() => portal.mutate(null, { onSuccess: (r) => window.location.assign(r.url) })}>
+                  Manage subscription
+                </button>
+              ) : (
+                <Link className="rs-btn rs-btn--wide" to="/paywall">See plans</Link>
+              )}
+              <Link className="rs-link" to="/terms" style={{ fontSize: 15 }}>Subscription terms</Link>
+            </div>
+            {sub.plan && <span className="rs-label">Change plan, update the card or cancel on Stripe's page. Access lasts to the end of the paid period.</span>}
+          </div>
+        )}
         <div className="rs-card rs-stack" style={{ gap: 12, padding: 24 }}>
           <h2 className="rs-h" style={{ fontSize: 20 }}>Your data</h2>
           <p style={{ margin: 0 }}>There's no account. Your profile, plan and recordings are tied to this browser. Clearing cookies or switching devices starts you fresh.</p>
@@ -101,7 +137,7 @@ export default function Settings() {
           ) : (
             <div className="rs-stack" style={{ gap: 12, border: '2px solid var(--danger-tint)', borderRadius: 18, padding: 16, background: 'var(--ground)' }}>
               <span style={{ fontWeight: 500 }}>Delete your recordings, profile and plan?</span>
-              <span style={{ fontSize: 15, color: 'var(--muted)' }}>This can't be undone. Your streak and notes go too.</span>
+              <span style={{ fontSize: 15, color: 'var(--muted)' }}>This can't be undone. Your streak and notes go too.{paid ? ' Your subscription is canceled right away.' : ''}</span>
               {wipe.error && <ErrorBanner error={wipe.error} />}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <button className="rs-btn" type="button" disabled={wipe.isPending} onClick={() => wipe.mutate()} style={{ background: 'var(--danger)', color: 'var(--ground)', boxShadow: '0 3px 0 var(--danger-edge)' }}>

@@ -126,7 +126,9 @@ def test_self_confirmation_does_not_count_estimate_as_actual_time(client, app):
 
 def test_legacy_self_confirmation_estimates_are_excluded_from_actual_totals(client, app):
     gid = guest(client).json()["guest_id"]
+    plan = generate_plan({"id": str(uuid4())}, {"priorities": []}, 1)
     with app.state.database.session.begin() as db:
+        db.add(Resource(id=plan["id"], guest_id=gid, kind="plan", data=plan))
         db.add(
             Resource(
                 guest_id=gid,
@@ -134,6 +136,7 @@ def test_legacy_self_confirmation_estimates_are_excluded_from_actual_totals(clie
                 data={
                     "status": "passed",
                     "verification_type": "self_confirmation",
+                    "plan_item_id": plan["lessons"][0]["items"][0]["id"],
                     "practice_seconds": 60,
                     "reward": {"notes": 2},
                 },
@@ -142,3 +145,4 @@ def test_legacy_self_confirmation_estimates_are_excluded_from_actual_totals(clie
     progress = client.get("/api/v1/me").json()["progress"]
     assert progress["practice_seconds_total"] == 0
     assert progress["notes_total"] == 2
+    assert sum(lesson["practice_seconds"] for lesson in client.get("/api/v1/plan").json()["lessons"]) == 0

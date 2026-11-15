@@ -1311,3 +1311,26 @@ test('a delayed old detail GET cannot replace a newer cached reflection before a
   expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true)
   expect((screen.getByRole('textbox', { name: 'Your listening note' }) as HTMLTextAreaElement).value).toBe('Current saved note.')
 })
+
+
+test.each(['pending', 'completed'] as const)('Stripe access gates %s practice while keeping owned task/result readable', async (status) => {
+  const item = { ...baseItem, status, latest_attempt_id: status === 'completed' ? 'attempt' : null }
+  const me = { guest_id: 'guest', capabilities: { assessment: true, daily_training: false, exercise_coaching: false },
+    preferences: { timezone: 'UTC' }, progress: { notes_total: 4, practice_seconds_total: 30, current_streak_days: 0 }, limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } }
+  const transport = setup(item, (path) => path === '/api/v1/me' ? Response.json(me) : undefined)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+  open('/exercise/item', client)
+  if (status === 'completed') {
+    await screen.findByText('Recording received. Audio quality checked.')
+    expect((await screen.findByLabelText('Your completed take')).getAttribute('src')).toBe('/api/v1/recordings/recording/audio')
+    expect(screen.queryByRole('button', { name: 'Practice again — no extra notes' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'See subscription plans for extra practice' }).getAttribute('href')).toBe('/paywall')
+  } else {
+    await screen.findByRole('heading', { name: 'Practice requires a subscription' })
+    expect(screen.getByRole('link', { name: 'See subscription plans' }).getAttribute('href')).toBe('/paywall')
+    expect(screen.queryByRole('button', { name: 'Start recording' })).toBeNull()
+    act(() => client.setQueryData(['me'], { ...me, capabilities: { ...me.capabilities, daily_training: true } }))
+    await screen.findByRole('button', { name: 'Start recording' })
+  }
+  expect(transport.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+})

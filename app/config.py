@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +29,12 @@ class Settings(BaseSettings):
     max_exercise_reviews_per_day: int = Field(default=10, ge=1)
     max_total_exercise_reviews_per_day: int = Field(default=100, ge=1)
     demo_mode: bool = False
-    billing_provider: Literal["none"] = "none"
+    billing_provider: Literal["none", "stripe_test"] = "none"
+    stripe_secret_key: SecretStr = SecretStr("")
+    stripe_webhook_secret: SecretStr = SecretStr("")
+    stripe_price_monthly: str = ""
+    stripe_price_yearly: str = ""
+    stripe_trial_days: int = Field(default=7, ge=0, le=730)
     cookie_secure: bool = False
     allowed_origins: str = "http://localhost:8000,http://localhost:3000,http://localhost:5173"
     job_lease_seconds: int = Field(default=600, ge=120)
@@ -43,6 +48,23 @@ class Settings(BaseSettings):
         if len(value.get_secret_value()) < 32:
             raise ValueError("APP_SECRET must contain at least 32 characters")
         return value
+
+    @model_validator(mode="after")
+    def validate_billing(self):
+        if self.billing_provider == "stripe_test":
+            if not self.stripe_secret_key.get_secret_value().startswith("sk_test_"):
+                raise ValueError(
+                    "BILLING_PROVIDER=stripe_test requires a test STRIPE_SECRET_KEY (sk_test_...)"
+                )
+            if not (
+                self.stripe_webhook_secret.get_secret_value()
+                and self.stripe_price_monthly
+                and self.stripe_price_yearly
+            ):
+                raise ValueError(
+                    "Stripe needs STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY"
+                )
+        return self
 
     @property
     def origins(self):

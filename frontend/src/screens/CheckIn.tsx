@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useMe } from '../api/hooks'
 import { AppShell } from '../components/AppShell'
 import { Skeleton } from '../components/ui'
@@ -7,6 +7,7 @@ import { formatDate } from '../lib/format'
 export default function CheckIn() {
   const me = useMe()
   if (!me.data) return <AppShell><Skeleton height={280} /></AppShell>
+  if (!me.data.capabilities?.daily_training) return <Navigate to="/paywall" replace />
   const r = me.data.reassessment
   return (
     <AppShell>

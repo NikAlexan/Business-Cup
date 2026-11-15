@@ -46,7 +46,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="business-cup-browser-") as temp:
         url = "sqlite:///" + str(Path(temp) / "browser-test.db")
         # Alembic reads Settings() separately. These explicit values also override any local .env.
-        os.environ.update(DATABASE_URL=url, APP_SECRET=SECRET, OPENAI_API_KEY="")
+        os.environ.update(DATABASE_URL=url, APP_SECRET=SECRET, OPENAI_API_KEY="", BILLING_PROVIDER="none")
         command.upgrade(Config(str(ROOT / "alembic.ini")), "head")
         from app.main import create_app
         from app.worker import Worker
@@ -57,6 +57,7 @@ def main():
             app_secret=SECRET,
             openai_api_key="",
             demo_mode=True,
+            billing_provider="none",
             audio_data=Path(temp) / "audio",
             allowed_origins="http://127.0.0.1:4173",
         )

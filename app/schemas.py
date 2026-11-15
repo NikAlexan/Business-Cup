@@ -143,3 +143,7 @@ class ExerciseReview(Input):
     next_step: str = Field(min_length=1, max_length=350)
     listening_question: str = Field(min_length=1, max_length=200)
     limitations: list[str] = Field(min_length=1, max_length=3)
+
+
+class CheckoutInput(Input):
+    interval: Literal["month", "year"]

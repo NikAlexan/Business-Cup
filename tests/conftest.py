@@ -56,6 +56,7 @@ def settings(tmp_path, monkeypatch):
         database_url=url,
         audio_data=tmp_path / "audio",
         openai_api_key="",
+        billing_provider="none",
         app_secret="test-secret-that-is-at-least-32-characters-long",
         vad_model_path=Path("models/silero_vad.onnx"),
         asr_model_dir=Path("models/asr"),

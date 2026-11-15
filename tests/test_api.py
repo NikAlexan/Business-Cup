@@ -1,6 +1,6 @@
 import copy
 import time
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -466,6 +466,8 @@ def test_rewards_follow_completed_practice(client, worker, speech_file):
     assert me["notes_total"] == sum(expected.values())
     assert me["practice_seconds_total"] == done["session_reward"]["practice_seconds"]
     assert client.get("/api/v1/progress").json()["summary"]["notes_total"] == me["notes_total"]
+    days = {x["id"]: x["practice_seconds"] for x in client.get("/api/v1/plan").json()["lessons"]}
+    assert days[lesson["id"]] == me["practice_seconds_total"] and sum(days.values()) == days[lesson["id"]]
 
     assert client.delete("/api/v1/guest-data").status_code == 204
     guest(client)
@@ -547,12 +549,16 @@ def test_interpretation_uses_assessment_goal(client, worker, speech_file):
     )  # clear_speech, the goal at creation
 
 
-def test_demo_seed(settings):
+def test_demo_seed(settings, monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.main import create_app
     from tests.conftest import guest
 
+    # Early New York morning: subtracting random UTC hours must not skip/duplicate local days.
+    clock = datetime(2026, 11, 15, 6, 30, tzinfo=UTC)
+    monkeypatch.setattr("app.demo.utcnow", lambda: clock)
+    monkeypatch.setattr("app.service.utcnow", lambda: clock)
     settings.demo_mode = True
     with TestClient(create_app(settings)) as c:
         guest(c)

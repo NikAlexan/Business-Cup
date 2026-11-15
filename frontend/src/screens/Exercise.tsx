@@ -254,6 +254,7 @@ export default function Exercise() {
     if (intent.guestId) rememberCancellation(intent)
     sendCancellation(intent)
   }
+  const trainingLocked = me.data?.capabilities?.daily_training === false
   const showOutcome = completed && !practicingAgain
   const progress = Math.round(((lesson.items.filter((x) => x.status === 'completed').length) / lesson.items.length) * 100)
 
@@ -290,12 +291,16 @@ export default function Exercise() {
             )}
           </div>
           <div className="rs-stack" style={{ gap: 16 }}>
-            {(v.type === 'self_confirmation' || showOutcome || readOnlyTask) && (
+            {(v.type === 'self_confirmation' || showOutcome || readOnlyTask || trainingLocked) && (
               <div className="rs-card" style={{ padding: 28 }}>
                 {item.task.steps?.length ? <ol>{item.task.steps.map((step, n) => <li key={n}>{step}</li>)}</ol> : <ScriptText text={item.task.text} />}
               </div>
             )}
-            {readOnlyTask ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
+            {trainingLocked && !showOutcome ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
+              <h2 className="rs-h" style={{ fontSize: 22 }}>Practice requires a subscription</h2>
+              <p>Your saved task and recordings stay available. Choose a plan to record a new take.</p>
+              <Link className="rs-btn" to="/paywall">See subscription plans</Link>
+            </div> : readOnlyTask ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
               {archivedTask ? <><h2 className="rs-h" style={{ fontSize: 22 }}>Saved task preview</h2><p>This older task is saved for reference. Continue practice in your current plan.</p></> : <><h2 className="rs-h" style={{ fontSize: 22 }}>Session not open yet</h2><p>You can preview this task. New sessions open in order, with one session completed per local day. Check Today for your current session.</p><button className="rs-link" type="button" disabled={itemState.isFetching} onClick={() => { void itemState.refetch() }}>Check availability</button></>}
               <Link className="rs-link" to="/today">{archivedTask ? 'Back to current plan' : 'Back to today'}</Link>
             </div> : showOutcome ? (
@@ -332,9 +337,9 @@ export default function Exercise() {
                     <NoteIcon /> <strong>+{p.notes}</strong> {REASON[p.reason]}
                   </div>
                 ))}
-                <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { viewedTake.current = { itemId: planItemId, attemptId: null }; canceling.current = false; uploadKey.current = null; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
+                {trainingLocked ? <Link className="rs-btn rs-btn--secondary" to="/paywall">See subscription plans for extra practice</Link> : <button className="rs-btn rs-btn--secondary" type="button" onClick={() => { viewedTake.current = { itemId: planItemId, attemptId: null }; canceling.current = false; uploadKey.current = null; setRepeatSource(result?.id ?? null); setRepeatFor(planItemId); setResult(null); attempt.reset() }}>
                   Practice again — no extra notes
-                </button>
+                </button>}
                 <button className="rs-btn rs-btn--wide" type="button" onClick={goNext} style={{ alignSelf: 'flex-start' }}>
                   {closedLesson ? 'Back to today' : nextItem ? 'Next exercise' : 'Finish session'}
                 </button>

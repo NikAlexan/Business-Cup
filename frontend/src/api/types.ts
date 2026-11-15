@@ -13,10 +13,18 @@ export type Reassessment = {
   demo_override_available: boolean
 }
 export type Streak = { current_days: number; longest_days: number; last_practice_on: string | null }
+export type Subscription = {
+  status: string | null
+  plan: 'month' | 'year' | null
+  current_period_end: number | null
+  cancel_at_period_end: boolean | null
+  test_mode: boolean
+}
 export type Me = {
   guest_id: string
   capabilities?: { exercise_coaching?: boolean; assessment?: boolean; daily_training?: boolean }
   data_provenance?: { prepared_demo_history: boolean }
+  subscription: Subscription | null // null when billing is disabled
   preferences: { goal: string; timezone: string; locale: string }
   demo_mode: boolean
   limits: {
@@ -73,6 +81,7 @@ export type Lesson = {
   day_index: number
   status: 'locked' | 'available' | 'in_progress' | 'completed'
   estimated_duration_seconds: number
+  practice_seconds: number // passed attempts only
   completed_at: string | null
   completed_on?: string | null
   items: PlanItem[]

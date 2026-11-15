@@ -115,7 +115,7 @@ export default function Profile() {
               </div>
             ))}
             <Link className="rs-btn rs-btn--wide" to="/today" style={{ alignSelf: 'flex-start', marginTop: 8 }}>
-              {re ? 'See my new plan' : 'Start day 1'}
+              {me.data?.capabilities?.daily_training === false ? 'See my 14-session plan' : re ? 'See my new plan' : 'Start day 1'}
             </Link>
           </div>
         </div>

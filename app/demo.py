@@ -1,12 +1,15 @@
 """One-click mock data for the current guest (DEMO_MODE only). Replaces the guest's resources."""
 
-from datetime import timedelta
+import random
+from datetime import UTC, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete
 
 from app.audio import metric
 from app.content import generate_plan, interpret, protocol
 from app.db import Idempotency, Job, Resource, iso, new_id, utcnow
+from app.service import notes_for
 from app.worker import MEASUREMENT_VERSION
 
 CONDITIONS = {
@@ -62,12 +65,53 @@ REPORT = {
 }
 
 
+def practice(rng, item, at, retry=False):
+    """An attempt shaped like Service.attempt() produces, with human variation in time spent."""
+    kind = item["task"]["verification"]["type"]
+    planned = item["estimated_duration_seconds"]
+    seconds = {
+        "timer": round(planned * rng.uniform(0.7, 1.4)),
+        "recording": rng.randint(35, 110),  # length of the accepted take
+        "self_confirmation": 0,
+    }[kind]
+    parts = [{"notes": notes_for(item) - (kind == "recording"), "reason": "exercise_completed"}]
+    if kind == "recording":
+        parts.append({"notes": 1, "reason": "quality_bonus"})
+    return {
+        "id": new_id(),
+        "plan_item_id": item["id"],
+        "exercise_id": item["exercise_id"],
+        "status": "needs_retry" if retry else "passed",
+        "verification_type": kind,
+        "elapsed_seconds": seconds if kind == "timer" else None,
+        "recording_id": None,
+        "created_at": iso(at),
+        "completed_at": None if retry else iso(at),
+        "plan_item_status": "pending" if retry else "completed",
+        "prepared_demo": True,
+        "practice_seconds_source": "prepared_demo",
+        "practice_seconds": 0 if retry else seconds,
+        "reward": {"notes": 0, "parts": []}
+        if retry
+        else {"notes": sum(x["notes"] for x in parts), "parts": parts},
+        "feedback": {
+            "summary": "Please try this exercise again." if retry else "Practice completed.",
+            "metrics": None,
+            "issues": [{"code": "no_speech", "message": "Record a clear spoken take before trying again."}]
+            if retry
+            else [],
+        },
+        **({"self_confirmed": True} if kind == "self_confirmation" else {}),
+    }
+
+
 def seed(s):
     g = s.auth()
     for model in (Resource, Job, Idempotency):
         s.db.execute(delete(model).where(model.guest_id == g.id))
     goal, tz = g.data["preferences"]["goal"], g.data["preferences"]["timezone"]
     now, previous = utcnow(), None
+    local_noon = now.astimezone(ZoneInfo(tz)).replace(hour=12, minute=0, second=0, microsecond=0)
     # ponytail: no recordings/audio files seeded; progress shows an empty recordings list
     for days_ago, m, kind in (
         (22, measurements(176.0, 0.09, 4.1, 182.0), "initial"),
@@ -103,26 +147,19 @@ def seed(s):
         p = generate_plan(a, REPORT, 2 if previous else 1, s.all("plan"))
         p["created_at"] = at
         if previous:
+            rng = random.Random(s.guest.id)  # stable per guest, different between guests
             for day, lesson in enumerate(p["lessons"][:6]):
-                done = now - timedelta(days=6 - day)
+                # Real people practice at different times of day and take uneven time per exercise.
+                # Keep each demo session on its intended local date, even near midnight or DST.
+                done = (
+                    local_noon - timedelta(days=6 - day, hours=rng.randint(0, 5), minutes=rng.randint(0, 59))
+                ).astimezone(UTC)
                 for item in lesson["items"]:
-                    attempt = {
-                        "id": new_id(),
-                        "plan_item_id": item["id"],
-                        "exercise_id": item["exercise_id"],
-                        "status": "passed",
-                        "verification_type": "self_confirmation",
-                        "self_confirmed": True,
-                        "elapsed_seconds": None,
-                        "recording_id": None,
-                        "created_at": iso(done),
-                        "completed_at": iso(done),
-                        "plan_item_status": "completed",
-                        "prepared_demo": True,
-                        "practice_seconds": item["estimated_duration_seconds"],
-                        "reward": {"notes": 3, "parts": [{"notes": 3, "reason": "exercise_completed"}]},
-                        "feedback": {"summary": "Practice completed.", "metrics": None, "issues": []},
-                    }
+                    attempt = practice(rng, item, done)
+                    if attempt["verification_type"] == "recording" and rng.random() < 0.25:
+                        s.put(
+                            "attempt", practice(rng, item, done, retry=True)
+                        )  # a simulated rejected audio-quality check
                     s.put("attempt", attempt)
                     item.update(status="completed", completed_at=iso(done), latest_attempt_id=attempt["id"])
                 lesson.update(

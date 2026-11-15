@@ -16,6 +16,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException
 
+from app import billing
 from app.asr import feed, recognizer
 from app.config import Settings
 from app.content import CATALOG, EXERCISES
@@ -25,6 +26,7 @@ from app.schemas import (
     AssessmentInput,
     AttemptInput,
     CancelUploadInput,
+    CheckoutInput,
     CompleteInput,
     Empty,
     FocusCheckInput,
@@ -274,6 +276,43 @@ def create_app(settings=None):
         from app.demo import seed
 
         return seed(s)
+
+    def origin(request):
+        # The guard middleware already rejected POSTs from origins outside ALLOWED_ORIGINS.
+        return (request.headers.get("origin") or settings.origins[0]).rstrip("/")
+
+    @app.get("/api/v1/billing/plans")
+    def billing_plans():
+        return billing.plans(settings)
+
+    @app.post("/api/v1/billing/checkout-session")
+    def checkout_session(payload: CheckoutInput, request: Request, s: S):
+        s.auth()
+        return billing.checkout(settings, s.guest, payload.interval, origin(request))
+
+    @app.post("/api/v1/billing/portal-session")
+    def portal_session(request: Request, s: S):
+        s.auth()
+        return billing.portal(settings, s.guest, origin(request))
+
+    @app.post("/api/v1/billing/webhook")
+    async def webhook(request: Request):
+        billing.require_billing(settings)
+        event = billing.verify(
+            settings.stripe_webhook_secret.get_secret_value(),
+            await request.body(),
+            request.headers.get("stripe-signature", ""),
+        )
+
+        def store():
+            with database.session() as db:
+                if settings.database_url.startswith("sqlite"):
+                    db.execute(text("BEGIN IMMEDIATE"))
+                billing.apply_event(db, event)
+                db.commit()
+
+        await run_in_threadpool(store)
+        return {"received": True}
 
     @app.patch("/api/v1/preferences")
     def preferences(payload: Preferences, s: S):
@@ -581,6 +620,7 @@ def create_app(settings=None):
     @app.delete("/api/v1/guest-data", status_code=204)
     def delete_guest(request: Request, s: S):
         s.auth()
+        billing.cancel(settings, s.guest)  # fails with 502 before anything is deleted
         directory = settings.audio_data / s.guest.id
         # Guest row lock serializes uploads and worker publication with deletion.
         if directory.exists():
