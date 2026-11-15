@@ -22,6 +22,7 @@ export default defineConfig({
   webServer: {
     command: (process.env.CI ? 'python' : '../.venv/bin/python') + ' ../scripts-browser-server.py',
     url: 'http://127.0.0.1:4173/health/ready',
+    env: { BUSINESS_CUP_BROWSER_PROFILE_FIXTURE: '1' },
     reuseExistingServer: false,
     timeout: 60_000,
     gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },

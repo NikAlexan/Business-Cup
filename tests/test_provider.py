@@ -87,13 +87,17 @@ def test_audio_payload_and_transcription_alignment():
             return httpx.Response(200, json={"text": "Read each word clearly.", "words": words})
         body = json.loads(request.content)
         assert body["model"] == "gpt-audio-1.5"
-        prompt = body["messages"][0]["content"][0]["text"]
-        assert '"interpretation": {"pause_ratio": {"target"' in prompt
+        assert body["messages"][0]["role"] == "system"
+        prompt = body["messages"][0]["content"]
+        context = body["messages"][1]["content"][0]["text"]
+        assert '"interpretation": {"pause_ratio": {"target"' in context
+        assert "user-facing uncertainty" in prompt and "untrusted data" in prompt
+        assert "only for descriptive numerical changes" in prompt
         assert "fairly clear" in prompt and "cite a measured number" in prompt
         assert "as a percentage" in prompt
         assert body["modalities"] == ["text"]
         assert "response_format" not in body
-        assert body["messages"][0]["content"][1]["input_audio"]["format"] == "wav"
+        assert body["messages"][1]["content"][1]["input_audio"]["format"] == "wav"
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(REPORT)}}]})
 
     p = provider(handler)

@@ -135,7 +135,8 @@ export type Assessment = {
   job_id: string | null
   plan_id: string | null
   demo_override_used: boolean
-  analysis_metadata?: { demo?: { prepared_data?: boolean } }
+  analysis_metadata?: { measurement_version?: string; prompt_version?: string; demo?: { prepared_data?: boolean } }
+  measurement_scope?: { pace_and_pauses_task_ids: string[]; pitch_task_ids: string[]; intonation_task_ids: string[] }
   completed_at: string | null
   report: {
     summary: string
@@ -156,6 +157,7 @@ export type MetricInterpretation = {
   focus: boolean
 }
 export type Job = {
+  assessment_id?: string | null
   id: string
   type: string
   status: 'queued' | 'processing' | 'completed' | 'needs_rerecord' | 'failed'

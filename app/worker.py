@@ -20,7 +20,12 @@ from app.coaching import quote_evidence, timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
-from app.provider import EXERCISE_PROMPT_VERSION, OpenAIAudioProvider, ProviderFailure
+from app.provider import (
+    ASSESSMENT_PROMPT_VERSION,
+    EXERCISE_PROMPT_VERSION,
+    OpenAIAudioProvider,
+    ProviderFailure,
+)
 from app.service import Service
 
 log = logging.getLogger("voice.worker")
@@ -466,6 +471,7 @@ class Worker:
                     "protocol_version": a["protocol_version"],
                     "measurement_version": MEASUREMENT_VERSION,
                     "targets_version": TARGETS_VERSION,
+                    "prompt_version": ASSESSMENT_PROMPT_VERSION,
                     "quality_rules_version": "quality-v1",
                     "thresholds": QUALITY_RULES,
                     "transcription_status": "completed" if transcript["verified"] else "unverified",

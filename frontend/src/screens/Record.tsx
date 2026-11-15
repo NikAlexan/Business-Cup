@@ -72,7 +72,7 @@ export default function Record() {
   useEffect(() => {
     const d = a.data
     if (!d) return
-    if ((d.status === 'queued' || d.status === 'processing') && d.job_id) navigate(`/analyzing?job_id=${d.job_id}&assessment_id=${d.id}`, { replace: true })
+    if ((d.status === 'queued' || d.status === 'processing' || d.status === 'failed') && d.job_id) navigate(`/analyzing?job_id=${d.job_id}&assessment_id=${d.id}`, { replace: true })
     if (d.status === 'completed') navigate('/profile/' + d.id, { replace: true })
   }, [a.data, navigate])
 

@@ -170,6 +170,7 @@ test('a completed session keeps its exercises reachable for feedback and extra p
 })
 
 test('baseline resumes an accepted upload after reload and finishes all three recording checks', async ({ page }) => {
+  test.setTimeout(75_000) // Three nine-second takes plus real VAD/worker processing, also on slower CI.
   test.setTimeout(75_000)
   expect((await page.request.post('/api/v1/guest-session', { headers: { 'Idempotency-Key': randomUUID() }, data: { goal: 'clear_speech', timezone: 'UTC', locale: 'en-US', consent: { audio_processing: true, policy_version: '2026-11-14' } } })).ok()).toBe(true)
   const created = await page.request.post('/api/v1/assessments', { headers: { 'Idempotency-Key': randomUUID() }, data: { kind: 'initial', recording_conditions: { device_label: 'Browser test microphone', distance_cm: 50, environment: 'quiet_room' } } })
@@ -330,4 +331,69 @@ test('a chosen change transfers from a drill to narration and remains on Today a
   await expect(page.getByText('Last story: you marked “Partly”.')).toBeVisible()
   await noOverflow(page)
   expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
+})
+
+test('baseline and check-in recover failed analysis, expose limitations and compare saved private recordings', async ({ page }) => {
+  test.setTimeout(150_000)
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect((await page.request.post('/api/v1/guest-session', {
+    headers: { 'Idempotency-Key': randomUUID() },
+    data: { goal: 'clear_speech', timezone: 'UTC', locale: 'en-US', consent: { audio_processing: true, policy_version: '2026-11-14' } },
+  })).ok()).toBe(true)
+  let uploads = 0
+  let submits = 0
+  let retries = 0
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    const path = new URL(request.url()).pathname
+    if (path === '/api/v1/recordings') uploads++
+    if (path.endsWith('/submit')) submits++
+    if (path.endsWith('/retry')) retries++
+  })
+  const run = async (kind: 'initial' | 'reassessment') => {
+    const created = await page.request.post('/api/v1/assessments', {
+      headers: { 'Idempotency-Key': randomUUID() },
+      data: { kind, recording_conditions: { device_label: 'Browser fixture mic', distance_cm: 50, environment: 'quiet_room' }, demo_override: kind === 'reassessment' },
+    })
+    expect(created.status()).toBe(201)
+    const assessment = await created.json()
+    await page.goto('/record?assessment_id=' + assessment.id)
+    for (let index = 0; index < 3; index++) {
+      await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+      await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+      await page.waitForTimeout(9000)
+      await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+      await page.getByRole('button', { name: 'Use this take', exact: true }).click()
+      await expect(page.getByRole('heading', { name: index === 0 ? 'Read this unfamiliar passage' : index === 1 ? 'Read with expression' : 'All 3 tasks recorded', exact: true })).toBeVisible()
+    }
+    await page.getByRole('button', { name: 'Build my voice profile', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Retry analysis', exact: true })).toBeVisible()
+    const failed = await (await page.request.get('/api/v1/assessments/' + assessment.id)).json()
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Retry analysis', exact: true })).toBeVisible()
+    // Recover the job from assessment metadata even when the saved URL has no job parameter.
+    await page.goto('/analyzing?assessment_id=' + assessment.id)
+    await page.getByRole('button', { name: 'Retry analysis', exact: true }).click()
+    await expect(page.getByRole('heading', { name: kind === 'initial' ? 'Your voice profile' : 'Your check-in', exact: true })).toBeVisible()
+    await expect(page.getByText('Test-only report from a deterministic provider; no AI listening assessment was performed.')).toBeVisible()
+    const saved = await (await page.request.get('/api/v1/assessments/' + assessment.id)).json()
+    expect(saved.job_id).toBe(failed.job_id)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Keep in mind', exact: true })).toBeVisible()
+    await noOverflow(page)
+    return saved
+  }
+  const baseline = await run('initial')
+  await expect(page.getByLabel('Control passage recording')).toHaveAttribute('src', '/api/v1/recordings/' + baseline.tasks[0].recording_id + '/audio')
+  const checkin = await run('reassessment')
+  expect(checkin.comparison.comparable).toBe(true)
+  await expect(page.getByLabel('Before: control_text')).toHaveAttribute('src', '/api/v1/recordings/' + baseline.tasks[0].recording_id + '/audio')
+  await expect(page.getByLabel('After: control_text')).toHaveAttribute('src', '/api/v1/recordings/' + checkin.tasks[0].recording_id + '/audio')
+  await expect(page.getByText('These unfamiliar passages use different texts; compare the delivery rather than matching individual words.')).toBeVisible()
+  expect(uploads).toBe(6)
+  expect(submits).toBe(2)
+  expect(retries).toBe(2)
+  await page.getByRole('link', { name: 'See my new plan' }).click()
+  await expect(page.getByRole('heading', { name: 'Your plan', exact: true })).toBeVisible()
+  await expect(page.getByText('Session 1 of 14', { exact: true })).toBeVisible()
 })

@@ -100,3 +100,12 @@ Real Whisper output can contain a zero-length internal word even with correct tr
 Quote playback can widen to adjacent real positive word anchors when an internal/edge quoted word lacks a separate span. It returns the actual expanded phrase and an uncertainty note, rather than assigning that word a fabricated timestamp. Existing available metric values use the same voice-metrics-v3 calculation; this changes availability for formerly rejected partial alignments, not the numerical method for prior available results.
 
 The coaching prompt is versioned (`exercise-coaching-v2`) separately from its JSON schema. It asks for an audible reason before changing a feature and allows preserving a useful feature in a new text. The real synthetic probe still produced a mechanical pause-lengthening suggestion, so prompt compliance and human usefulness remain unresolved. Automated quote grounding is a location check, not a correctness certificate.
+
+
+## Assessment result and recovery
+
+A failed full analysis is resumed through its saved job, not another submit/upload. Recording/profile routes reach that job; analysis can recover its ID from the assessment, accepts links containing either identifier, and shows actual server stages. A stale incomplete profile is refreshed before redirecting again so a completed job cannot cause a navigation loop while its report loads. Missing identifiers and failed polling have explicit retryable UI states.
+
+Completed profiles show saved report/comparison limitations and private source playback, including the recorded script. The measurement-scope details identify which tasks supplied each numeric group. For assessment-v2, pitch/intonation range/pace/pauses use the first two reading tasks; the third expression task goes to the audio-model report only. Check-in labels the fresh unfamiliar text as different from its baseline passage. `assessment-coaching-v2` makes uncertainty notes user-facing and separates system policy from untrusted context/audio. This does not establish accurate auditory judgment.
+
+The opt-in browser test-server fixture has empty paid credentials and a deterministic provider from tests/browser_provider.py. It deliberately fails each new full analysis once, then verifies same-job retry, report limitations, source playback, check-in comparison and plan navigation. Its ASR/report are synthetic fixtures; only transport, state transitions, real local audio processing and UI behavior are asserted.

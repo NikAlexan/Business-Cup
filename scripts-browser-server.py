@@ -1,4 +1,4 @@
-"""Local-only browser test server: temporary database/audio, demo seed and no paid credentials."""
+"""Local-only browser test server: temporary database/audio, demo seed, optional deterministic profile fixture and no paid credentials."""
 
 import os
 import subprocess
@@ -60,6 +60,9 @@ def main():
             audio_data=Path(temp) / "audio",
             allowed_origins="http://127.0.0.1:4173",
         )
+        profile_fixture = os.environ.get("BUSINESS_CUP_BROWSER_PROFILE_FIXTURE") == "1"
+        if profile_fixture:
+            settings.job_max_attempts = 1
         app = create_app(settings)
 
         @app.get("/{path:path}", include_in_schema=False)
@@ -72,7 +75,12 @@ def main():
             return FileResponse(DIST / "index.html")
 
         stopped = threading.Event()
-        worker = Worker(settings, app.state.database)
+        if profile_fixture:
+            from tests.browser_provider import BrowserAssessmentProvider
+
+            worker = Worker(settings, app.state.database, provider_factory=BrowserAssessmentProvider)
+        else:
+            worker = Worker(settings, app.state.database)
 
         def process_jobs():
             while not stopped.is_set():

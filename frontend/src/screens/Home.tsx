@@ -129,7 +129,7 @@ export default function Home() {
           {checkIn && (
             <div className="rs-card rs-stack" style={{ gap: 8, padding: 24, background: 'var(--sky-tint)' }}>
               <h2 className="rs-h" style={{ fontSize: 22 }}>Check-in on {formatDate(checkIn, t.timezone)}</h2>
-              <p style={{ margin: 0, fontSize: 15 }}>Same 3 tasks as your baseline. Then a new plan.</p>
+              <p style={{ margin: 0, fontSize: 15 }}>Repeat the control and expression tasks, plus a fresh unfamiliar passage. Then a new plan.</p>
               {(t.reassessment.available || t.reassessment.demo_override_available) && (
                 <Link className="rs-link" to="/check-in" style={{ fontSize: 15 }}>Open check-in</Link>
               )}
