@@ -34,7 +34,7 @@ export function SpeechReview({ take, onHear }: { take: Attempt; onHear: (seconds
         <button className="rs-link" type="button" onClick={() => onHear(report.observation!.evidence.start_seconds)}>Listen to “{report.observation.evidence.quote}”</button>
         {report.observation.evidence.note && <p className="rs-label">{report.observation.evidence.note}</p>}
       </div>}
-      <p><strong>Try next:</strong> {report.next_step}</p>
+      <p><strong>Optional idea:</strong> {report.next_step}</p>
       <p><strong>Ask yourself:</strong> {report.listening_question}</p>
       <span className="rs-label">AI listening notes can be mistaken. Check the observation against your own playback.</span>
       {report.limitations.map((note, index) => <p className="rs-label" key={index}>{note}</p>)}

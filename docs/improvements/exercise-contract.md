@@ -114,3 +114,14 @@ The opt-in browser test-server fixture has empty paid credentials and a determin
 Focus precedence for narration: the frozen `training_focus` note/rubric is the coaching intent even when a repeat also stores a different earlier `practice_focus` reflection. The source reflection remains historical comparison context. Source-category editing restores the saved manual category unless the user explicitly selects the exercise default. A late reflection/listening-check save updates its own take without changing the current history selection.
 
 `targets-v2` changes pause-share wording, not numerical ranges or measurement methodology. A value in the practice band does not establish good semantic placement; the UI corrects old persisted labels as well. Playback remains the way to judge which thought a pause separates.
+
+
+## Listening decisions and keeping a useful feature
+
+A reflection can store intent=experiment, keep or undecided. These are subjective practice decisions, with no reward/skill implications. A note can be empty when the learner only wants to record a decision. Omitted or null intent in a legacy reflection PUT preserves the saved choice; choose undecided to defer a new action. The same note/choice returns the same timestamp.
+
+New story-focus snapshots include intent and rubric version story-listening-v2. Keep uses steps to preserve a useful feature in a new phrase without automatically intensifying it. Experiment tests one optional change. POST inherits source intent when omitted, defaults to experiment for pre-intent data, and requires an explicit new choice if the source is undecided. Saving an undecided reflection does not implicitly clear or replace a separately saved focus; the UI explains that relationship and links to current focus management.
+
+The editor offers native keyboard-operable radio choices and a user-authored note; it does not copy AI next_step through a shortcut. Failed saves retain the note/choice and retry identity. Choices and manual skill category restore after reload. Story focus freezes at recording start, normal same-item practice intent at accepted upload; later source edits do not rewrite those stored snapshots. Coaching receives practice_intent consistently with its frozen note, and prompt exercise-coaching-v3 allows retaining a feature or listening before deciding. No new paid quality evaluation has been performed, so model compliance/usefulness remains unproved.
+
+Legacy POST focus receipts keep their exact original fingerprint and response shape when intent is absent. Old snapshots without an intent remain readable; they are not rewritten with an invented listener decision. Native completion remains independent of all these optional reflections.

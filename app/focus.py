@@ -42,7 +42,7 @@ RUBRICS = {
         "exercise_ids": ["E12"],
     },
 }
-RUBRIC_VERSION = "story-listening-v1"
+RUBRIC_VERSION = "story-listening-v2"
 STORY_STEPS = [
     "Choose one phrase where your change could help the listener follow the meaning.",
     "Read the story once, keeping your voice comfortable.",
@@ -52,3 +52,10 @@ STORY_STEPS = [
 
 def suggested_skill(exercise_id):
     return next((key for key, rubric in RUBRICS.items() if exercise_id in rubric["exercise_ids"]), "delivery")
+
+
+KEEP_STEPS = [
+    "Choose a new phrase where the feature you want to keep can support the meaning.",
+    "Read the story once, keeping that useful feature comfortable.",
+    "Listen for the same feature in the new phrase. You can keep it without making it stronger.",
+]

@@ -178,8 +178,8 @@ export type Attempt = {
     reason?: string | null
     report: { summary: string; observation: { text: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; limitations: string[] } | null
   }
-  reflection?: { note: string; updated_at: string }
-  practice_focus?: { attempt_id: string; note: string } | null
+  reflection?: { note: string; updated_at: string; intent?: PracticeIntent }
+  practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null
   practice_only?: boolean
   created_at?: string
   recording_id?: string | null
@@ -225,11 +225,13 @@ export type Exercise = {
   tags: string[]
 }
 
-export type PendingTake = { training_focus?: TrainingFocus | null; based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
+export type PendingTake = { training_focus?: TrainingFocus | null; based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string; intent?: PracticeIntent } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
 export type PlanItemState = { training_focus?: TrainingFocus | null; plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }
 
+export type PracticeIntent = 'experiment' | 'keep' | 'undecided'
 export type FocusOutcome = 'heard' | 'partly' | 'not_yet' | 'unsure'
 export type TrainingFocus = {
+  intent?: Exclude<PracticeIntent, 'undecided'>
   id: string; note: string; skill: string; skill_label: string; listening_question: string
   steps: string[]; rubric_version: string; created_at: string
   source_attempt_id: string; source_plan_item_id: string; source_recording_id: string

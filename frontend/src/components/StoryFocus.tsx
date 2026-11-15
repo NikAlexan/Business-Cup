@@ -11,6 +11,7 @@ export function StoryFocus({ focus, recording = false, completed = false }: { fo
   useEffect(() => { if (recording) source.current?.pause() }, [recording])
   return <section className="rs-card rs-stack" aria-label="One focus for this story" style={{ padding: 22, gap: 10 }}>
     <h2 className="rs-h" style={{ fontSize: 22 }}>{completed ? 'Focus used for this take' : 'One focus for this story'}</h2>
+    <span className="rs-label">{focus.intent === 'keep' ? 'Keep a useful feature' : focus.intent === 'experiment' ? 'One optional experiment' : 'Saved practice focus'}</span>
     <p style={{ margin: 0 }}><strong>{focus.skill_label}:</strong> {focus.note}</p>
     {!completed && <ol style={{ margin: 0, paddingLeft: 22 }}>{focus.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>}
     <p style={{ margin: 0 }}><strong>Listen for:</strong> {focus.listening_question}</p>
@@ -27,7 +28,7 @@ export function FocusCheck({ take, onSaved }: { take: Attempt; onSaved: (attempt
     onSuccess: (updated) => { onSaved(updated); qc.setQueryData(['attempt', take.id], updated); void qc.invalidateQueries({ queryKey: ['practice-focus'] }) } })
   const selected = save.data?.focus_check?.outcome ?? take.focus_check?.outcome
   return <section className="rs-stack" aria-label="Your listening check" style={{ gap: 8 }}>
-    <h3 className="rs-h" style={{ fontSize: 20 }}>Could you hear your chosen change?</h3>
+    <h3 className="rs-h" style={{ fontSize: 20 }}>{take.training_focus?.intent === 'keep' ? 'Could you hear the feature you wanted to keep?' : 'Could you hear your chosen change?'}</h3>
     <span className="rs-label">Your own listening check · you can change it after listening again</span>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
       {OUTCOMES.map(([value, label]) => <button className="rs-btn rs-btn--secondary" key={value} type="button" aria-pressed={selected === value} disabled={save.isPending} onClick={() => save.mutate(value)}>{label}</button>)}

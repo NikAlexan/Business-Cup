@@ -506,11 +506,8 @@ def create_app(settings=None):
     @app.put("/api/v1/exercise-attempts/{attempt_id}/reflection")
     def reflection(attempt_id: UUID, payload: ReflectionInput, s: S):
         attempt = s.get(attempt_id, "attempt")
-        note = payload.note.strip()
-        if attempt.get("reflection", {}).get("note") != note:
-            attempt["reflection"] = {"note": note, "updated_at": iso()}
-            s.put("attempt", attempt)
-        return attempt
+        values = payload.model_dump(exclude_unset=True)
+        return s.save_reflection(attempt, values)
 
     @app.get("/api/v1/practice-focus")
     def practice_focus(s: S):
@@ -519,6 +516,8 @@ def create_app(settings=None):
     @app.post("/api/v1/practice-focus")
     def save_practice_focus(payload: PracticeFocusInput, request: Request, s: S):
         values = payload.model_dump(mode="json")
+        if values["intent"] is None:
+            values.pop("intent")  # Preserve fingerprints for pre-intent clients and same-key retries.
         return mutate(s, request, values, lambda: s.save_practice_focus(values))
 
     @app.delete("/api/v1/practice-focus/{focus_id}", status_code=204)

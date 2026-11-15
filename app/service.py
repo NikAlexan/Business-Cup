@@ -13,7 +13,7 @@ from app.access import NoBillingAccessPolicy
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
 from app.errors import ApiError, fail
-from app.focus import RUBRIC_VERSION, RUBRICS, STORY_STEPS, suggested_skill
+from app.focus import KEEP_STEPS, RUBRIC_VERSION, RUBRICS, STORY_STEPS, suggested_skill
 
 COOKIE = "guest_session"
 ACTIVE = {"draft", "queued", "processing", "needs_rerecord"}
@@ -615,7 +615,22 @@ class Service:
         source = self.get(source_id, "attempt")
         if source["plan_item_id"] != item_id:
             fail(404, "not_found", "The source take does not belong to this exercise.")
-        return {"attempt_id": source["id"], "note": source.get("reflection", {}).get("note", "")}
+        reflection = source.get("reflection") or {}
+        return {
+            "attempt_id": source["id"],
+            "note": reflection.get("note", ""),
+            **({"intent": reflection["intent"]} if reflection.get("intent") else {}),
+        }
+
+    def save_reflection(self, attempt, payload):
+        previous = attempt.get("reflection") or {}
+        reflection = {**previous, "note": payload["note"].strip()}
+        if payload.get("intent") is not None:
+            reflection["intent"] = payload["intent"]
+        if reflection != previous:
+            attempt["reflection"] = {**reflection, "updated_at": iso()}
+            self.put("attempt", attempt)
+        return attempt
 
     def active_practice_focus(self):
         self.auth()
@@ -649,13 +664,20 @@ class Service:
             )
         note = payload["note"].strip()
         if not note:
-            fail(422, "validation_error", "Describe one change to try in the story.")
+            fail(422, "validation_error", "Describe one experiment or a feature to keep in the story.")
         if (
             sum(self.local_date(f["created_at"]) == self.local_date() for f in self.all("practice_focus"))
             >= self.settings.max_uploads_per_day
         ):
             fail(
                 429, "rate_limit_exceeded", "Daily focus-change limit reached.", {"retry_after_seconds": 3600}
+            )
+        intent = payload.get("intent") or source.get("reflection", {}).get("intent") or "experiment"
+        if intent == "undecided":
+            fail(
+                422,
+                "focus_intent_required",
+                "Choose an experiment or a feature to keep before saving a story focus.",
             )
         skill = payload.get("skill") or suggested_skill(source["exercise_id"])
         focus = {
@@ -665,7 +687,8 @@ class Service:
             "skill": skill,
             "skill_label": RUBRICS[skill]["label"],
             "listening_question": RUBRICS[skill]["question"],
-            "steps": list(STORY_STEPS),
+            "steps": list(KEEP_STEPS if intent == "keep" else STORY_STEPS),
+            "intent": intent,
             "rubric_version": RUBRIC_VERSION,
             "source_attempt_id": source["id"],
             "source_plan_item_id": source["plan_item_id"],
@@ -673,9 +696,7 @@ class Service:
         }
         self.put("practice_focus", focus)
         self.guest.data = {**self.guest.data, "practice_focus_id": focus["id"]}
-        if source.get("reflection", {}).get("note") != note:
-            source["reflection"] = {"note": note, "updated_at": iso()}
-            self.put("attempt", source)
+        self.save_reflection(source, {"note": note, "intent": intent})
         return 201, {"focus": focus, "source_attempt": source}
 
     def clear_practice_focus(self, focus_id):

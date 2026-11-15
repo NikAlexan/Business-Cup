@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a958701f-4231-58c2-b575-02f1c37ddbcb",
     "name": "Voice Training API v1 — frontend contract",
-    "description": "Implemented Voice Training API v1. English product content; Russian integration guide in README.md. Examples are static illustrative data, not real analysis. IDs are opaque UUIDs; authentication uses the HttpOnly guest cookie.\nStory focus: choose one saved recorded-take reflection, explicitly attach its immutable version when starting narration, then save a subjective listening check. Older take snapshots remain unchanged; focus is carried into the next day.",
+    "description": "Implemented Voice Training API v1. English product content; Russian integration guide in README.md. Examples are static illustrative data, not real analysis. IDs are opaque UUIDs; authentication uses the HttpOnly guest cookie.\nStory focus: choose one saved recorded-take reflection, explicitly attach its immutable version when starting narration, then save a subjective listening check. Older take snapshots remain unchanged; focus is carried into the next day.\nListening decisions: experiment with one change, keep a useful feature, or save an undecided reflection without adopting a new story focus.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -5138,10 +5138,10 @@
                 "reflection"
               ]
             },
-            "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus.",
+            "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus. Optional intent: experiment | keep | undecided. Missing or null intent preserves a previous choice; undecided records a decision to listen first. The same note and intent preserve updated_at. Undecided may have an empty note and does not replace the active story focus.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"note\": \"Let the final word land.\"\n}",
+              "raw": "{\n  \"note\": \"Keep the final word comfortable.\",\n  \"intent\": \"keep\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5176,10 +5176,10 @@
                     "reflection"
                   ]
                 },
-                "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus.",
+                "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus. Optional intent: experiment | keep | undecided. Missing or null intent preserves a previous choice; undecided records a decision to listen first. The same note and intent preserve updated_at. Undecided may have an empty note and does not replace the active story focus.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"note\": \"Let the final word land.\"\n}",
+                  "raw": "{\n  \"note\": \"Keep the final word comfortable.\",\n  \"intent\": \"keep\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5196,7 +5196,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n  \"plan_item_id\": \"718e06e3-f16d-598c-b71c-4192ff38c5f4\",\n  \"exercise_id\": \"E01\",\n  \"status\": \"passed\",\n  \"verification_type\": \"timer\",\n  \"elapsed_seconds\": 60,\n  \"recording_id\": null,\n  \"feedback\": {\n    \"summary\": \"Warm-up completed.\",\n    \"metrics\": null,\n    \"issues\": [],\n    \"coaching\": []\n  },\n  \"created_at\": \"2026-11-14T12:00:00Z\",\n  \"completed_at\": \"2026-11-14T12:00:00Z\",\n  \"plan_item_status\": \"completed\",\n  \"practice_only\": false,\n  \"reward\": {\n    \"notes\": 2,\n    \"parts\": [\n      {\n        \"notes\": 2,\n        \"reason\": \"exercise_completed\"\n      }\n    ]\n  },\n  \"practice_seconds\": 60,\n  \"practice_seconds_source\": \"self_reported\",\n  \"reflection\": {\n    \"note\": \"Let the final word land.\",\n    \"updated_at\": \"2026-11-14T12:10:00Z\"\n  }\n}"
+              "body": "{\n  \"id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n  \"plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n  \"exercise_id\": \"E03\",\n  \"status\": \"passed\",\n  \"verification_type\": \"recording\",\n  \"elapsed_seconds\": null,\n  \"recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n  \"feedback\": {\n    \"summary\": \"Recording received. Audio quality checked; pronunciation and expression have not been scored.\",\n    \"metrics\": {\n      \"speaking_rate_wpm\": {\n        \"available\": true,\n        \"value\": 139.4,\n        \"unit\": \"words/min\",\n        \"unavailable_reason\": null\n      }\n    },\n    \"issues\": [],\n    \"coaching\": []\n  },\n  \"created_at\": \"2026-11-14T12:00:00Z\",\n  \"completed_at\": \"2026-11-14T12:00:00Z\",\n  \"plan_item_status\": \"completed\",\n  \"reward\": {\n    \"notes\": 3,\n    \"parts\": [\n      {\n        \"notes\": 3,\n        \"reason\": \"exercise_completed\"\n      }\n    ]\n  },\n  \"practice_seconds\": 60,\n  \"practice_only\": false,\n  \"practice_seconds_source\": \"audio_duration\",\n  \"reflection\": {\n    \"note\": \"Keep the final word comfortable.\",\n    \"intent\": \"keep\",\n    \"updated_at\": \"2026-11-15T10:10:00Z\"\n  }\n}"
             },
             {
               "name": "404 — Not Found",
@@ -5224,10 +5224,10 @@
                     "reflection"
                   ]
                 },
-                "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus.",
+                "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus. Optional intent: experiment | keep | undecided. Missing or null intent preserves a previous choice; undecided records a decision to listen first. The same note and intent preserve updated_at. Undecided may have an empty note and does not replace the active story focus.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"note\": \"Let the final word land.\"\n}",
+                  "raw": "{\n  \"note\": \"Keep the final word comfortable.\",\n  \"intent\": \"keep\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5245,6 +5245,54 @@
               ],
               "cookie": [],
               "body": "{\n  \"error\": {\n    \"code\": \"not_found\",\n    \"message\": \"Attempt not found.\",\n    \"details\": {},\n    \"request_id\": \"368d49be-ca55-5cbc-a8e8-eeb12b74a456\"\n  }\n}"
+            },
+            {
+              "name": "200 — listen before deciding",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/exercise-attempts/{{attempt_id}}/reflection",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "exercise-attempts",
+                    "{{attempt_id}}",
+                    "reflection"
+                  ]
+                },
+                "description": "Owned take only. Trimmed note up to 500 characters; repeating the same note returns unchanged data. Empty note clears it. This subjective reflection is not an automatic speech assessment. For extra practice, optional based_on_attempt_id in upload and attempt snapshots this focus. Optional intent: experiment | keep | undecided. Missing or null intent preserves a previous choice; undecided records a decision to listen first. The same note and intent preserve updated_at. Undecided may have an empty note and does not replace the active story focus.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"note\": \"\",\n  \"intent\": \"undecided\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n  \"plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n  \"exercise_id\": \"E03\",\n  \"status\": \"passed\",\n  \"verification_type\": \"recording\",\n  \"elapsed_seconds\": null,\n  \"recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n  \"feedback\": {\n    \"summary\": \"Recording received. Audio quality checked; pronunciation and expression have not been scored.\",\n    \"metrics\": {\n      \"speaking_rate_wpm\": {\n        \"available\": true,\n        \"value\": 139.4,\n        \"unit\": \"words/min\",\n        \"unavailable_reason\": null\n      }\n    },\n    \"issues\": [],\n    \"coaching\": []\n  },\n  \"created_at\": \"2026-11-14T12:00:00Z\",\n  \"completed_at\": \"2026-11-14T12:00:00Z\",\n  \"plan_item_status\": \"completed\",\n  \"reward\": {\n    \"notes\": 3,\n    \"parts\": [\n      {\n        \"notes\": 3,\n        \"reason\": \"exercise_completed\"\n      }\n    ]\n  },\n  \"practice_seconds\": 60,\n  \"practice_only\": false,\n  \"practice_seconds_source\": \"audio_duration\",\n  \"reflection\": {\n    \"note\": \"\",\n    \"intent\": \"undecided\",\n    \"updated_at\": \"2026-11-15T10:11:00Z\"\n  }\n}"
             }
           ]
         },
@@ -5506,7 +5554,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"focus\": {\n    \"id\": \"e2e9283b-667d-535d-8448-f162a0d639d7\",\n    \"created_at\": \"2026-11-15T10:00:00Z\",\n    \"note\": \"Let the final word land.\",\n    \"skill\": \"word_endings\",\n    \"skill_label\": \"Word endings\",\n    \"listening_question\": \"Can you hear the final sound of the key words without extra force?\",\n    \"steps\": [\n      \"Choose one phrase where your change could help the listener follow the meaning.\",\n      \"Read the story once, keeping your voice comfortable.\",\n      \"Listen to that phrase. In an optional repeat, change just one thing and compare both takes.\"\n    ],\n    \"rubric_version\": \"story-listening-v1\",\n    \"source_attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"source_plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"source_recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\"\n  },\n  \"skills\": {\n    \"word_endings\": {\n      \"label\": \"Word endings\",\n      \"question\": \"Can you hear the final sound of the key words without extra force?\",\n      \"exercise_ids\": [\n        \"E03\"\n      ]\n    },\n    \"consonants\": {\n      \"label\": \"Clear sound groups\",\n      \"question\": \"Can you follow the sound groups in the phrase without losing the thought?\",\n      \"exercise_ids\": [\n        \"E02\",\n        \"E04\",\n        \"E05\"\n      ]\n    },\n    \"pace\": {\n      \"label\": \"Comfortable pace\",\n      \"question\": \"Can you follow the idea while the words stay comfortably connected?\",\n      \"exercise_ids\": [\n        \"E06\",\n        \"E07\"\n      ]\n    },\n    \"pauses\": {\n      \"label\": \"Meaningful pauses\",\n      \"question\": \"Does your chosen pause help one thought land before the next begins?\",\n      \"exercise_ids\": [\n        \"E08\"\n      ]\n    },\n    \"intonation\": {\n      \"label\": \"Intonation\",\n      \"question\": \"Can you hear which phrase is a question, a statement or a change of thought?\",\n      \"exercise_ids\": [\n        \"E09\"\n      ]\n    },\n    \"emphasis\": {\n      \"label\": \"Meaning through emphasis\",\n      \"question\": \"Can you hear the word you chose to carry the meaning, without extra loudness?\",\n      \"exercise_ids\": [\n        \"E10\"\n      ]\n    },\n    \"breath\": {\n      \"label\": \"Comfortable phrasing\",\n      \"question\": \"Does the phrase sound complete and comfortable, with room to breathe when needed?\",\n      \"exercise_ids\": [\n        \"E11\"\n      ]\n    },\n    \"delivery\": {\n      \"label\": \"Story delivery\",\n      \"question\": \"Can a listener follow the change or discovery in the story?\",\n      \"exercise_ids\": [\n        \"E12\"\n      ]\n    }\n  },\n  \"last_check\": {\n    \"attempt_id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\",\n    \"outcome\": \"partly\",\n    \"source\": \"user_listening\",\n    \"updated_at\": \"2026-11-15T10:05:00Z\"\n  }\n}"
+              "body": "{\n  \"focus\": {\n    \"id\": \"e2e9283b-667d-535d-8448-f162a0d639d7\",\n    \"created_at\": \"2026-11-15T10:00:00Z\",\n    \"note\": \"Let the final word land.\",\n    \"skill\": \"word_endings\",\n    \"skill_label\": \"Word endings\",\n    \"listening_question\": \"Can you hear the final sound of the key words without extra force?\",\n    \"steps\": [\n      \"Choose a new phrase where the feature you want to keep can support the meaning.\",\n      \"Read the story once, keeping that useful feature comfortable.\",\n      \"Listen for the same feature in the new phrase. You can keep it without making it stronger.\"\n    ],\n    \"rubric_version\": \"story-listening-v2\",\n    \"source_attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"source_plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"source_recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n    \"intent\": \"keep\"\n  },\n  \"skills\": {\n    \"word_endings\": {\n      \"label\": \"Word endings\",\n      \"question\": \"Can you hear the final sound of the key words without extra force?\",\n      \"exercise_ids\": [\n        \"E03\"\n      ]\n    },\n    \"consonants\": {\n      \"label\": \"Clear sound groups\",\n      \"question\": \"Can you follow the sound groups in the phrase without losing the thought?\",\n      \"exercise_ids\": [\n        \"E02\",\n        \"E04\",\n        \"E05\"\n      ]\n    },\n    \"pace\": {\n      \"label\": \"Comfortable pace\",\n      \"question\": \"Can you follow the idea while the words stay comfortably connected?\",\n      \"exercise_ids\": [\n        \"E06\",\n        \"E07\"\n      ]\n    },\n    \"pauses\": {\n      \"label\": \"Meaningful pauses\",\n      \"question\": \"Does your chosen pause help one thought land before the next begins?\",\n      \"exercise_ids\": [\n        \"E08\"\n      ]\n    },\n    \"intonation\": {\n      \"label\": \"Intonation\",\n      \"question\": \"Can you hear which phrase is a question, a statement or a change of thought?\",\n      \"exercise_ids\": [\n        \"E09\"\n      ]\n    },\n    \"emphasis\": {\n      \"label\": \"Meaning through emphasis\",\n      \"question\": \"Can you hear the word you chose to carry the meaning, without extra loudness?\",\n      \"exercise_ids\": [\n        \"E10\"\n      ]\n    },\n    \"breath\": {\n      \"label\": \"Comfortable phrasing\",\n      \"question\": \"Does the phrase sound complete and comfortable, with room to breathe when needed?\",\n      \"exercise_ids\": [\n        \"E11\"\n      ]\n    },\n    \"delivery\": {\n      \"label\": \"Story delivery\",\n      \"question\": \"Can a listener follow the change or discovery in the story?\",\n      \"exercise_ids\": [\n        \"E12\"\n      ]\n    }\n  },\n  \"last_check\": {\n    \"attempt_id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\",\n    \"outcome\": \"partly\",\n    \"source\": \"user_listening\",\n    \"updated_at\": \"2026-11-15T10:05:00Z\"\n  }\n}"
             },
             {
               "name": "200 — no focus",
@@ -5571,10 +5619,10 @@
                 "practice-focus"
               ]
             },
-            "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit.",
+            "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit. Optional intent: experiment | keep; omitted inherits the source reflection choice, or experiment for pre-intent data. An undecided source requires an explicit new choice. The focus snapshot preserves this intention; keep uses practice steps without intensifying the feature.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"source_attempt_id\": \"{{focus_source_attempt_id}}\",\n  \"note\": \"Let the final word land.\",\n  \"skill\": \"word_endings\"\n}",
+              "raw": "{\n  \"source_attempt_id\": \"{{focus_source_attempt_id}}\",\n  \"note\": \"Let the final word land.\",\n  \"skill\": \"word_endings\",\n  \"intent\": \"keep\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5611,10 +5659,10 @@
                     "practice-focus"
                   ]
                 },
-                "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit.",
+                "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit. Optional intent: experiment | keep; omitted inherits the source reflection choice, or experiment for pre-intent data. An undecided source requires an explicit new choice. The focus snapshot preserves this intention; keep uses practice steps without intensifying the feature.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"source_attempt_id\": \"{{focus_source_attempt_id}}\",\n  \"note\": \"Let the final word land.\",\n  \"skill\": \"word_endings\"\n}",
+                  "raw": "{\n  \"source_attempt_id\": \"{{focus_source_attempt_id}}\",\n  \"note\": \"Let the final word land.\",\n  \"skill\": \"word_endings\",\n  \"intent\": \"keep\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5631,7 +5679,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"focus\": {\n    \"id\": \"e2e9283b-667d-535d-8448-f162a0d639d7\",\n    \"created_at\": \"2026-11-15T10:00:00Z\",\n    \"note\": \"Let the final word land.\",\n    \"skill\": \"word_endings\",\n    \"skill_label\": \"Word endings\",\n    \"listening_question\": \"Can you hear the final sound of the key words without extra force?\",\n    \"steps\": [\n      \"Choose one phrase where your change could help the listener follow the meaning.\",\n      \"Read the story once, keeping your voice comfortable.\",\n      \"Listen to that phrase. In an optional repeat, change just one thing and compare both takes.\"\n    ],\n    \"rubric_version\": \"story-listening-v1\",\n    \"source_attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"source_plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"source_recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\"\n  },\n  \"source_attempt\": {\n    \"id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"exercise_id\": \"E03\",\n    \"status\": \"passed\",\n    \"verification_type\": \"recording\",\n    \"elapsed_seconds\": null,\n    \"recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n    \"feedback\": {\n      \"summary\": \"Recording received. Audio quality checked; pronunciation and expression have not been scored.\",\n      \"metrics\": {\n        \"speaking_rate_wpm\": {\n          \"available\": true,\n          \"value\": 139.4,\n          \"unit\": \"words/min\",\n          \"unavailable_reason\": null\n        }\n      },\n      \"issues\": [],\n      \"coaching\": []\n    },\n    \"created_at\": \"2026-11-14T12:00:00Z\",\n    \"completed_at\": \"2026-11-14T12:00:00Z\",\n    \"plan_item_status\": \"completed\",\n    \"reward\": {\n      \"notes\": 3,\n      \"parts\": [\n        {\n          \"notes\": 3,\n          \"reason\": \"exercise_completed\"\n        }\n      ]\n    },\n    \"practice_seconds\": 60,\n    \"practice_only\": false,\n    \"practice_seconds_source\": \"audio_duration\",\n    \"reflection\": {\n      \"note\": \"Let the final word land.\",\n      \"updated_at\": \"2026-11-15T10:00:00Z\"\n    }\n  }\n}"
+              "body": "{\n  \"focus\": {\n    \"id\": \"e2e9283b-667d-535d-8448-f162a0d639d7\",\n    \"created_at\": \"2026-11-15T10:00:00Z\",\n    \"note\": \"Let the final word land.\",\n    \"skill\": \"word_endings\",\n    \"skill_label\": \"Word endings\",\n    \"listening_question\": \"Can you hear the final sound of the key words without extra force?\",\n    \"steps\": [\n      \"Choose a new phrase where the feature you want to keep can support the meaning.\",\n      \"Read the story once, keeping that useful feature comfortable.\",\n      \"Listen for the same feature in the new phrase. You can keep it without making it stronger.\"\n    ],\n    \"rubric_version\": \"story-listening-v2\",\n    \"source_attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"source_plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"source_recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n    \"intent\": \"keep\"\n  },\n  \"source_attempt\": {\n    \"id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"exercise_id\": \"E03\",\n    \"status\": \"passed\",\n    \"verification_type\": \"recording\",\n    \"elapsed_seconds\": null,\n    \"recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n    \"feedback\": {\n      \"summary\": \"Recording received. Audio quality checked; pronunciation and expression have not been scored.\",\n      \"metrics\": {\n        \"speaking_rate_wpm\": {\n          \"available\": true,\n          \"value\": 139.4,\n          \"unit\": \"words/min\",\n          \"unavailable_reason\": null\n        }\n      },\n      \"issues\": [],\n      \"coaching\": []\n    },\n    \"created_at\": \"2026-11-14T12:00:00Z\",\n    \"completed_at\": \"2026-11-14T12:00:00Z\",\n    \"plan_item_status\": \"completed\",\n    \"reward\": {\n      \"notes\": 3,\n      \"parts\": [\n        {\n          \"notes\": 3,\n          \"reason\": \"exercise_completed\"\n        }\n      ]\n    },\n    \"practice_seconds\": 60,\n    \"practice_only\": false,\n    \"practice_seconds_source\": \"audio_duration\",\n    \"reflection\": {\n      \"note\": \"Let the final word land.\",\n      \"updated_at\": \"2026-11-15T10:00:00Z\",\n      \"intent\": \"keep\"\n    }\n  }\n}"
             },
             {
               "name": "422 — source has no accepted audio",
@@ -5661,7 +5709,57 @@
                     "practice-focus"
                   ]
                 },
-                "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit.",
+                "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit. Optional intent: experiment | keep; omitted inherits the source reflection choice, or experiment for pre-intent data. An undecided source requires an explicit new choice. The focus snapshot preserves this intention; keep uses practice steps without intensifying the feature.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"source_attempt_id\": \"{{focus_source_attempt_id}}\",\n  \"note\": \"Let the final word land.\",\n  \"skill\": \"word_endings\",\n  \"intent\": \"keep\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"error\": {\n    \"code\": \"focus_source_not_available\",\n    \"message\": \"Choose a saved, accepted recording for your story focus.\",\n    \"details\": {},\n    \"request_id\": \"70755a71-d809-5a7c-a568-2d12f8679131\"\n  }\n}"
+            },
+            {
+              "name": "422 — source decision is still undecided",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{idempotency_key}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}{{api_prefix}}/practice-focus",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "{{api_prefix}}",
+                    "practice-focus"
+                  ]
+                },
+                "description": "Choose an owned passed recorded attempt, not a timer/self-confirmation. Note is trimmed, 1..500 characters; optional skill defaults from its exercise. Creates an immutable focus and saves the source reflection atomically. New operation needs a new key; same-key replay returns the original focus. Focus changes per local day are bounded by the recording limit. Optional intent: experiment | keep; omitted inherits the source reflection choice, or experiment for pre-intent data. An undecided source requires an explicit new choice. The focus snapshot preserves this intention; keep uses practice steps without intensifying the feature.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"source_attempt_id\": \"{{focus_source_attempt_id}}\",\n  \"note\": \"Let the final word land.\",\n  \"skill\": \"word_endings\"\n}",
@@ -5681,7 +5779,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"error\": {\n    \"code\": \"focus_source_not_available\",\n    \"message\": \"Choose a saved, accepted recording for your story focus.\",\n    \"details\": {},\n    \"request_id\": \"70755a71-d809-5a7c-a568-2d12f8679131\"\n  }\n}"
+              "body": "{\n  \"error\": {\n    \"code\": \"focus_intent_required\",\n    \"message\": \"Choose an experiment or a feature to keep before saving a story focus.\",\n    \"details\": {},\n    \"request_id\": \"70755a71-d809-5a7c-a568-2d12f8679131\"\n  }\n}"
             }
           ],
           "event": [
@@ -5835,7 +5933,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\",\n  \"plan_item_id\": \"c879fd09-f758-545a-afcf-4f03850de4bb\",\n  \"exercise_id\": \"E12\",\n  \"status\": \"passed\",\n  \"verification_type\": \"recording\",\n  \"elapsed_seconds\": null,\n  \"recording_id\": \"d98d531e-287c-58ba-bff0-c9703791b1b2\",\n  \"feedback\": {\n    \"summary\": \"Recording received. Audio quality checked; pronunciation and expression have not been scored.\",\n    \"metrics\": {\n      \"speaking_rate_wpm\": {\n        \"available\": true,\n        \"value\": 139.4,\n        \"unit\": \"words/min\",\n        \"unavailable_reason\": null\n      }\n    },\n    \"issues\": [],\n    \"coaching\": []\n  },\n  \"created_at\": \"2026-11-14T12:00:00Z\",\n  \"completed_at\": \"2026-11-14T12:00:00Z\",\n  \"plan_item_status\": \"completed\",\n  \"reward\": {\n    \"notes\": 3,\n    \"parts\": [\n      {\n        \"notes\": 3,\n        \"reason\": \"exercise_completed\"\n      }\n    ]\n  },\n  \"practice_seconds\": 60,\n  \"practice_only\": false,\n  \"practice_seconds_source\": \"audio_duration\",\n  \"training_focus\": {\n    \"id\": \"e2e9283b-667d-535d-8448-f162a0d639d7\",\n    \"created_at\": \"2026-11-15T10:00:00Z\",\n    \"note\": \"Let the final word land.\",\n    \"skill\": \"word_endings\",\n    \"skill_label\": \"Word endings\",\n    \"listening_question\": \"Can you hear the final sound of the key words without extra force?\",\n    \"steps\": [\n      \"Choose one phrase where your change could help the listener follow the meaning.\",\n      \"Read the story once, keeping your voice comfortable.\",\n      \"Listen to that phrase. In an optional repeat, change just one thing and compare both takes.\"\n    ],\n    \"rubric_version\": \"story-listening-v1\",\n    \"source_attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"source_plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"source_recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\"\n  },\n  \"focus_check\": {\n    \"outcome\": \"partly\",\n    \"source\": \"user_listening\",\n    \"updated_at\": \"2026-11-15T10:05:00Z\"\n  }\n}"
+              "body": "{\n  \"id\": \"2394e5d4-00db-5535-b6b4-eeb990ce2350\",\n  \"plan_item_id\": \"c879fd09-f758-545a-afcf-4f03850de4bb\",\n  \"exercise_id\": \"E12\",\n  \"status\": \"passed\",\n  \"verification_type\": \"recording\",\n  \"elapsed_seconds\": null,\n  \"recording_id\": \"d98d531e-287c-58ba-bff0-c9703791b1b2\",\n  \"feedback\": {\n    \"summary\": \"Recording received. Audio quality checked; pronunciation and expression have not been scored.\",\n    \"metrics\": {\n      \"speaking_rate_wpm\": {\n        \"available\": true,\n        \"value\": 139.4,\n        \"unit\": \"words/min\",\n        \"unavailable_reason\": null\n      }\n    },\n    \"issues\": [],\n    \"coaching\": []\n  },\n  \"created_at\": \"2026-11-14T12:00:00Z\",\n  \"completed_at\": \"2026-11-14T12:00:00Z\",\n  \"plan_item_status\": \"completed\",\n  \"reward\": {\n    \"notes\": 3,\n    \"parts\": [\n      {\n        \"notes\": 3,\n        \"reason\": \"exercise_completed\"\n      }\n    ]\n  },\n  \"practice_seconds\": 60,\n  \"practice_only\": false,\n  \"practice_seconds_source\": \"audio_duration\",\n  \"training_focus\": {\n    \"id\": \"e2e9283b-667d-535d-8448-f162a0d639d7\",\n    \"created_at\": \"2026-11-15T10:00:00Z\",\n    \"note\": \"Let the final word land.\",\n    \"skill\": \"word_endings\",\n    \"skill_label\": \"Word endings\",\n    \"listening_question\": \"Can you hear the final sound of the key words without extra force?\",\n    \"steps\": [\n      \"Choose a new phrase where the feature you want to keep can support the meaning.\",\n      \"Read the story once, keeping that useful feature comfortable.\",\n      \"Listen for the same feature in the new phrase. You can keep it without making it stronger.\"\n    ],\n    \"rubric_version\": \"story-listening-v2\",\n    \"source_attempt_id\": \"d7427a21-6327-50cd-982a-b99eda199495\",\n    \"source_plan_item_id\": \"902a4cc2-6ecf-56e3-bbc4-2b91002e6bf3\",\n    \"source_recording_id\": \"09be4dc7-5c0c-5a4f-944c-05a55b18d39c\",\n    \"intent\": \"keep\"\n  },\n  \"focus_check\": {\n    \"outcome\": \"partly\",\n    \"source\": \"user_listening\",\n    \"updated_at\": \"2026-11-15T10:05:00Z\"\n  }\n}"
             },
             {
               "name": "422 — take has no story focus",

@@ -40,12 +40,19 @@ def test_daily_review_sends_actual_audio_and_validates_the_small_coaching_contra
         assert "untrusted" in body["messages"][0]["content"]
         assert "Do not invent measurements" in body["messages"][0]["content"]
         assert "retain that useful feature" in body["messages"][0]["content"]
+        assert "undecided means listen first" in body["messages"][0]["content"]
+        assert '"practice_intent": "keep"' in content[0]["text"]
         assert "unavailable timing does not mean audio is absent" in body["messages"][0]["content"]
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(DAILY_REPORT)}}]})
 
     p = provider(handler)
     try:
-        assert p.exercise_review(np.zeros(16000), {"saved_focus": "Keep endings audible"}) == DAILY_REPORT
+        assert (
+            p.exercise_review(
+                np.zeros(16000), {"saved_focus": "Keep endings audible", "practice_intent": "keep"}
+            )
+            == DAILY_REPORT
+        )
     finally:
         p.close()
 

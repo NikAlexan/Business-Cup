@@ -62,6 +62,7 @@ class CancelUploadInput(Input):
 
 class PracticeFocusInput(Input):
     source_attempt_id: UUID
+    intent: Literal["experiment", "keep"] | None = None
     note: str = Field(min_length=1, max_length=500)
     skill: (
         Literal[
@@ -114,6 +115,7 @@ class VoiceReport(Input):
 
 class ReflectionInput(Input):
     note: str = Field(max_length=500)
+    intent: Literal["experiment", "keep", "undecided"] | None = None
 
 
 class SpeechObservation(Input):

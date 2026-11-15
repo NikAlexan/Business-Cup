@@ -159,3 +159,6 @@ A bounded real-provider probe with public synthetic speech exposed and fixed par
 
 
 The completed profile exposes its saved limitations, private source takes and measurement scope. Unfinished profile links resume the saved recording/analysis flow; failed analysis retries its existing job. The analysis screen can restore that job from the assessment alone and reports server stages rather than marking uncompleted stages as finished. New assessment reports store `analysis_metadata.prompt_version`; limitations are user-facing uncertainty notes.
+
+
+Listening reflections can now record one of three intentions: try an experiment, keep a useful feature, or listen again before deciding. A story focus freezes the chosen intention and appropriate steps; keeping a feature does not require making it stronger. An undecided note can be empty and does not replace an existing focus. AI ideas remain optional alongside playback; they are no longer copied into the next goal by a shortcut. These user choices do not establish the correctness of a model's advice or mastery of a skill.

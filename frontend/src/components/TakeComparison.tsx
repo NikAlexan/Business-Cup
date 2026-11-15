@@ -24,6 +24,8 @@ export function TakeComparison({ take }: { take: Attempt }) {
       <span className="rs-label">Previous take · use the player above for this take</span>
       <audio controls preload="metadata" aria-label="Previous take for comparison" src={'/api/v1/recordings/' + before.recording_id + '/audio'} style={{ width: '100%' }} />
     </>}
+    {take.practice_focus.intent === 'keep' && <p className="rs-label">You chose to keep a useful feature for this take.</p>}
+    {take.practice_focus.intent === 'undecided' && <p className="rs-label">You chose to listen again before deciding on a change.</p>}
     {before?.training_focus && <p className="rs-label">Previous story focus: {before.training_focus.note}</p>}
     {before && before.training_focus?.id !== take.training_focus?.id && <p className="rs-label">Your chosen focus changed between these takes. Keep that change in mind when listening.</p>}
     {rows.length > 0 && <table style={{ width: '100%', textAlign: 'left' }}>

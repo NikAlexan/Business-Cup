@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from app.content import EXERCISES
 from app.schemas import ExerciseReview, VoiceReport
 
-EXERCISE_PROMPT_VERSION = "exercise-coaching-v2"
+EXERCISE_PROMPT_VERSION = "exercise-coaching-v3"
 ASSESSMENT_PROMPT_VERSION = "assessment-coaching-v2"
 
 
@@ -126,6 +126,9 @@ class OpenAIAudioProvider:
             "The quote identifies where to listen; it is not proof that your interpretation is correct. "
             "If no specific observation is supported, set observation to null and say what could not be judged. "
             "Give ONE comfortable action for the next take and a concrete question for listening back. "
+            "practice_intent is the user's listening decision, not an independent evaluation: keep means carry a "
+            "useful feature into new text without automatically intensifying it; undecided means listen first "
+            "without demanding a correction; experiment means test one optional change. "
             "An action is an optional experiment, not a required correction. If the chosen change already supports "
             "the meaning, acknowledge it and retain that useful feature in a different sentence or story. "
             "Do not mechanically request a longer pause, slower pace, louder sound or larger pitch range just "

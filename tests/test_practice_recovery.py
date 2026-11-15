@@ -1,6 +1,7 @@
 import copy
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.conftest import guest, post, upload
@@ -74,12 +75,16 @@ def test_archived_item_and_pending_extra_take_are_recoverable(client, app, worke
     assert state["item"]["latest_attempt_id"] == first["id"]
 
 
-def test_reflection_is_owned_idempotent_and_frozen_with_the_next_take(client, app, worker, speech_file):
+@pytest.mark.parametrize("intent", [None, "keep"])
+def test_reflection_is_owned_idempotent_and_frozen_with_the_next_take(
+    client, app, worker, speech_file, intent
+):
     _, item = setup_plan(client, app)
     rid = take(client, worker, speech_file, item)
     first = post(client, "/exercise-attempts", {"plan_item_id": item["id"], "recording_id": rid}).json()
     path = "/api/v1/exercise-attempts/" + first["id"] + "/reflection"
-    saved = client.put(path, json={"note": "  Let the final word land.  "})
+    choice = {"intent": intent} if intent else {}
+    saved = client.put(path, json={"note": "  Let the final word land.  ", **choice})
     assert saved.status_code == 200 and saved.json()["reflection"]["note"] == "Let the final word land."
     assert client.put(path, json={"note": "Let the final word land."}).json() == saved.json()
     assert client.put(path, json={"note": "x" * 501}).status_code == 422
@@ -103,6 +108,7 @@ def test_reflection_is_owned_idempotent_and_frozen_with_the_next_take(client, ap
     assert response.json()["practice_focus"] == {
         "attempt_id": first["id"],
         "note": "Let the final word land.",
+        **choice,
     }
     with TestClient(app) as other:
         guest(other)

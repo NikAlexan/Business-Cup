@@ -336,7 +336,7 @@ test('saved reflection becomes the next takes focus and is restored when selecti
     if (path === '/api/v1/exercise-attempts') { rows = [extra, original]; return Response.json(extra) }
   })
   open('/exercise/item')
-  const reflection = await screen.findByRole('textbox', { name: 'What did you hear, and what will you try next?' })
+  const reflection = await screen.findByRole('textbox', { name: 'Your listening note' })
   fireEvent.change(reflection, { target: { value: note } })
   fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
   await screen.findByText('Reflection saved with this take.')
@@ -365,7 +365,7 @@ test('a timing observation seeks its saved audio to the cited moment', async () 
 
 test.each([true, false])('repeat comparison restores source playback and only compares compatible timings: %s', async (compatible) => {
   const before = { ...savedAttempt, feedback: { ...savedAttempt.feedback, version: 'speech-timing-feedback-v1' } }
-  const extra = { ...savedAttempt, id: 'extra', practice_only: true, practice_focus: { attempt_id: 'attempt', note: 'Let the final word land.' },
+  const extra = { ...savedAttempt, id: 'extra', practice_only: true, practice_focus: { attempt_id: 'attempt', note: 'Let the final word land.', intent: 'keep' },
     feedback: { ...savedAttempt.feedback, version: compatible ? 'speech-timing-feedback-v1' : 'older-timing',
       metrics: { speaking_rate_wpm: { available: true, value: 140, unit: 'words/min', unavailable_reason: null } } } }
   setup(baseItem, (path) => {
@@ -374,6 +374,7 @@ test.each([true, false])('repeat comparison restores source playback and only co
   })
   open('/exercise/item')
   expect((await screen.findByLabelText('Previous take for comparison')).getAttribute('src')).toBe('/api/v1/recordings/recording/audio')
+  expect(screen.getByText('You chose to keep a useful feature for this take.')).toBeTruthy()
   if (compatible) {
     expect(screen.getByRole('cell', { name: '165 words/min' })).toBeTruthy()
     expect(screen.getByRole('cell', { name: '140 words/min' })).toBeTruthy()
@@ -435,7 +436,7 @@ test('a speech-coaching failure keeps saved audio, reflection and completion ava
   fireEvent.click(await screen.findByRole('button', { name: 'Retry speech coaching' }))
   await waitFor(() => expect(retried).toBe(true))
   expect(screen.getByLabelText('Your completed take')).toBeTruthy()
-  expect(screen.getByRole('textbox', { name: 'What did you hear, and what will you try next?' })).toBeTruthy()
+  expect(screen.getByRole('textbox', { name: 'Your listening note' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Practice again — no extra notes' })).toBeTruthy()
 })
 
@@ -577,7 +578,7 @@ test('a reflection becomes a story focus, survives narration and saves a subject
     if (path === '/api/v1/plan-items/item') return Response.json({ item: baseItem, lesson, item_index: 0, plan_status: 'active', pending_take: null })
     if (path === '/api/v1/practice-focus') {
       if (init?.method === 'POST') {
-        expect(JSON.parse(String(init.body))).toEqual({ source_attempt_id: 'attempt', note: storyFocus.note, skill: 'pauses' })
+        expect(JSON.parse(String(init.body))).toEqual({ source_attempt_id: 'attempt', note: storyFocus.note, skill: 'pauses', intent: 'experiment' })
         active = storyFocus; original = { ...original, reflection: { note: storyFocus.note, updated_at: 'now' } }
         return Response.json({ focus: active, source_attempt: original }, { status: 201 })
       }
@@ -600,10 +601,11 @@ test('a reflection becomes a story focus, survives narration and saves a subject
     }
   })
   const view = open('/exercise/item')
-  const note = await screen.findByRole('textbox', { name: 'What did you hear, and what will you try next?' })
+  const note = await screen.findByRole('textbox', { name: 'Your listening note' })
   fireEvent.change(note, { target: { value: storyFocus.note } })
   await screen.findByRole('option', { name: 'Meaningful pauses' })
   fireEvent.change(screen.getByRole('combobox', { name: 'Focus for story practice' }), { target: { value: 'pauses' } })
+  fireEvent.click(screen.getByRole('radio', { name: 'Try one small change' }))
   fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
   fireEvent.click(await screen.findByRole('link', { name: 'Open the story' }))
   await screen.findByRole('heading', { name: 'One focus for this story' })
@@ -739,4 +741,80 @@ test.each(['focus-check', 'reflection'])('a late %s save updates its take withou
   await screen.findByText('Take A feedback.')
   if (operation === 'focus-check') expect(screen.getByRole('button', { name: 'Partly' }).getAttribute('aria-pressed')).toBe('true')
   else expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('A saved note.')
+})
+
+test('keeping a useful feature survives a failed focus save and reload without copying the AI idea', async () => {
+  const note = 'Keep the gap after bridge so the next idea starts separately.'
+  let original = { ...savedAttempt, reflection: { note: '', updated_at: '', intent: undefined as 'keep' | undefined },
+    speech_review: { status: 'completed', job_id: null, report: { summary: 'The thoughts have room.', observation: null,
+      next_step: 'Make the pause longer.', listening_question: 'Can you follow the thoughts?', limitations: ['One take only.'] } } }
+  let active: TrainingFocus | null = null
+  const keys: string[] = []
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+    if (path === '/api/v1/practice-focus') {
+      if (init?.method === 'POST') {
+        keys.push(String((init.headers as Record<string, string>)['Idempotency-Key']))
+        const payload = JSON.parse(String(init.body))
+        expect(payload.intent).toBe('keep')
+        expect(payload.note).toBe(note)
+        if (keys.length === 1) return Response.json({ error: { message: 'Focus save offline.' } }, { status: 503 })
+        active = { ...storyFocus, note, intent: 'keep', skill: 'pace' }
+        original = { ...original, reflection: { note, intent: 'keep', updated_at: 'now' } }
+        return Response.json({ focus: active, source_attempt: original }, { status: 201 })
+      }
+      return Response.json({ focus: active, skills: { pace: { label: 'Comfortable pace', exercise_ids: ['E06'] } }, last_check: null })
+    }
+  })
+  const view = open('/exercise/item')
+  await screen.findByText('Make the pause longer.')
+  expect(screen.queryByRole('button', { name: 'Use suggested change' })).toBeNull()
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('')
+  fireEvent.click(screen.getByRole('radio', { name: 'Keep a useful feature' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: note } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
+  await screen.findByText('Focus save offline.')
+  expect((screen.getByRole('radio', { name: 'Keep a useful feature' }) as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(note)
+  fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
+  await screen.findByText('Saved for story practice and your next session.')
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
+  expect(keys[0]).toBe(keys[1])
+  view.unmount()
+  open('/exercise/item')
+  await screen.findByText('Saved for story practice and your next session.')
+  expect((screen.getByRole('radio', { name: 'Keep a useful feature' }) as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(note)
+})
+
+test('an undecided listening note can be empty and survives reload without replacing an existing focus', async () => {
+  let original = { ...savedAttempt, reflection: { note: '', updated_at: '', intent: undefined as 'undecided' | undefined } }
+  let focusPosts = 0
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/exercise-attempts/attempt/reflection') {
+      expect(JSON.parse(String(init?.body))).toEqual({ note: '', intent: 'undecided' })
+      original = { ...original, reflection: { note: '', intent: 'undecided', updated_at: 'now' } }
+      return Response.json(original)
+    }
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [original], next_cursor: null })
+    if (path === '/api/v1/practice-focus') {
+      if (init?.method === 'POST') focusPosts++
+      return Response.json({ focus: storyFocus, skills: {}, last_check: null })
+    }
+  })
+  const view = open('/exercise/item')
+  fireEvent.click(await screen.findByRole('radio', { name: 'Listen again before deciding' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save reflection' }))
+  await screen.findByText('Reflection saved with this take.')
+  expect(screen.queryByRole('button', { name: 'Save for story practice' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Practice again — no extra notes' })).toBeTruthy()
+  await screen.findByText(/Your existing story focus stays in place/)
+  view.unmount()
+  open('/exercise/item')
+  await waitFor(() => expect((screen.getByRole('radio', { name: 'Listen again before deciding' }) as HTMLInputElement).checked).toBe(true))
+  expect(screen.queryByRole('button', { name: 'Save for story practice' })).toBeNull()
+  expect(focusPosts).toBe(0)
 })

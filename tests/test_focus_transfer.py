@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.content import generate_plan
@@ -162,14 +163,20 @@ def test_focus_survives_the_next_local_day_without_claiming_a_skill_level(
     assert client.get("/api/v1/me").json()["progress"] == before
 
 
+@pytest.mark.parametrize("intent", ["experiment", "keep"])
 def test_story_coaching_receives_the_frozen_focus_without_private_source_identifiers(
-    client, app, worker, settings, speech_file
+    client, app, worker, settings, speech_file, intent
 ):
     from pydantic import SecretStr
 
     from tests.test_speech_reviews import ReviewProvider
 
-    _, focus, story = choose_focus(client, app, worker, speech_file)
+    source, _, story = choose_focus(client, app, worker, speech_file)
+    focus = post(
+        client,
+        "/practice-focus",
+        {"source_attempt_id": source["id"], "note": "Keep the phrase ending comfortable.", "intent": intent},
+    ).json()["focus"]
     uploaded = upload(
         client,
         speech_file,
@@ -192,6 +199,7 @@ def test_story_coaching_receives_the_frozen_focus_without_private_source_identif
     ).json()
     assert worker.run_once()
     assert contexts[0]["saved_focus"] == focus["note"]
+    assert contexts[0]["practice_intent"] == intent
     assert contexts[0]["story_focus"] == {
         key: focus[key] for key in ("skill_label", "listening_question", "rubric_version")
     }
@@ -260,3 +268,121 @@ def test_story_repeat_coaching_uses_current_story_focus_over_previous_take_refle
     assert saved.json()["training_focus"] == current and worker.run_once()
     assert contexts[0]["saved_focus"] == "Keep word endings audible."
     assert contexts[0]["story_focus"]["skill_label"] == current["skill_label"]
+
+
+def test_undecided_reflection_is_saved_without_replacing_focus_and_legacy_edits_preserve_intent(
+    client, app, worker, speech_file
+):
+    source, focus, _ = choose_focus(client, app, worker, speech_file)
+    progress = client.get("/api/v1/me").json()["progress"]
+    path = "/api/v1/exercise-attempts/" + source["id"] + "/reflection"
+    first = client.put(path, json={"note": "", "intent": "undecided"})
+    assert first.status_code == 200 and first.json()["reflection"]["intent"] == "undecided"
+    assert client.put(path, json={"note": "", "intent": "undecided"}).json() == first.json()
+    assert (
+        client.put(path, json={"note": "I want to listen again."}).json()["reflection"]["intent"]
+        == "undecided"
+    )
+    assert client.put(path, json={"note": "x", "intent": "mastered"}).status_code == 422
+    not_chosen = post(client, "/practice-focus", {"source_attempt_id": source["id"], "note": "Listen again."})
+    assert not_chosen.status_code == 422 and not_chosen.json()["error"]["code"] == "focus_intent_required"
+    assert client.get("/api/v1/practice-focus").json()["focus"] == focus
+    assert client.get("/api/v1/me").json()["progress"] == progress
+    # Explicit keep replaces an undecided source intention and freezes its own task steps.
+    chosen = post(
+        client,
+        "/practice-focus",
+        {"source_attempt_id": source["id"], "note": "Keep this phrase ending.", "intent": "keep"},
+    ).json()
+    assert chosen["focus"]["intent"] == chosen["source_attempt"]["reflection"]["intent"] == "keep"
+    assert "without making it stronger" in chosen["focus"]["steps"][-1]
+    assert (
+        client.put(path, json={"note": "Keep this phrase ending.", "intent": None}).json()["reflection"][
+            "intent"
+        ]
+        == "keep"
+    )
+    with TestClient(app) as other:
+        guest(other)
+        assert other.put(path, json={"note": "", "intent": "undecided"}).status_code == 404
+
+
+def test_keep_intent_is_inherited_by_focus_and_frozen_with_a_started_story(client, app, worker, speech_file):
+    source, _, story = choose_focus(client, app, worker, speech_file)
+    path = "/api/v1/exercise-attempts/" + source["id"] + "/reflection"
+    assert client.put(path, json={"note": "Keep the thought boundary.", "intent": "keep"}).status_code == 200
+    focus = post(
+        client, "/practice-focus", {"source_attempt_id": source["id"], "note": "Keep the thought boundary."}
+    ).json()["focus"]
+    assert focus["intent"] == "keep"
+    recording = upload(
+        client,
+        speech_file,
+        {"purpose": "exercise", "plan_item_id": story["id"], "training_focus_id": focus["id"]},
+    )
+    assert recording.status_code == 202
+    assert client.put(path, json={"note": "A later experiment.", "intent": "experiment"}).status_code == 200
+    assert worker.run_once()
+    saved = post(
+        client,
+        "/exercise-attempts",
+        {"plan_item_id": story["id"], "recording_id": recording.json()["recording"]["id"]},
+    ).json()
+    assert saved["training_focus"] == focus
+    assert saved["training_focus"]["intent"] == "keep"
+    assert client.get("/api/v1/practice-focus").json()["focus"] == focus
+
+
+def test_focus_post_replays_a_pre_intent_idempotency_receipt(client, app, worker, speech_file):
+    import json
+
+    from app.db import Guest, Idempotency, iso
+    from app.focus import RUBRICS, STORY_STEPS
+    from app.service import digest
+
+    drill, _ = setup_story(client, app)
+    recording_id = take(client, worker, speech_file, drill)
+    source = post(
+        client, "/exercise-attempts", {"plan_item_id": drill["id"], "recording_id": recording_id}
+    ).json()
+    gid = client.get("/api/v1/me").json()["guest_id"]
+    key, fid = str(uuid4()), str(uuid4())
+    note = "Let the phrase end comfortably."
+    source["reflection"] = {"note": note, "updated_at": iso()}
+    legacy = {
+        "id": fid,
+        "created_at": iso(),
+        "note": note,
+        "skill": "word_endings",
+        "skill_label": RUBRICS["word_endings"]["label"],
+        "listening_question": RUBRICS["word_endings"]["question"],
+        "steps": STORY_STEPS,
+        "rubric_version": "story-listening-v1",
+        "source_attempt_id": source["id"],
+        "source_plan_item_id": drill["id"],
+        "source_recording_id": recording_id,
+    }
+    reply = {"focus": legacy, "source_attempt": source}
+    payload = {"source_attempt_id": source["id"], "note": note}
+    old_canonical = {
+        **payload,
+        "skill": None,
+    }  # Before intent existed, omitted skill was materialized as null.
+    with app.state.database.session.begin() as db:
+        db.add(Resource(id=fid, guest_id=gid, kind="practice_focus", data=legacy))
+        db.get(Resource, source["id"]).data = source
+        guest_row = db.get(Guest, gid)
+        guest_row.data = {**guest_row.data, "practice_focus_id": fid}
+        db.add(
+            Idempotency(
+                id=digest(gid + "POST/api/v1/practice-focus" + key),
+                guest_id=gid,
+                fingerprint=digest(json.dumps(old_canonical, sort_keys=True, separators=(",", ":"))),
+                status=201,
+                data=reply,
+            )
+        )
+    replay = post(client, "/practice-focus", payload, key)
+    assert replay.status_code == 201 and replay.json() == reply
+    assert client.get("/api/v1/practice-focus").json()["focus"] == legacy
+    assert "intent" not in client.get("/api/v1/exercise-attempts/" + source["id"]).json()["reflection"]
