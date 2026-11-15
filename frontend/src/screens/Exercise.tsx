@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, post, request, useMutationWithKey } from '../api/api'
 import { useAttempt, useAttemptHistory, useMe, usePlanItem, useRecording } from '../api/hooks'
-import type { Attempt, PendingTake, PlanItem } from '../api/types'
+import type { Attempt, PendingTake, PlanItem, TrainingFocus } from '../api/types'
 import { useRedirectOn401 } from '../components/AppShell'
 import { DemoNotice } from '../components/DemoNotice'
 import { FlowHeader } from '../components/FlowHeader'
@@ -11,6 +11,7 @@ import { NoteIcon } from '../components/Icons'
 import { RecorderDock } from '../components/RecorderDock'
 import { TakeReflection } from '../components/TakeReflection'
 import { TakeComparison } from '../components/TakeComparison'
+import { FocusCheck, StoryFocus } from '../components/StoryFocus'
 import { SpeechReview } from '../components/SpeechReview'
 import { ScriptText } from '../components/ScriptText'
 import { useSpeechFollow } from '../lib/follow'
@@ -77,11 +78,14 @@ function SelfCheck({ onFinish, busy }: { onFinish: () => void; busy: boolean }) 
   )
 }
 
-function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn, onUploadStarted }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void; onUploadStarted?: (key: string) => void }) {
+function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pendingTake, busy, practiceOnly, basedOn, onUploadStarted, trainingFocus }: { item: PlanItem; accepted: string[]; serverLimit: number; onRecorded: (id: string) => void; busy: boolean; practiceOnly: boolean; basedOn?: string; pendingTake: PendingTake | null; onUploaded: (take: PendingTake) => void; onUploadStarted?: (key: string) => void; trainingFocus?: TrainingFocus | null }) {
   const max = Math.min(item.task.verification.max_recording_seconds ?? 90, serverLimit)
   const r = useRecorder({ maxSeconds: max, accepted })
+  const [draftFocus, setDraftFocus] = useState<TrainingFocus | null | undefined>(() => pendingTake ? pendingTake.training_focus ?? null : undefined)
+  const focus = draftFocus === undefined ? trainingFocus : draftFocus
+  const dockRecorder = { ...r, start: () => { setDraftFocus(trainingFocus ?? null); return r.start() }, reset: () => { setDraftFocus(undefined); r.reset() } }
   const check = useRecordingCheck({ pendingTake, blob: r.blob, mime: r.mime, onChecked: onRecorded, onUploaded, onUploadStarted,
-    fields: { purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(basedOn ? { based_on_attempt_id: basedOn } : {}) } })
+    fields: { purpose: 'exercise', plan_item_id: item.id, ...(practiceOnly ? { practice_only: 'true' } : {}), ...(basedOn ? { based_on_attempt_id: basedOn } : {}), ...(focus ? { training_focus_id: focus.id } : {}) } })
   const recording = r.state === 'recording'
   const spokenText = Array.from({ length: item.task.repetitions ?? 1 }, () => item.task.text).join('\n\n')
   const follow = useSpeechFollow(spokenText, recording)
@@ -91,6 +95,7 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pend
   const pacer = wpm && recording ? (r.seconds * (wpm.min + wpm.max)) / 2 / 60 : undefined
   return (
     <>
+      {focus && <StoryFocus focus={focus} recording={recording || r.state === 'requesting'} />}
       <div className="rs-card rs-stack" style={{ padding: 28, gap: 12 }}>
         <ScriptText text={spokenText} read={recording ? follow.read : playT !== null ? follow.readAt(playT) : 0} pacer={pacer} />
         {recording && (follow.supported || pacer !== undefined) && (
@@ -107,7 +112,7 @@ function RecordCheck({ item, accepted, serverLimit, onRecorded, onUploaded, pend
       {check.checkedRecording && !r.blob ? <div className="rs-card rs-stack" style={{ padding: 24, gap: 12 }}>
         <audio controls aria-label="Your checked take" src={'/api/v1/recordings/' + check.checkedRecording + '/audio'} />
         <button className="rs-btn" type="button" disabled={busy} onClick={check.send}>{busy ? 'Saving…' : 'Save checked take'}</button>
-      </div> : !check.checking || r.blob ? <RecorderDock r={r} sending={busy || check.busy} onSend={check.send} sendLabel="Check my take" onPlayTime={setPlayT} /> : null}
+      </div> : !check.checking || r.blob ? <RecorderDock r={dockRecorder} sending={busy || check.busy} onSend={check.send} sendLabel="Check my take" onPlayTime={setPlayT} /> : null}
     </>
   )
 }
@@ -283,7 +288,9 @@ export default function Exercise() {
                 {result?.status === 'passed' && result.recording_id && <SpeechReview key={"speech-review-" + result.id} take={result} onHear={(seconds) => { const audio = audioRef.current; if (audio) { audio.currentTime = seconds; void audio.play().catch(() => {}) } }} />}
                 {result?.practice_focus?.note && <p><strong>Your focus for this take:</strong> {result.practice_focus.note}</p>}
                 {result?.practice_focus && <TakeComparison take={result} />}
-                {result && <TakeReflection key={"reflection-" + result.id} attempt={result} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }); void qc.invalidateQueries({ queryKey: ['attempt', result.id] }) }} />}
+                {result?.training_focus && <StoryFocus focus={result.training_focus} completed />}
+                {result?.training_focus && result.status === 'passed' && <FocusCheck key={"focus-check-" + result.id} take={result} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }) }} />}
+                {result && <TakeReflection key={"reflection-" + result.id} attempt={result} exerciseId={item.exercise_id} storyId={lesson.items.find((entry) => entry.exercise_id === 'E12')?.id} onSaved={(updated) => { setResult(updated); void qc.invalidateQueries({ queryKey: ['attempt-history', item.id] }); void qc.invalidateQueries({ queryKey: ['attempt', result.id] }) }} />}
                 {result?.feedback.coaching?.map((tip) => <p key={tip.code} style={{ margin: 0 }}>{tip.message}</p>)}
                 {result?.reward.parts.map((p) => (
                   <div key={p.reason} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -319,7 +326,7 @@ export default function Exercise() {
                 {v.type === 'self_confirmation' && <SelfCheck key={item.id} busy={attempt.isPending} onFinish={() => submit({ self_confirmed: true })} />}
                 {v.type === 'recording' && me.error && <ErrorBanner error={me.error} onRetry={() => me.refetch()} />}
                 {v.type === 'recording' && me.isPending && <Skeleton height={160} />}
-                {v.type === 'recording' && me.data && !cancellation.intent && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
+                {v.type === 'recording' && me.data && !cancellation.intent && <RecordCheck key={item.id + (practicingAgain ? '-repeat' : '-first')} practiceOnly={practicingAgain} basedOn={basedOn} trainingFocus={itemState.data?.training_focus} pendingTake={pendingTake} onUploadStarted={(key) => { uploadKey.current = key }} onUploaded={(take) => { setLocalPending({ itemId: item.id, take: { ...take, based_on_attempt_id: basedOn } }) }} item={item} serverLimit={me.data.limits.max_recording_seconds} accepted={me.data.limits.accepted_audio_types} busy={attempt.isPending || dismiss.isPending || cancelUpload.isPending || canceling.current} onRecorded={(id) => { if (!canceling.current) submit({ recording_id: id }) }} />}
               </>
             )}
             {completed && <section className="rs-card rs-stack" aria-label="Your takes" style={{ padding: 24, gap: 12 }}>

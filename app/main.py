@@ -27,7 +27,9 @@ from app.schemas import (
     CancelUploadInput,
     CompleteInput,
     Empty,
+    FocusCheckInput,
     GuestInput,
+    PracticeFocusInput,
     Preferences,
     ReflectionInput,
 )
@@ -316,6 +318,7 @@ def create_app(settings=None):
         plan_item_id: Annotated[UUID | None, Form()] = None,
         practice_only: Annotated[bool, Form()] = False,
         based_on_attempt_id: Annotated[UUID | None, Form()] = None,
+        training_focus_id: Annotated[UUID | None, Form()] = None,
     ):
         s.auth()
         fields = {
@@ -328,6 +331,8 @@ def create_app(settings=None):
             fields["practice_only"] = True
         if based_on_attempt_id:
             fields["based_on_attempt_id"] = str(based_on_attempt_id)
+        if training_focus_id:
+            fields["training_focus_id"] = str(training_focus_id)
         fingerprint, size = hashlib.sha256(), 0
         while chunk := file.file.read(1024 * 1024):
             size += len(chunk)
@@ -506,6 +511,24 @@ def create_app(settings=None):
             attempt["reflection"] = {"note": note, "updated_at": iso()}
             s.put("attempt", attempt)
         return attempt
+
+    @app.get("/api/v1/practice-focus")
+    def practice_focus(s: S):
+        return s.practice_focus_view()
+
+    @app.post("/api/v1/practice-focus")
+    def save_practice_focus(payload: PracticeFocusInput, request: Request, s: S):
+        values = payload.model_dump(mode="json")
+        return mutate(s, request, values, lambda: s.save_practice_focus(values))
+
+    @app.delete("/api/v1/practice-focus/{focus_id}", status_code=204)
+    def clear_practice_focus(focus_id: UUID, s: S):
+        s.clear_practice_focus(focus_id)
+        return Response(status_code=204)
+
+    @app.put("/api/v1/exercise-attempts/{attempt_id}/focus-check")
+    def focus_check(attempt_id: UUID, payload: FocusCheckInput, s: S):
+        return s.save_focus_check(attempt_id, payload.outcome)
 
     @app.post("/api/v1/exercise-attempts/{attempt_id}/review")
     def speech_review(attempt_id: UUID, payload: Empty, request: Request, s: S):

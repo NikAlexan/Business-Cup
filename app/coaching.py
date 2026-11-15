@@ -2,6 +2,8 @@
 
 import re
 
+from app.audio import SAMPLE_RATE, valid_word_timestamps
+
 
 def quote_evidence(quote, transcript, duration, occurrence=1):
     """Locate model-selected words in ASR output; never accept a model-invented timestamp."""
@@ -9,7 +11,14 @@ def quote_evidence(quote, transcript, duration, occurrence=1):
     def tokenize(text):
         return re.findall(r"[a-zA-Z0-9]+(?:'[a-zA-Z]+)?", text.lower())
 
-    if len(transcript.get("recognized_words", [])) != len(transcript.get("words", [])):
+    timing = transcript.get("words") or []
+    if (
+        len(transcript.get("recognized_words", [])) != len(timing)
+        or not valid_word_timestamps(timing)
+        or timing[-1]["end"] > duration + 0.05
+        or timing[-1]["start"] >= duration
+        or min(duration, timing[-1]["end"]) - timing[0]["start"] < 1 / SAMPLE_RATE
+    ):
         return None
     wanted = tokenize(quote)
     if not 2 <= len(wanted) <= 12:
@@ -27,12 +36,25 @@ def quote_evidence(quote, transcript, duration, occurrence=1):
             if occurrence:
                 continue
             first, last = frames[start], frames[start + len(wanted) - 1]
-            timing = transcript["words"]
-            return {
+            original = first, last
+            while first > 0 and timing[first]["start"] == timing[first]["end"]:
+                first -= 1
+            while last < len(timing) - 1 and timing[last]["start"] == timing[last]["end"]:
+                last += 1
+            if last - first + 1 > 16:
+                return None
+            evidence = {
                 "quote": " ".join(transcript["recognized_words"][first : last + 1]),
                 "start_seconds": max(0, timing[first]["start"] - 0.2),
                 "end_seconds": min(duration, timing[last]["end"] + 0.2),
             }
+            if original != (first, last) or any(
+                word["start"] == word["end"] for word in timing[first : last + 1]
+            ):
+                evidence["note"] = (
+                    "Some words had no separate time span; replay this wider phrase to check the observation."
+                )
+            return evidence
     return None
 
 
@@ -45,7 +67,7 @@ def timing_feedback(transcript, metrics, verification, duration):
         "insights": [],
         "next_step": None,
     }
-    if not pace.get("available") or not pauses.get("available"):
+    if not pace.get("available"):
         return result
     result["scope"] = "quality_and_timing"
     result["insights"] = [
@@ -55,16 +77,28 @@ def timing_feedback(transcript, metrics, verification, duration):
             "message": f"This take: {pace['value']:g} words per minute.",
             "evidence": None,
         },
-        {
-            "code": "observed_pauses",
-            "source": "transcript_timing",
-            "message": f"Pauses account for {pauses['value']:.0%} of the timed speech span; silence before and after speech is excluded.",
-            "evidence": None,
-        },
     ]
+    if pauses.get("available"):
+        result["insights"].append(
+            {
+                "code": "observed_pauses",
+                "source": "transcript_timing",
+                "message": f"Pauses account for {pauses['value']:.0%} of the timed speech span; silence before and after speech is excluded.",
+                "evidence": None,
+            }
+        )
+    else:
+        result["insights"].append(
+            {
+                "code": "pause_timing_unavailable",
+                "source": "transcript_timing",
+                "message": "Some words had no separate time span, so pauses were not measured for this take.",
+                "evidence": None,
+            }
+        )
     timings = transcript.get("words") or []
     recognized = transcript.get("recognized_words") or []
-    if len(recognized) == len(timings) and len(timings) >= 2:
+    if pauses.get("available") and len(recognized) == len(timings) and len(timings) >= 2:
         gaps = [(i, b["start"] - a["end"]) for i, (a, b) in enumerate(zip(timings, timings[1:]))]
         index, gap = max(gaps, key=lambda pair: pair[1])
         before, after = recognized[index], recognized[index + 1]

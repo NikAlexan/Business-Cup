@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { PlanItem } from '../api/types'
+import type { PlanItem, TrainingFocus } from '../api/types'
 import * as recorder from '../lib/recorder'
 import { clearCancellationIntents } from '../lib/cancellationIntent'
 import Exercise from './Exercise'
@@ -17,8 +18,8 @@ import Profile from './Profile'
 vi.mock('../components/UpdateBanner', () => ({ UpdateBanner: () => null }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); clearCancellationIntents(); vi.restoreAllMocks() })
 
-function open(path: string) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } })
+function open(path: string, existingClient?: QueryClient) {
+  const client = existingClient ?? new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } })
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/" element={<Main />} />
     <Route path="/exercise/:planItemId" element={<Exercise />} />
@@ -46,6 +47,12 @@ const savedAttempt = {
     coaching: [{ code: 'pace_outside_target', message: 'For future practice, explore a gentler pace.' }],
     metrics: { speaking_rate_wpm: { available: true, value: 165, unit: 'words/min', unavailable_reason: null } } },
 }
+const storyFocus: TrainingFocus = {
+  id: 'focus-a', note: 'Leave room between ideas.', skill: 'pauses', skill_label: 'Meaningful pauses',
+  listening_question: 'Does the pause help the meaning?', steps: ['Choose one thought boundary.', 'Read once and listen back.'],
+  rubric_version: 'story-listening-v1', created_at: '2026-11-15T00:00:00Z',
+  source_attempt_id: 'attempt', source_plan_item_id: 'item', source_recording_id: 'recording',
+}
 function setup(item: PlanItem, intercept?: (path: string, init?: RequestInit) => Response | Promise<Response> | undefined) {
   const lesson = { id: 'lesson', items: [item] }
   const transport = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -53,6 +60,7 @@ function setup(item: PlanItem, intercept?: (path: string, init?: RequestInit) =>
     const handled = intercept?.(path, init)
     if (handled) return handled
     const data: Record<string, unknown> = {
+      '/api/v1/practice-focus': { focus: null, skills: { pace: { label: 'Comfortable pace', question: 'Can you follow the thought?', exercise_ids: ['E06'] }, pauses: { label: 'Meaningful pauses', question: 'Does the pause help the meaning?', exercise_ids: ['E08'] } }, last_check: null },
       '/api/v1/me': { guest_id: 'guest', preferences: { timezone: 'UTC' }, progress: { notes_total: 0, practice_seconds_total: 0, current_streak_days: 0 }, limits: { accepted_audio_types: ['audio/webm'], max_recording_seconds: 180 } },
       '/api/v1/plan-items/item': { item, lesson, item_index: 0, pending_take: null, plan_id: 'plan', plan_status: 'active' },
       '/api/v1/today': { lesson }, '/api/v1/plan': { lessons: [lesson] },
@@ -397,7 +405,7 @@ test('background speech coaching refreshes after its job finishes and seeks grou
   let finished = false
   const review = { status: 'queued', job_id: 'speech-job', report: null }
   const pending = { ...savedAttempt, speech_review: review }
-  const report = { summary: 'Listen to the phrase ending.', observation: { text: 'Check the final word.', evidence: { quote: 'clear message', start_seconds: 3, end_seconds: 5 } },
+  const report = { summary: 'Listen to the phrase ending.', observation: { text: 'Check the final word.', evidence: { quote: 'clear message', start_seconds: 3, end_seconds: 5, note: 'Some words had no separate time span; replay this wider phrase to check the observation.' } },
     next_step: 'Let the final word land.', listening_question: 'Can you hear the final sound?', limitations: ['One take only.'] }
   setup(baseItem, (path) => {
     if (path.startsWith('/api/v1/exercise-attempts?')) return Response.json({ items: [pending], next_cursor: null })
@@ -408,6 +416,7 @@ test('background speech coaching refreshes after its job finishes and seeks grou
   await screen.findByText('Listen to the phrase ending.')
   expect(screen.getByText('Let the final word land.')).toBeTruthy()
   expect(screen.getByText('AI listening notes can be mistaken. Check the observation against your own playback.')).toBeTruthy()
+  expect(screen.getByText('Some words had no separate time span; replay this wider phrase to check the observation.')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'Listen to “clear message”' }))
   expect((screen.getByLabelText('Your completed take') as HTMLAudioElement).currentTime).toBe(3)
   expect(play).toHaveBeenCalledOnce()
@@ -553,6 +562,91 @@ test('check-in restores the actual previous setup before recording', async () =>
   await waitFor(() => expect((screen.getByRole('button', { name: 'Start the 3 tasks' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'Start the 3 tasks' }))
   await waitFor(() => expect(submitted?.recording_conditions).toEqual({ device_label: 'USB microphone', distance_cm: 50, environment: 'some_noise', notes: 'Mic on the stand.' }))
+})
+
+test('a reflection becomes a story focus, survives narration and saves a subjective listening check', async () => {
+  vi.spyOn(recorder, 'useRecorder').mockReturnValue({ state: 'recorded', level: { level: 0, status: 'waiting' }, seconds: 25, mime: 'audio/webm', blob: new Blob(['take']), url: 'blob:take', error: null, limitReached: false, start: vi.fn(), stop: vi.fn(), reset: vi.fn() })
+  const story: PlanItem = { ...baseItem, id: 'story', exercise_id: 'E12', title: 'Read a new story', status: 'pending', latest_attempt_id: null }
+  const lesson = { id: 'lesson', items: [baseItem, story] }
+  let active: TrainingFocus | null = null
+  let posted = false
+  let check: { outcome: string; source: string; updated_at: string } | undefined
+  let original = { ...savedAttempt, reflection: { note: '', updated_at: '' } }
+  const completedStory = () => ({ ...savedAttempt, id: 'story-take', plan_item_id: 'story', recording_id: 'story-recording', training_focus: storyFocus, focus_check: check, feedback: { summary: 'Story saved.', issues: [] } })
+  setup(baseItem, (path, init) => {
+    if (path === '/api/v1/plan-items/item') return Response.json({ item: baseItem, lesson, item_index: 0, plan_status: 'active', pending_take: null })
+    if (path === '/api/v1/practice-focus') {
+      if (init?.method === 'POST') {
+        expect(JSON.parse(String(init.body))).toEqual({ source_attempt_id: 'attempt', note: storyFocus.note, skill: 'pauses' })
+        active = storyFocus; original = { ...original, reflection: { note: storyFocus.note, updated_at: 'now' } }
+        return Response.json({ focus: active, source_attempt: original }, { status: 201 })
+      }
+      return Response.json({ focus: active, skills: { pauses: { label: 'Meaningful pauses', question: storyFocus.listening_question, exercise_ids: ['E08'] } }, last_check: null })
+    }
+    if (path === '/api/v1/exercise-attempts/attempt') return Response.json(original)
+    if (path === '/api/v1/plan-items/story') return Response.json({ item: posted ? { ...story, status: 'completed', latest_attempt_id: 'story-take' } : story, lesson, item_index: 1, plan_status: 'active', pending_take: null, training_focus: active })
+    if (path === '/api/v1/recordings') {
+      expect((init?.body as FormData).get('training_focus_id')).toBe(storyFocus.id)
+      return Response.json({ recording: { id: 'story-recording', training_focus: active }, job_id: 'story-check' }, { status: 202 })
+    }
+    if (path === '/api/v1/jobs/story-check') return Response.json({ status: 'completed' })
+    if (path === '/api/v1/exercise-attempts') { posted = true; return Response.json(completedStory()) }
+    if (path === '/api/v1/exercise-attempts/story-take') return Response.json(completedStory())
+    if (path === '/api/v1/exercise-attempts?plan_item_id=story&limit=20') return Response.json({ items: posted ? [completedStory()] : [], next_cursor: null })
+    if (path === '/api/v1/recordings/story-recording') return Response.json({ audio_url: '/api/v1/recordings/story-recording/audio' })
+    if (path === '/api/v1/exercise-attempts/story-take/focus-check') {
+      check = { outcome: JSON.parse(String(init?.body)).outcome, source: 'user_listening', updated_at: 'now' }
+      return Response.json(completedStory())
+    }
+  })
+  const view = open('/exercise/item')
+  const note = await screen.findByRole('textbox', { name: 'What did you hear, and what will you try next?' })
+  fireEvent.change(note, { target: { value: storyFocus.note } })
+  await screen.findByRole('option', { name: 'Meaningful pauses' })
+  fireEvent.change(screen.getByRole('combobox', { name: 'Focus for story practice' }), { target: { value: 'pauses' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save for story practice' }))
+  fireEvent.click(await screen.findByRole('link', { name: 'Open the story' }))
+  await screen.findByRole('heading', { name: 'One focus for this story' })
+  fireEvent.click(screen.getByRole('button', { name: 'Check my take' }))
+  await screen.findByRole('heading', { name: 'Focus used for this take' })
+  fireEvent.click(screen.getByRole('button', { name: 'Partly' }))
+  await screen.findByText('Listening check saved with this take.')
+  expect(check?.source).toBe('user_listening')
+  view.unmount()
+  open('/exercise/story')
+  await screen.findByRole('heading', { name: 'Focus used for this take' })
+  expect(screen.getByRole('button', { name: 'Partly' }).getAttribute('aria-pressed')).toBe('true')
+})
+
+test('the focus shown when recording starts stays bound to that take if the active focus changes', async () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
+  const blob = new Blob(['story'])
+  vi.spyOn(recorder, 'useRecorder').mockImplementation(() => {
+    const [state, setState] = useState<'idle' | 'recording' | 'recorded'>('idle')
+    return { state, level: { level: 0, status: 'waiting' }, seconds: 20, mime: state === 'recorded' ? 'audio/webm' : null,
+      blob: state === 'recorded' ? blob : null, url: state === 'recorded' ? 'blob:story' : null, error: null, limitReached: false,
+      start: async () => { setState('recording') }, stop: () => setState('recorded'), reset: () => setState('idle') }
+  })
+  const story: PlanItem = { ...baseItem, id: 'story', exercise_id: 'E12', status: 'pending', latest_attempt_id: null }
+  const state = { item: story, lesson: { id: 'lesson', items: [story] }, item_index: 0, plan_status: 'active', pending_take: null, training_focus: storyFocus }
+  let sent: string | null = null
+  setup(story, (path, init) => {
+    if (path === '/api/v1/plan-items/story') return Response.json(state)
+    if (path === '/api/v1/recordings') {
+      sent = (init?.body as FormData).get('training_focus_id') as string
+      return Response.json({ error: { message: 'Stop after verifying the captured focus' } }, { status: 503 })
+    }
+  })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } })
+  open('/exercise/story', client)
+  fireEvent.click(await screen.findByRole('button', { name: 'Start recording' }))
+  await screen.findByRole('button', { name: 'Stop recording' })
+  act(() => client.setQueryData(['plan-item', 'story'], { ...state, training_focus: { ...storyFocus, id: 'focus-b', note: 'A different future focus.' } }))
+  expect(screen.queryByText('A different future focus.')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Check my take' }))
+  await screen.findByText('Stop after verifying the captured focus')
+  expect(sent).toBe(storyFocus.id)
 })
 
 test('a completed day still exposes its exercises for review and marks prepared history', async () => {

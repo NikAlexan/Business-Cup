@@ -68,7 +68,7 @@ A saved passed recording can queue `exercise_review` separately from its quality
 
 The provider receives the real audio, saved task, verified transcript, measured timing and the repeat's saved focus. It returns a concise summary, at most one audible observation, a contiguous transcript quote/occurrence, one comfortable next action, one listening question and uncertainty notes. The server resolves the quote into actual validated ASR intervals; it does not accept model-generated timestamps or objective skill scores. If transcript timing cannot support an anchor, coaching is unavailable. An absent quote is an invalid response. A quoted interval locates the phrase, but does not prove the model's perceptual judgment. The UI labels it as fallible AI listening notes and offers playback.
 
-Tests validate real-audio request construction through mocked HTTP, strict schema rejection, worker publication, ownership, unchanged completion/reward/audio, daily budgets, provider failure/retry, grounding and concurrent reflection. They do not establish accuracy on human speech. Paid-provider and human usefulness evaluation remain outstanding.
+Tests validate real-audio request construction through mocked HTTP, strict schema rejection, worker publication, ownership, unchanged completion/reward/audio, daily budgets, provider failure/retry, grounding and concurrent reflection. They do not establish accuracy on human speech. A bounded synthetic-speech paid-provider probe is recorded in [evaluations](evaluations/README.md). Human usefulness evaluation remains outstanding.
 
 
 ## Shared check recovery and upload cancellation
@@ -83,3 +83,20 @@ Check-in mic setup loads and displays previous conditions, including custom dist
 SQLite worker transactions acquire BEGIN IMMEDIATE before reading a claim or JSON resource that will be replaced. This gives API cancellation and worker publication the same serialization guarantee; PostgreSQL continues to lock owned guest/job rows. Durable upload-cancellation markers independently exclude the recording from pending lookup and attempt acceptance, including records where an older worker lost the dismissed flag.
 
 Before sending cancellation, the browser stores the guest/item-scoped operation or recording ID. A restored intent suppresses the saved-check component and replays cancellation before any automatic attempt. Successful confirmation removes it; account deletion clears device cancellation state. Storage-disabled environments retain it only for the current page and show a concrete keep-page-open/retry message after a network failure. An unavailable local store cannot guarantee offline intent survival across reload.
+
+
+## Focus transfer into narration
+
+`POST /practice-focus` selects one owned passed recorded take, saves its trimmed reflection and creates an immutable `practice_focus` resource. It stores the user's chosen skill, one note, a versioned listening rubric, three comfortable practice steps and the source take/recording IDs. GET returns the active version, available skill rubrics and the latest subjective listening check for that version. It persists across local days; it does not claim mastery or independently change curriculum difficulty. Focus changes share the daily recording-count limit.
+
+E12 item state exposes the active focus. The recorder freezes the version shown at recording start, even if another tab changes or clears it before upload. The client explicitly attaches `training_focus_id` only for narration; omitting it means no focus for that take. Upload recovery and the saved attempt retain the full snapshot. Changing the active pointer or source reflection cannot rewrite it. Deleting an older focus pointer cannot clear a newer active choice. The Today card brings the focus and latest listening check into the next session.
+
+After playback, the user can save `heard`, `partly`, `not_yet` or `unsure` through the attempt's focus-check endpoint. The stored source is `user_listening`, never an AI/listener consensus or numerical score. It changes neither time/rewards nor completion/skill level. A repeat comparison labels differing focus versions. Background audio review receives the frozen note and semantic rubric, without source IDs or another take's audio; it cannot claim a before/after comparison.
+
+## Partial word alignment
+
+Real Whisper output can contain a zero-length internal word even with correct transcript text and positive first/last anchors. Finite, ordered, nonoverlapping intervals, exact recognized word count and decoded-audio bounds remain mandatory. Positive outer anchors at least one sample apart allow overall WPM; any zero-length word makes pause count/share/time and articulation rate unavailable (`word_alignment_incomplete`). No word boundary is invented. Zero-length edge words, tiny invalid spans, mismatched counts and out-of-audio timestamps remain unavailable.
+
+Quote playback can widen to adjacent real positive word anchors when an internal/edge quoted word lacks a separate span. It returns the actual expanded phrase and an uncertainty note, rather than assigning that word a fabricated timestamp. Existing available metric values use the same voice-metrics-v3 calculation; this changes availability for formerly rejected partial alignments, not the numerical method for prior available results.
+
+The coaching prompt is versioned (`exercise-coaching-v2`) separately from its JSON schema. It asks for an audible reason before changing a feature and allows preserving a useful feature in a new text. The real synthetic probe still produced a mechanical pause-lengthening suggestion, so prompt compliance and human usefulness remain unresolved. Automated quote grounding is a location check, not a correctness certificate.

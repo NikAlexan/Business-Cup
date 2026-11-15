@@ -101,6 +101,30 @@ def test_timing_is_bounded_by_the_decoded_audio_and_requires_complete_word_inter
         assert all(not v["available"] and v["value"] is None for v in measured.values())
 
 
+def test_real_whisper_internal_zero_word_preserves_span_pace_without_inventing_pauses():
+    import json
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).parent / "fixtures/whisper-internal-zero-word.json").read_text())
+    transcript = fixture["transcript"]
+    measured = timing_metrics(
+        np.zeros(round(fixture["duration_seconds"] * 16000)),
+        [],
+        transcript["word_count"],
+        transcript["words"],
+    )
+    assert measured["speaking_rate_wpm"]["available"] and measured["speaking_rate_wpm"]["value"] == 179.81
+    for key in ("pause_count", "pause_total_seconds", "pause_ratio", "articulation_rate_wpm"):
+        assert not measured[key]["available"] and measured[key]["value"] is None
+        assert measured[key]["unavailable_reason"] == "word_alignment_incomplete"
+
+
+def test_unresolvable_edge_words_and_subsample_spans_still_make_timing_unavailable():
+    for spans in [W((0, 0), (1, 2)), W((0, 1), (2, 2)), W((0, 1e-310), (1e-310, 2e-310))]:
+        measured = timing_metrics(np.zeros(16000 * 3), [], 2, spans)
+        assert all(not value["available"] for value in measured.values())
+
+
 def test_prepared_demo_measurements_are_not_a_baseline_for_real_comparisons():
     from app.worker import MEASUREMENT_VERSION, comparable_measurements
 

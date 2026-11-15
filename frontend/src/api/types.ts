@@ -97,6 +97,7 @@ export type Today = {
 }
 export type Issue = { code: string; message: string }
 export type Recording = {
+  training_focus?: TrainingFocus | null
   id: string
   status: 'queued' | 'processing' | 'completed' | 'needs_rerecord' | 'failed'
   duration_seconds: number | null
@@ -166,11 +167,14 @@ export type Job = {
 }
 export type Reward = { notes: number; parts: { notes: number; reason: 'exercise_completed' | 'quality_bonus' }[] }
 export type Attempt = {
+  exercise_id?: string
+  training_focus?: TrainingFocus | null
+  focus_check?: { outcome: FocusOutcome; source: 'user_listening'; updated_at: string }
   speech_review?: {
     status: 'queued' | 'processing' | 'completed' | 'unavailable' | 'failed'
     job_id: string | null
     reason?: string | null
-    report: { summary: string; observation: { text: string; evidence: { quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; limitations: string[] } | null
+    report: { summary: string; observation: { text: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } } | null; next_step: string; listening_question: string; limitations: string[] } | null
   }
   reflection?: { note: string; updated_at: string }
   practice_focus?: { attempt_id: string; note: string } | null
@@ -182,7 +186,7 @@ export type Attempt = {
   status: 'passed' | 'needs_retry'
   reward: Reward
   practice_seconds: number
-  feedback: { version?: string; scope?: string; insights?: { code: string; source: string; message: string; evidence: { quote: string; start_seconds: number; end_seconds: number } | null }[]; next_step?: string | null; summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
+  feedback: { version?: string; scope?: string; insights?: { code: string; source: string; message: string; evidence: { note?: string; quote: string; start_seconds: number; end_seconds: number } | null }[]; next_step?: string | null; summary: string; issues: Issue[]; coaching?: Issue[]; metrics?: Record<string, Measurement> | null }
 }
 export type Completion = {
   lesson_id: string
@@ -219,5 +223,17 @@ export type Exercise = {
   tags: string[]
 }
 
-export type PendingTake = { based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
-export type PlanItemState = { plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }
+export type PendingTake = { training_focus?: TrainingFocus | null; based_on_attempt_id?: string | null; practice_focus?: { attempt_id: string; note: string } | null; recording_id: string; job_id: string; practice_only: boolean; status: string }
+export type PlanItemState = { training_focus?: TrainingFocus | null; plan_id: string; plan_status: string; lesson: Lesson; item: PlanItem; item_index: number; pending_take: PendingTake | null }
+
+export type FocusOutcome = 'heard' | 'partly' | 'not_yet' | 'unsure'
+export type TrainingFocus = {
+  id: string; note: string; skill: string; skill_label: string; listening_question: string
+  steps: string[]; rubric_version: string; created_at: string
+  source_attempt_id: string; source_plan_item_id: string; source_recording_id: string
+}
+export type PracticeFocusState = {
+  focus: TrainingFocus | null
+  skills: Record<string, { label: string; question: string; exercise_ids: string[] }>
+  last_check: { outcome: FocusOutcome; source: 'user_listening'; attempt_id: string; updated_at: string } | null
+}

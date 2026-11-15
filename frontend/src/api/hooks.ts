@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { request } from './api'
-import type { Assessment, Attempt, Exercise, Job, Me, Plan, PlanItemState, Progress, Recording, Today } from './types'
+import type { PracticeFocusState, Assessment, Attempt, Exercise, Job, Me, Plan, PlanItemState, Progress, Recording, Today } from './types'
 
 export const useMe = (enabled = true) => useQuery({ queryKey: ['me'], queryFn: () => request<Me>('/me'), enabled })
 export const useToday = () => useQuery({ queryKey: ['today'], queryFn: () => request<Today>('/today') })
@@ -46,3 +46,5 @@ export const useAttemptHistory = (planItemId: string | undefined) =>
 
 export const usePlanItem = (id: string) =>
   useQuery({ queryKey: ['plan-item', id], queryFn: () => request<PlanItemState>('/plan-items/' + id), enabled: !!id })
+
+export const usePracticeFocus = (enabled = true) => useQuery({ queryKey: ['practice-focus'], queryFn: () => request<PracticeFocusState>('/practice-focus'), enabled })

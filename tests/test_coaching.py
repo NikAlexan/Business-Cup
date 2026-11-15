@@ -20,6 +20,21 @@ def test_quoted_evidence_uses_the_requested_occurrence_and_rejects_absent_phrase
     assert quote_evidence("this", transcript, 4) is None
 
 
+def test_partial_word_alignment_uses_wider_grounded_phrase_and_no_numeric_pause_claim():
+    transcript = {
+        "words": [{"start": 0, "end": 1}, {"start": 1, "end": 1}, {"start": 2, "end": 3}],
+        "recognized_words": ["the", "river", "flows"],
+    }
+    evidence = quote_evidence("the river", transcript, 4)
+    assert evidence["quote"] == "the river flows" and "no separate time span" in evidence["note"]
+    assert evidence["start_seconds"] == 0 and evidence["end_seconds"] == 3.2
+    metrics = timing_metrics(np.zeros(64000), [], 3, transcript["words"])
+    feedback = timing_feedback(transcript, metrics, {}, 4)
+    assert feedback["scope"] == "quality_and_timing"
+    assert [item["code"] for item in feedback["insights"]] == ["observed_pace", "pause_timing_unavailable"]
+    assert not any(item.get("evidence") for item in feedback["insights"])
+
+
 def test_feedback_uses_actual_timings_and_a_playable_recognized_word_boundary():
     times = [{"start": 0.0, "end": 1.0}, {"start": 1.1, "end": 2.0}, {"start": 3.4, "end": 4.0}]
     transcript = {"words": times, "recognized_words": ["One", "small", "change."]}

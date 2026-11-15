@@ -206,15 +206,16 @@ def valid_word_timestamps(words):
             for v in (start, end)
         ):
             return False
-        if start < previous_end or end <= start:
+        if start < previous_end or end < start:
             return False
         previous_end = end
-    return True
+    return words[0]["end"] > words[0]["start"] and words[-1]["end"] > words[-1]["start"]
 
 
 def combine_timing(*parts):
-    """Timing pooled over (word_count, words, decoded_duration) parts; unavailable if any part lacks words, never partial."""
+    """Pool verified utterance spans. Untimed internal words preserve pace, never pause precision."""
     total_words = span = pause_time = pause_count = 0
+    incomplete_words = False
     for word_count, words, duration in parts:
         if not word_count or not words or len(words) < 2:
             return {k: metric(None, u, "transcription_unavailable") for k, u in TIMING_UNITS.items()}
@@ -227,14 +228,25 @@ def combine_timing(*parts):
             or duration <= 0
             or words[-1]["end"] > duration + 0.05
             or words[-1]["start"] >= duration
+            or min(duration, words[-1]["end"]) - words[0]["start"] < 1 / SAMPLE_RATE
         ):
             return {k: metric(None, u, "transcription_invalid_timestamps") for k, u in TIMING_UNITS.items()}
         pauses = [b["start"] - a["end"] for a, b in zip(words, words[1:])]
+        incomplete_words = incomplete_words or any(word["end"] == word["start"] for word in words)
         pauses = [g for g in pauses if g >= 0.3]
         total_words += word_count
         span += min(duration, words[-1]["end"]) - words[0]["start"]
         pause_time += sum(pauses)
         pause_count += len(pauses)
+    if incomplete_words:
+        return {
+            **{
+                k: metric(None, u, "word_alignment_incomplete")
+                for k, u in TIMING_UNITS.items()
+                if k != "speaking_rate_wpm"
+            },
+            "speaking_rate_wpm": metric(round(total_words * 60 / span, 2), "words/min"),
+        }
     return {
         "pause_count": metric(pause_count, "count"),
         "pause_total_seconds": metric(round(pause_time, 3), "s"),

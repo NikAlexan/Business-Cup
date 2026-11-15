@@ -5,6 +5,7 @@ import type { PlanItem } from '../api/types'
 import { AppShell, Chips, useRedirectOn401 } from '../components/AppShell'
 import { Check } from '../components/Icons'
 import { PlanWave } from '../components/PlanWave'
+import { PracticeFocusCard } from '../components/PracticeFocusCard'
 import { ErrorBanner, Skeleton } from '../components/ui'
 import { formatDate, formatEstimate } from '../lib/format'
 
@@ -67,6 +68,7 @@ export default function Home() {
   const checkIn = t.reassessment.next_available_on
   const total = plan.data?.total_lessons ?? 14
   const open = t.daily_status === 'available' || t.daily_status === 'in_progress'
+  const story = lesson?.items.find((item) => item.exercise_id === 'E12') ?? [...(plan.data?.lessons ?? [])].reverse().flatMap((day) => day.items).find((item) => item.exercise_id === 'E12' && item.status === 'completed')
 
   return (
     <AppShell>
@@ -75,6 +77,7 @@ export default function Home() {
       </div>
       <div className="rs-cols rs-cols--side">
         <div className="rs-stack" style={{ gap: 24 }}>
+          <PracticeFocusCard storyId={story?.id} />
           <div className="rs-card rs-stack" style={{ gap: 16, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
               <h1 className="rs-h" style={{ fontSize: 26 }}>

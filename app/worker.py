@@ -20,7 +20,7 @@ from app.coaching import quote_evidence, timing_feedback
 from app.config import Settings
 from app.content import EXERCISES, TARGETS_VERSION, generate_plan, interpret
 from app.db import Database, Guest, Job, iso, new_id
-from app.provider import OpenAIAudioProvider, ProviderFailure
+from app.provider import EXERCISE_PROMPT_VERSION, OpenAIAudioProvider, ProviderFailure
 from app.service import Service
 
 log = logging.getLogger("voice.worker")
@@ -337,7 +337,14 @@ class Worker:
                         "goal": attempt["speech_review"]["goal"],
                         "title": item["title"],
                         "task": item["task"],
-                        "saved_focus": (attempt.get("practice_focus") or {}).get("note", ""),
+                        "saved_focus": (attempt.get("practice_focus") or {}).get("note")
+                        or (attempt.get("training_focus") or {}).get("note", ""),
+                        "story_focus": {
+                            key: attempt["training_focus"][key]
+                            for key in ("skill_label", "listening_question", "rubric_version")
+                        }
+                        if attempt.get("training_focus")
+                        else None,
                         "verified_transcript": transcript["text"],
                         "measurements": metrics,
                     },
@@ -368,6 +375,7 @@ class Worker:
                 completed_at=iso(),
                 source="audio_model",
                 model=self.settings.audio_model,
+                prompt_version=EXERCISE_PROMPT_VERSION,
                 error=None,
             )
             s.put("attempt", a)
@@ -421,9 +429,11 @@ class Worker:
             self.stage(claim, "ai_analysis")
             report = provider.report(signals, a, measurements, comparison, interpretation)
             transcript = {"verified": all(t["verified"] for t in transcripts)}
-            if not transcript["verified"] or not measurements["speaking_rate_wpm"]["available"]:
+            if not transcript["verified"] or any(
+                not measurements[key]["available"] for key in ("speaking_rate_wpm", "pause_ratio")
+            ):
                 report["limitations"].append(
-                    "Pace and pauses could not be measured reliably from transcript timing."
+                    "Some timing measurements are unavailable because word alignment was incomplete or unreliable."
                 )
             usage = copy.deepcopy(provider.usage)
         finally:

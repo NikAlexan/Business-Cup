@@ -151,3 +151,8 @@ When provider credentials are configured, each saved accepted exercise recording
 
 
 Baseline/check-in and daily exercises share accepted-upload recovery and saved-check retries. Before a check-in, the mic screen displays and prefills the prior setup; each recording screen also shows the assessment's saved conditions. Canceling extra practice during an in-flight upload uses its original operation UUID: the server either dismisses the accepted take or rejects a later upload. Cancellation is confirmed only when its request succeeds; a cancellation transport error keeps late check results from auto-saving an attempt while the user retries.
+
+
+A chosen listening reflection can now carry from a recorded drill into narration and the next session. The story recorder freezes the focus shown at start; later edits cannot rewrite a take. Playback offers a saved subjective check against a skill-specific question, with no extra rewards or mastery claim. See the [exercise contract](docs/improvements/exercise-contract.md) and [API guide](postman/README.md).
+
+A bounded real-provider probe with public synthetic speech exposed and fixed partial Whisper alignment handling. It also showed that an audio-grounded model response can still give weak advice. The [raw responses and assessment](docs/improvements/evaluations/README.md) preserve that limitation. This is integration evidence, not proof of useful coaching on human speech.

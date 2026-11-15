@@ -10,7 +10,7 @@ async function seed(page: Page) {
   const seeded = await page.request.post('/api/v1/demo/seed')
   expect(seeded.ok()).toBe(true)
   const today = await page.request.get('/api/v1/today')
-  return (await today.json()).lesson as { id: string; items: { id: string; title: string; task: { verification: { type: string } } }[] }
+  return (await today.json()).lesson as { id: string; items: { id: string; exercise_id: string; title: string; task: { verification: { type: string } } }[] }
 }
 
 async function noOverflow(page: Page) {
@@ -290,5 +290,44 @@ test('unconfirmed cancellation survives reload before any completed extra take c
   await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
   const takes = await (await page.request.get('/api/v1/exercise-attempts?plan_item_id=' + item.id)).json()
   expect(takes.items.some((take: { recording_id: string }) => take.recording_id === uploaded!.recording.id)).toBe(false)
+  expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
+})
+
+test('a chosen change transfers from a drill to narration and remains on Today after a listening check', async ({ page }) => {
+  test.setTimeout(75_000)
+  await page.setViewportSize({ width: 390, height: 844 })
+  const lesson = await seed(page)
+  const drill = lesson.items.find((item) => item.exercise_id !== 'E12' && item.task.verification.type === 'recording')!
+  const story = lesson.items.find((item) => item.exercise_id === 'E12')!
+  await page.goto('/exercise/' + drill.id)
+  const record = async () => {
+    await page.getByRole('button', { name: 'Start recording', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Stop recording', exact: true })).toBeVisible()
+    await page.waitForTimeout(4000)
+    await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
+    await page.getByRole('button', { name: 'Check my take' }).click()
+    await expect(page.getByRole('heading', { name: 'Practice complete', exact: true })).toBeVisible()
+  }
+  await record()
+  const focus = 'Leave room for the thought to land.'
+  await page.getByRole('textbox', { name: 'What did you hear, and what will you try next?' }).fill(focus)
+  await page.getByRole('combobox', { name: 'Focus for story practice' }).selectOption('pauses')
+  await page.getByRole('button', { name: 'Save for story practice' }).click()
+  await page.getByRole('link', { name: 'Open the story' }).click()
+  await expect(page).toHaveURL(new RegExp('/exercise/' + story.id + '$'))
+  await expect(page.getByRole('heading', { name: 'One focus for this story' })).toBeVisible()
+  await noOverflow(page)
+  await record()
+  await expect(page.getByRole('heading', { name: 'Focus used for this take' })).toBeVisible()
+  const before = await (await page.request.get('/api/v1/me')).json()
+  await page.getByRole('button', { name: 'Partly', exact: true }).click()
+  await expect(page.getByText('Listening check saved with this take.')).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Partly', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await noOverflow(page)
+  await page.getByRole('link', { name: 'Back', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Keep working on one change' })).toBeVisible()
+  await expect(page.getByText('Last story: you marked “Partly”.')).toBeVisible()
+  await noOverflow(page)
   expect((await (await page.request.get('/api/v1/me')).json()).progress).toEqual(before.progress)
 })

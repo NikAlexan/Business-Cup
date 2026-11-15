@@ -60,6 +60,21 @@ class CancelUploadInput(Input):
     plan_item_id: UUID
 
 
+class PracticeFocusInput(Input):
+    source_attempt_id: UUID
+    note: str = Field(min_length=1, max_length=500)
+    skill: (
+        Literal[
+            "word_endings", "consonants", "pace", "pauses", "intonation", "emphasis", "breath", "delivery"
+        ]
+        | None
+    ) = None
+
+
+class FocusCheckInput(Input):
+    outcome: Literal["heard", "partly", "not_yet", "unsure"]
+
+
 class AttemptInput(Input):
     plan_item_id: UUID
     practice_only: bool = False

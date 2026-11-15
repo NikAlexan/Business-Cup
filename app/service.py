@@ -13,6 +13,7 @@ from app.access import NoBillingAccessPolicy
 from app.content import protocol
 from app.db import DailyBudget, Guest, Idempotency, Job, Resource, iso, new_id, utcnow
 from app.errors import ApiError, fail
+from app.focus import RUBRIC_VERSION, RUBRICS, STORY_STEPS, suggested_skill
 
 COOKIE = "guest_session"
 ACTIVE = {"draft", "queued", "processing", "needs_rerecord"}
@@ -549,6 +550,7 @@ class Service:
                 "practice_only": bool(record.get("practice_only")),
                 "based_on_attempt_id": (record.get("practice_focus") or {}).get("attempt_id"),
                 "practice_focus": record.get("practice_focus"),
+                "training_focus": record.get("training_focus"),
                 "status": record["status"],
             }
             if job_id
@@ -591,6 +593,7 @@ class Service:
             "item": item,
             "item_index": next(n for n, value in enumerate(lesson["items"]) if value["id"] == item["id"]),
             "pending_take": pending,
+            "training_focus": self.active_practice_focus() if item["exercise_id"] == "E12" else None,
         }
 
     def dismiss_recording(self, recording_id):
@@ -613,6 +616,81 @@ class Service:
         if source["plan_item_id"] != item_id:
             fail(404, "not_found", "The source take does not belong to this exercise.")
         return {"attempt_id": source["id"], "note": source.get("reflection", {}).get("note", "")}
+
+    def active_practice_focus(self):
+        self.auth()
+        focus_id = self.guest.data.get("practice_focus_id")
+        return self.get(focus_id, "practice_focus") if focus_id else None
+
+    def practice_focus_view(self):
+        focus = self.active_practice_focus()
+        checks = (
+            [
+                a
+                for a in self.all("attempt")
+                if (a.get("training_focus") or {}).get("id") == focus["id"] and a.get("focus_check")
+            ]
+            if focus
+            else []
+        )
+        latest = max(checks, key=lambda a: a["focus_check"]["updated_at"]) if checks else None
+        return {
+            "focus": focus,
+            "skills": RUBRICS,
+            "last_check": {"attempt_id": latest["id"], **latest["focus_check"]} if latest else None,
+        }
+
+    def save_practice_focus(self, payload):
+        self.auth("daily_training")
+        source = self.get(payload["source_attempt_id"], "attempt")
+        if source["status"] != "passed" or not source.get("recording_id"):
+            fail(
+                422, "focus_source_not_available", "Choose a saved, accepted recording for your story focus."
+            )
+        note = payload["note"].strip()
+        if not note:
+            fail(422, "validation_error", "Describe one change to try in the story.")
+        if (
+            sum(self.local_date(f["created_at"]) == self.local_date() for f in self.all("practice_focus"))
+            >= self.settings.max_uploads_per_day
+        ):
+            fail(
+                429, "rate_limit_exceeded", "Daily focus-change limit reached.", {"retry_after_seconds": 3600}
+            )
+        skill = payload.get("skill") or suggested_skill(source["exercise_id"])
+        focus = {
+            "id": new_id(),
+            "created_at": iso(),
+            "note": note,
+            "skill": skill,
+            "skill_label": RUBRICS[skill]["label"],
+            "listening_question": RUBRICS[skill]["question"],
+            "steps": list(STORY_STEPS),
+            "rubric_version": RUBRIC_VERSION,
+            "source_attempt_id": source["id"],
+            "source_plan_item_id": source["plan_item_id"],
+            "source_recording_id": source["recording_id"],
+        }
+        self.put("practice_focus", focus)
+        self.guest.data = {**self.guest.data, "practice_focus_id": focus["id"]}
+        if source.get("reflection", {}).get("note") != note:
+            source["reflection"] = {"note": note, "updated_at": iso()}
+            self.put("attempt", source)
+        return 201, {"focus": focus, "source_attempt": source}
+
+    def clear_practice_focus(self, focus_id):
+        self.get(focus_id, "practice_focus")
+        if self.guest.data.get("practice_focus_id") == str(focus_id):
+            self.guest.data = {**self.guest.data, "practice_focus_id": None}
+
+    def save_focus_check(self, attempt_id, outcome):
+        attempt = self.get(attempt_id, "attempt")
+        if attempt["status"] != "passed" or not attempt.get("training_focus"):
+            fail(422, "focus_check_not_available", "This take does not have a saved story focus.")
+        if attempt.get("focus_check", {}).get("outcome") != outcome:
+            attempt["focus_check"] = {"outcome": outcome, "source": "user_listening", "updated_at": iso()}
+            self.put("attempt", attempt)
+        return attempt
 
     def cancel_upload(self, upload_key, item_id):
         self.auth("daily_training")
@@ -684,6 +762,11 @@ class Service:
             item["id"] if item else None,
             fields.get("practice_only", False),
         )
+        training_focus = None
+        if fields.get("training_focus_id"):
+            if not item or item["exercise_id"] != "E12":
+                fail(422, "validation_error", "A saved story focus applies only to a narration task.")
+            training_focus = self.get(fields["training_focus_id"], "practice_focus")
         used = sum(self.local_date(r["created_at"]) == self.local_date() for r in self.all("recording"))
         if used >= self.settings.max_uploads_per_day:
             fail(429, "rate_limit_exceeded", "Daily recording limit reached.", {"retry_after_seconds": 3600})
@@ -702,6 +785,7 @@ class Service:
                 "id": rid,
                 **fields,
                 "practice_focus": practice_focus,
+                "training_focus": training_focus,
                 "status": "queued",
                 "mime_type": mime_type,
                 "bytes": path.stat().st_size,
@@ -823,6 +907,7 @@ class Service:
             "plan_item_id": item["id"],
             "practice_only": practice_only,
             "practice_focus": practice_focus,
+            "training_focus": rec.get("training_focus") if kind == "recording" else None,
             "reward": {"notes": 0, "parts": []},
             "practice_seconds": 0,
             "practice_seconds_source": {
